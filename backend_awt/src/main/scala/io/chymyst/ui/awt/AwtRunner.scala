@@ -1,6 +1,5 @@
 package io.chymyst.ui.awt
 
-import io.chymyst.ui.elm.Elm._
 import io.chymyst.ui.elm.{LabelAlignment, View}
 
 import java.awt._
@@ -8,9 +7,7 @@ import java.awt.event.{ActionEvent, WindowAdapter, WindowEvent}
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, Promise}
-import scala.util.{Failure, Success}
-
-
+import scala.util.Success
 
 object AwtRunner {
   lazy val (frame, panel) = getFrameAndPanel()
@@ -90,64 +87,4 @@ object AwtRunner {
     //    }
     p.future
   }
-}
-
-object ExampleElmProgram {
-  final case class Model(clicks: Int = 0, showButtons: Boolean = true)
-
-  type M = Model // Count clicks and indicate whether control buttons are shown.
-
-  sealed trait ExampleEvents
-
-  case object Increment extends ExampleEvents
-
-  case object Reset extends ExampleEvents
-
-  case object ToggleButtons extends ExampleEvents
-
-  type E = ExampleEvents // Three buttons. "Increment", "Reset", "Show/hide other buttons".
-  val display: M => View[E] = { m =>
-    val buttons = View.TileH(
-      View.Button("Increment", Increment), View.Button("Reset", Reset)
-    )
-    val clicksDisplay = View.TileH(
-      View.Label(s"${m.clicks} clicks"), View.Button(if (m.showButtons) "Hide buttons" else "Show buttons", ToggleButtons)
-    )
-    if (m.showButtons) View.TileV(
-      clicksDisplay,
-      buttons,
-    ) else clicksDisplay
-  }
-  val update: M => E => M = m => {
-    case Increment => m.copy(clicks = m.clicks + 1)
-    case Reset => m.copy(clicks = 0)
-    case ToggleButtons => m.copy(showButtons = !m.showButtons)
-  }
-  val program: SimpleProgram[M, View, E] = (Model(), display, update)
-}
-
-object RunElmWithAwt extends App {
-  val hgap = 20
-  val vgap = 20
-
-  def test1 = {
-    val f = new Frame()
-    f.setTitle("AWT Runner example")
-    f.setSize(400, 400)
-    f.setLayout(new GridLayout(1, 1, 0, 0))
-    val p = new Panel(new GridLayout(1, 1, hgap, vgap))
-
-    f.add(p)
-    val b = new Button("click me")
-    p.add(b)
-    //    //  b.setBounds(30, 50, 80, 30)
-    //    f.add(b)
-    f.setVisible(true)
-  }
-
-  def test2 = {
-    run[ExampleElmProgram.M, View, ExampleElmProgram.E](ExampleElmProgram.program, v => AwtRunner.render(v))
-  }
-
-  test2
 }
