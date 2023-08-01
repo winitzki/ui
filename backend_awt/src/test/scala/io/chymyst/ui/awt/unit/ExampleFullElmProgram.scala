@@ -15,11 +15,8 @@ object ExampleFullElmProgram {
           override def run(): Unit = consume(TimerTick(duration))
         }
         timer.scheduleAtFixedRate(timerTask, 0L, duration.toMillis)
+        _ => timer.cancel()
 
-        { _ =>
-          println(s"DEBUG: canceling timer with interval $duration")
-          timer.cancel()
-        }
   }
 
   // Command consists of a random answer (success or fail) after a delay of 0.5 seconds.
