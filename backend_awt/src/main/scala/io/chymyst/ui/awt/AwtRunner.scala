@@ -21,7 +21,7 @@ object AwtRunner {
   def getFrameAndPanel() = {
     val f = new Frame()
     f.setTitle("AWT Runner example")
-    f.setSize(400, 400)
+    f.setBounds(400, 400, 640, 480)
     f.setLayout(new GridLayout(1, 1, 0, 0))
     val p = new Panel(new GridLayout(1, 1, 5, 5))
     p.setName("main panel")
@@ -48,7 +48,7 @@ object AwtRunner {
   }
 
   def renderView[E](view: View[E]): Future[E] = {
-    def render(subview: View[E], inPanel: => Panel = panel, clearPanel: Boolean = true): Future[E]  = {
+    def render(subview: View[E], inPanel: => Panel = panel, clearPanel: Boolean = true): Future[E] = {
       //    println(s"DEBUG: adding view $view in panel $inPanel; panel is valid: ${inPanel.isValid}, on dispatch thread: ${EventQueue.isDispatchThread}")
       val p = Promise[E]
       //    EventQueue.invokeLater { () =>
@@ -88,6 +88,7 @@ object AwtRunner {
       //    }
       p.future
     }
+
     render(view)
   }
 }

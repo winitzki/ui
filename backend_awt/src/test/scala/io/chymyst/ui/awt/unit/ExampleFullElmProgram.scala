@@ -15,7 +15,11 @@ object ExampleFullElmProgram {
           override def run(): Unit = consume(TimerTick(duration))
         }
         timer.scheduleAtFixedRate(timerTask, 0L, duration.toMillis)
-        _ => timer.cancel()
+
+        { _ =>
+          println(s"DEBUG: canceling timer with interval $duration")
+          timer.cancel()
+        }
   }
 
   // Command consists of a random answer (success or fail) after a delay of 0.5 seconds.
@@ -37,8 +41,8 @@ object ExampleFullElmProgram {
                           showButtons: Boolean = true,
                           lastCommandStatus: Option[Boolean] = None,
                           lastTimerTickHadInterval: Option[FiniteDuration] = None,
-                          isListening1: Boolean = true,
-                          isListening2: Boolean = true,
+                          isListening1: Boolean = false,
+                          isListening2: Boolean = false,
                         )
 
   type M = Model // Count clicks and indicate whether control buttons are shown.
@@ -96,7 +100,7 @@ object ExampleFullElmProgram {
 
   val updateModel: PartialFunction[E, M => M] = {
     case Increment => m => m.copy(clicks = m.clicks + 1)
-    case Reset => _.copy(clicks = 0)
+    case Reset => _.copy(clicks = 0, lastTimerTickHadInterval = None, lastCommandStatus = None)
     case ToggleButtons => m => m.copy(showButtons = !m.showButtons)
     case StartTimer1 => _.copy(isListening1 = true)
     case StartTimer2 => _.copy(isListening2 = true)

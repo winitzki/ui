@@ -82,14 +82,20 @@ object Elm {
       val addedSubs = subs.diff(oldSubs)
       val deletedSubs = oldSubs.diff(subs)
       addedSubs foreach { sub =>
+        println(s"DEBUG: adding subscription $sub")
         val cancel = listen(sub)(e => eventExecutor.execute(RunnableForSubscriptions(sub, e)))
         currentSubs.put(sub, cancel)
       }
       deletedSubs foreach { sub =>
-        val cancel = currentSubs.get(sub)
+        println(s"DEBUG: removing subscription $sub")
+        val cancel = currentSubs.remove(sub)
         cancel(())
         // Remove all tasks that have already been scheduled for this subscription.
-        eventExecutor.getQueue.removeIf((t: Runnable) => t.isInstanceOf[RunnableForSubscriptions] && t.asInstanceOf[RunnableForSubscriptions].sub == sub)
+        eventExecutor.getQueue.removeIf { (t: Runnable) =>
+          val remove = t.isInstanceOf[RunnableForSubscriptions] && t.asInstanceOf[RunnableForSubscriptions].sub == sub
+          if (remove) println(s"DEBUG: Will remove subscription $sub from queue")
+          remove
+        }
       }
     }
 
