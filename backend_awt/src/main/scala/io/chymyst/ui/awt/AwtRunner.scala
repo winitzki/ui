@@ -47,44 +47,47 @@ object AwtRunner {
     p.future
   }
 
-  def render[V[_], E](view: V[E], inPanel: => Panel = panel, clear: Boolean = true): Future[E] = {
-    //    println(s"DEBUG: adding view $view in panel $inPanel; panel is valid: ${inPanel.isValid}, on dispatch thread: ${EventQueue.isDispatchThread}")
-    val p = Promise[E]
-    //    EventQueue.invokeLater { () =>
-    if (clear) inPanel.removeAll() //else println(s"DEBUG: Not clearing panel for view $view")
-    view match {
-      case View.Label(text, alignment) =>
-        inPanel.add(new Label(text, labelAlignment(alignment)))
+  def renderView[E](view: View[E]): Future[E] = {
+    def render(subview: View[E], inPanel: => Panel = panel, clearPanel: Boolean = true): Future[E]  = {
+      //    println(s"DEBUG: adding view $view in panel $inPanel; panel is valid: ${inPanel.isValid}, on dispatch thread: ${EventQueue.isDispatchThread}")
+      val p = Promise[E]
+      //    EventQueue.invokeLater { () =>
+      if (clearPanel) inPanel.removeAll() //else println(s"DEBUG: Not clearing panel for view $view")
+      subview match {
+        case View.Label(text, alignment) =>
+          inPanel.add(new Label(text, labelAlignment(alignment)))
 
-      case View.Button(text, event: E) =>
-        val button = new Button(text)
-        button.addActionListener { (e: ActionEvent) =>
-          p.trySuccess(event)
-        }
-        inPanel.add(button)
+        case View.Button(text, event: E) =>
+          val button = new Button(text)
+          button.addActionListener { (e: ActionEvent) =>
+            p.trySuccess(event)
+          }
+          inPanel.add(button)
 
-      case View.TileH(left, right) =>
-        val n = new Panel(new GridLayout(1, 2, 5, 5))
-        n.setName(s"Panel for $view")
-        //        n.setVisible(true) // Not necessary.
-        inPanel.add(n)
-        first(
-          render(left, n, false),
-          render(right, n, false),
-        ).onComplete { case Success(e: E) => p.success(e) }
+        case View.TileH(left, right) =>
+          val n = new Panel(new GridLayout(1, 2, 5, 5))
+          n.setName(s"Panel for $subview")
+          //        n.setVisible(true) // Not necessary.
+          inPanel.add(n)
+          first(
+            render(left, n, false),
+            render(right, n, false),
+          ).onComplete { case Success(e: E) => p.success(e) }
 
-      case View.TileV(top, bottom) =>
-        val n = new Panel(new GridLayout(2, 1, 5, 5))
-        n.setName(s"Panel for $view")
-        //        n.setVisible(true) // Not necessary.
-        inPanel.add(n)
-        first(
-          render(top, n, false),
-          render(bottom, n, false),
-        ).onComplete { case Success(e: E) => p.success(e) }
+        case View.TileV(top, bottom) =>
+          val n = new Panel(new GridLayout(2, 1, 5, 5))
+          n.setName(s"Panel for $subview")
+          //        n.setVisible(true) // Not necessary.
+          inPanel.add(n)
+          first(
+            render(top, n, false),
+            render(bottom, n, false),
+          ).onComplete { case Success(e: E) => p.success(e) }
+      }
+      frame.setVisible(true) // Need to do this after any changes in layout or adding components. Otherwise nothing is shown and frame.isValid == false.
+      //    }
+      p.future
     }
-    frame.setVisible(true) // Need to do this after any changes in layout or adding components. Otherwise nothing is shown and frame.isValid == false.
-    //    }
-    p.future
+    render(view)
   }
 }
