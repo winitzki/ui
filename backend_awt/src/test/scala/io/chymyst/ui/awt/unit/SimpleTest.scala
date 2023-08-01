@@ -12,6 +12,7 @@ object SimpleTest extends TestSuite {
   val tests: Tests = this {
     test - {
       run[ExampleSimpleElmProgram.M, View, ExampleSimpleElmProgram.E](ExampleSimpleElmProgram.program, AwtRunner.renderView)
+      Thread.sleep(10000L)
     }
   }
 

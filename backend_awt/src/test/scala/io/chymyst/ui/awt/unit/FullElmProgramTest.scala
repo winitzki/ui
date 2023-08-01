@@ -1,11 +1,11 @@
 package io.chymyst.ui.awt.unit
 
 import io.chymyst.ui.awt.AwtRunner
-import io.chymyst.ui.elm.Elm.{RunLoop, run}
+import io.chymyst.ui.elm.Elm.RunLoop
 import io.chymyst.ui.elm.View
 import utest.{TestSuite, test}
 
-class FullElmProgramTest extends TestSuite {
+object FullElmProgramTest extends TestSuite {
 
   val tests = this {
     test - {
@@ -16,6 +16,8 @@ class FullElmProgramTest extends TestSuite {
         ExampleFullElmProgram.listen,
       )
       runLoop.start()
+      Thread.sleep(60000L)
+      runLoop.stop()
     }
   }
 }

@@ -3,7 +3,7 @@ package io.chymyst.ui.awt.unit
 import io.chymyst.ui.elm.Elm.{Consume, ConsumeOrCancel, Program}
 import io.chymyst.ui.elm.View
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 object ExampleFullElmProgram {
   val listen: S[E] => ConsumeOrCancel[E] = {
@@ -18,14 +18,14 @@ object ExampleFullElmProgram {
         _ => timer.cancel()
   }
 
-  // Command consists of a random answer (success or fail) after a delay of 2 seconds.
+  // Command consists of a random answer (success or fail) after a delay of 0.5 seconds.
   val runCommand: C[E] => Consume[E] = {
     case () =>
       import scala.concurrent.ExecutionContext.Implicits.global
       import scala.concurrent.Future
       val result: Consume[E] = { consume =>
         Future {
-          Thread.sleep(2000L)
+          Thread.sleep(500L)
           consume(if (scala.util.Random.nextBoolean()) CommandSucceeded else CommandFailed)
         }
       }
@@ -37,54 +37,81 @@ object ExampleFullElmProgram {
                           showButtons: Boolean = true,
                           lastCommandStatus: Option[Boolean] = None,
                           lastTimerTickHadInterval: Option[FiniteDuration] = None,
+                          isListening1: Boolean = true,
+                          isListening2: Boolean = true,
                         )
 
   type M = Model // Count clicks and indicate whether control buttons are shown.
 
-  sealed trait ExampleEvents
+  sealed trait Events
 
-  case object Increment extends ExampleEvents
+  case object Increment extends Events
 
-  case object Reset extends ExampleEvents
+  case object Reset extends Events
 
-  case object ToggleButtons extends ExampleEvents
+  case object ToggleButtons extends Events
 
-  final case class TimerTick(interval: FiniteDuration) extends ExampleEvents
+  final case class TimerTick(interval: FiniteDuration) extends Events
 
-  final case class StartTimer(interval: FiniteDuration) extends ExampleEvents
+  case object StartTimer1 extends Events
 
-  case object StopAllTimers extends ExampleEvents
+  case object StartTimer2 extends Events
 
-  case object SendCommand extends ExampleEvents
+  case object StopAllTimers extends Events
 
-  case object CommandSucceeded extends ExampleEvents
+  case object SendCommand extends Events
 
-  case object CommandFailed extends ExampleEvents
+  case object CommandSucceeded extends Events
 
-  type E = ExampleEvents // Three buttons. "Increment", "Reset", "Show/hide other buttons".
+  case object CommandFailed extends Events
+
+  type E = Events
 
   val displayView: M => View[E] = { m =>
-    val buttons = View.TileH(
-      View.Button("Increment", Increment), View.Button("Reset", Reset)
+    val buttons = View.TileH(View.TileH(
+      View.Button("Increment", Increment), View.Button("Reset", Reset),
+    ), View.TileH(
+      View.Button("Start timer1", StartTimer1), View.Button("Start timer2", StartTimer2),
     )
-    val clicksDisplay = View.TileH(
-      View.Label(s"${m.clicks} clicks"), View.Button(if (m.showButtons) "Hide buttons" else "Show buttons", ToggleButtons)
     )
-    if (m.showButtons) View.TileV(
-      clicksDisplay,
-      buttons,
-    ) else clicksDisplay
+    val clicksDisplay = View.TileH(View.TileH(
+      View.Label(s"${m.clicks} clicks"), View.Label(m.lastCommandStatus match {
+        case Some(value) => s"Last command $value"
+        case None => "No last command"
+      })), View.TileH(View.Label(m.lastTimerTickHadInterval match {
+      case Some(value) => s"Last ticker had interval $value"
+      case None => "No last ticker event"
+    }), View.Button(if (m.showButtons) "Hide buttons" else "Show buttons", ToggleButtons)
+    ))
+    val buttons2 = View.TileH(View.Button("Send command", SendCommand), View.Button("Stop all timers", StopAllTimers))
+    View.TileV(
+      if (m.showButtons) View.TileV(
+        clicksDisplay,
+        buttons,
+      ) else clicksDisplay,
+
+      buttons2,
+    )
   }
 
-  val updateModel: M => E => M = m => {
-    case Increment => m.copy(clicks = m.clicks + 1)
-    case Reset => m.copy(clicks = 0)
-    case ToggleButtons => m.copy(showButtons = !m.showButtons)
+  val updateModel: PartialFunction[E, M => M] = {
+    case Increment => m => m.copy(clicks = m.clicks + 1)
+    case Reset => _.copy(clicks = 0)
+    case ToggleButtons => m => m.copy(showButtons = !m.showButtons)
+    case StartTimer1 => _.copy(isListening1 = true)
+    case StartTimer2 => _.copy(isListening2 = true)
+    case StopAllTimers => _.copy(isListening1 = false, isListening2 = false)
+    case TimerTick(duration) => _.copy(lastTimerTickHadInterval = Some(duration))
+    case CommandFailed => _.copy(lastCommandStatus = Some(false))
+    case CommandSucceeded => _.copy(lastCommandStatus = Some(true))
   }
 
-  sealed trait Subscriptions[E]
+  sealed trait Subscriptions[+E]
 
   final case class TimerSub[E](interval: FiniteDuration) extends Subscriptions[E]
+
+  val interval1: FiniteDuration = 1200.millis
+  val interval2: FiniteDuration = 2.seconds
 
   type S[E] = Subscriptions[E]
   type C[E] = Unit
@@ -94,12 +121,12 @@ object ExampleFullElmProgram {
 
     override def display: M => View[E] = displayView
 
-    override def update: PartialFunction[E, M => M] = e => m => updateModel(m)(e)
+    override def update: PartialFunction[E, M => M] = updateModel
 
     override def commands: PartialFunction[E, M => Seq[C[E]]] = {
       case SendCommand => _ => Seq(())
     }
 
-    override def subscriptions: M => Set[S[E]] = super.subscriptions
+    override def subscriptions: M => Set[S[E]] = m => (if (m.isListening1) Set(TimerSub(interval1)) else Set[S[E]]()) ++ (if (m.isListening2) Set(TimerSub(interval2)) else Set())
   }
 }
