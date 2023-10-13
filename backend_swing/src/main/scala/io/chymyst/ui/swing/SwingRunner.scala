@@ -1,16 +1,11 @@
-package io.chymyst.ui.awt
+package io.chymyst.ui.swing
 
 import io.chymyst.ui.elm.Elm.{Consume, UiBackend}
 import io.chymyst.ui.elm.{LabelAlignment, View}
 
-import java.awt._
-import java.awt.event.{ActionEvent, WindowAdapter, WindowEvent}
-import java.util.concurrent.{LinkedBlockingQueue, ThreadPoolExecutor, TimeUnit}
-import javax.swing.{Box, BoxLayout}
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Future, Promise}
-
-object AwtRunner {
+import javax.swing._
+/*
+object SwingRunner {
   private lazy val (frame, panel) = getFrameAndPanel()
 
   private def toAwtLabelAlignment: LabelAlignment => Int = {
@@ -21,7 +16,7 @@ object AwtRunner {
 
   private def getFrameAndPanel() = {
     val f = new Frame()
-    f.setTitle("AWT Runner example")
+    f.setTitle("Swing Runner example")
     f.setBounds(400, 400, 640, 480)
     f.setLayout(new BoxLayout(f, BoxLayout.X_AXIS)) // TODO better layout, or just use Swing instead of AWT.
     val p = new Panel()
@@ -47,10 +42,16 @@ object AwtRunner {
     p.future
   }
 
-  final case class LabeledRunnable[L](label: L, code: () => Unit) extends Runnable {
+  final class LabeledRunnable[L](label: L, code: () => Unit) extends Runnable {
     def hasLabel(l: L): Boolean = label == l
 
     override def run(): Unit = code()
+  }
+
+  object LabeledRunnable {
+    def apply[L](label: L, code: => Unit): LabeledRunnable[L] = new LabeledRunnable(label, () => code)
+
+    def apply(code: => Unit): LabeledRunnable[Unit] = new LabeledRunnable[Unit]((), () => code)
   }
 
   def backend[E]: UiBackend[View, E] = new UiBackend[View, E] {
@@ -62,7 +63,7 @@ object AwtRunner {
       if (EventQueue.isDispatchThread)
         callback(e)
       else
-        singleThreadExecutor.execute(LabeledRunnable(label, () => EventQueue.invokeLater(() => callback(e))))
+        singleThreadExecutor.execute(LabeledRunnable(label, EventQueue.invokeLater(() => callback(e))))
     }
 
     override def removePendingEvents[L](label: L): Unit = {
@@ -112,3 +113,4 @@ object AwtRunner {
     render(view)
   }
 }
+*/

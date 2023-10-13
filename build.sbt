@@ -56,3 +56,12 @@ lazy val backend_awt = (project in file("backend_awt")).settings(
     utest,
   ),
 ).dependsOn(core_elm, macros, example_elm % "test->compile")
+
+lazy val backend_swing = (project in file("backend_swing")).settings(
+  scalaVersion := scalaV,
+  crossScalaVersions := Seq(scala2V, scala3V),
+  testFrameworks += utestFramework,
+  libraryDependencies ++= Seq(
+    utest,
+  ),
+).dependsOn(core_elm, macros, example_elm % "test->compile")
