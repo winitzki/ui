@@ -1,6 +1,6 @@
 package io.chymyst.ui.awt
 
-import io.chymyst.ui.elm.Elm.{Backend, Consume}
+import io.chymyst.ui.elm.Elm.{Consume, UiBackend}
 import io.chymyst.ui.elm.{LabelAlignment, View}
 
 import java.awt._
@@ -59,19 +59,19 @@ object AwtRunner {
     def apply(code: => Unit): LabeledRunnable[Unit] = new LabeledRunnable[Unit]((), () => code)
   }
 
-  def backend[E]: Backend[View, E] = new Backend[View, E] {
+  def backend[E]: UiBackend[View, E] = new UiBackend[View, E] {
     private val singleThreadExecutor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue[Runnable]())
 
-    override def render: View[E] => Consume[E] = renderView[E]
+    override def renderView: View[E] => Consume[E] = AwtRunner.renderView[E]
 
-    override def onGuiThread[L](label: L, callback: E => Unit): E => Unit = { e =>
+    override def runOnEventThread[L](label: L, callback: E => Unit): E => Unit = { e =>
       if (EventQueue.isDispatchThread)
         callback(e)
       else
         singleThreadExecutor.execute(LabeledRunnable(label, EventQueue.invokeLater(() => callback(e))))
     }
 
-    override def removePending[L](label: L): Unit = {
+    override def removePendingEvents[L](label: L): Unit = {
       singleThreadExecutor.getQueue.removeIf(t => t.isInstanceOf[LabeledRunnable[L]] && t.asInstanceOf[LabeledRunnable[L]].is(label))
     }
   }

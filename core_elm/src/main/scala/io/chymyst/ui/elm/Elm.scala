@@ -41,21 +41,22 @@ object Elm {
   type ConsumeOrCancel[E] = (E => Unit) => Cancel // Call the function of type E => Unit to consume an event. Call the function of type Cancel to cancel the subscription. No further events should be consumed after the Cancel function returns.
   type Consume[E] = (E => Unit) => Unit // Call the function of type E => Unit to consume an event.
 
-  trait Backend[V[_], E] {
+  trait UiBackend[V[_], E] {
     // Render the view graphically and return the first user-generated event asynchronously by calling the callback on the GUI thread.
-    def render: V[E] => Consume[E]
+    def renderView: V[E] => Consume[E]
 
     // Call the callback on the GUI thread, even when this function was called on another thread.
-    def onGuiThread[L](label: L, callback: E => Unit): E => Unit = callback
+    def runOnEventThread[L](label: L, callback: E => Unit): E => Unit = callback
 
-    def removePending[L](label: L): Unit = ()
+    // Remove pending subscribed-to events created before a subscription is canceled. The events are identified by a value `label` in some way.
+    def removePendingEvents[L](label: L): Unit = ()
   }
 
   trait EffectRunner[E, C[_], S[_]] {
     // Run the command and consume its resulting event(s). The backend will make sure that events go to the GUI thread. The command cannot be canceled once started.
     def runCommand: C[E] => Consume[E]
 
-    // Consume these events unless canceled. The backend will make sure that events go to the GUI thread. Events created before canceling but not yet delivered will not be delivered.
+    // Consume subscribed-to events unless canceled. The backend will make sure that events go to the GUI thread. Events created before canceling but not yet delivered will not be delivered.
     def listen: S[E] => ConsumeOrCancel[E]
   }
 
@@ -63,8 +64,8 @@ object Elm {
   final class RunLoop[M, V[_], E, C[_], S[_]](
                                                program: Program[M, V, E, C, S],
                                              )(
-                                               backend: Backend[V, E],
-                                               effectRunner: EffectRunner[E, C, S],
+                                               ui: UiBackend[V, E],
+                                               effects: EffectRunner[E, C, S],
                                              ) {
     @volatile private var currentModel: M = program.init
 
@@ -75,18 +76,18 @@ object Elm {
       val oldM = currentModel
       val view = program.display(oldM)
       val subs = program.subscriptions(oldM)
-      backend.render(view)(backend.onGuiThread((), runSingleStep))
+      ui.renderView(view)(ui.runOnEventThread((), runSingleStep))
       // Find out which subscriptions are new and which have disappeared.
       val oldSubs = Set.from(currentSubs.keySet.asScala)
       val addedSubs = subs.diff(oldSubs)
       val deletedSubs = oldSubs.diff(subs)
       addedSubs foreach { sub =>
-        val cancel = effectRunner.listen(sub)(backend.onGuiThread(sub, runSingleStep))
+        val cancel = effects.listen(sub)(ui.runOnEventThread(sub, runSingleStep))
         currentSubs.put(sub, cancel)
       }
       deletedSubs foreach { sub =>
         val cancel = currentSubs.remove(sub)
-        backend.removePending(sub)
+        ui.removePendingEvents(sub)
         cancel(())
       }
     }
@@ -102,7 +103,7 @@ object Elm {
         if (program.commands.isDefinedAt(event)) {
           val commands = program.commands(event)(oldM)
           commands foreach { command =>
-            effectRunner.runCommand(command)(backend.onGuiThread((), runSingleStep))
+            effects.runCommand(command)(ui.runOnEventThread((), runSingleStep))
           }
         }
         if (eventIsEnabled && modelUpdateNeeded) outputStep()
