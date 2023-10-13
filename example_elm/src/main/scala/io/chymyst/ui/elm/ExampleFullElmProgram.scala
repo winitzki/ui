@@ -18,7 +18,7 @@ object ExampleFullElmProgram {
 
   }
 
-  // Command consists of a random answer (success or fail) after a delay of 0.5 seconds.
+  // A command consists of a random answer (success or fail) after a delay of 0.5 seconds.
   val runCommand: C[E] => Consume[E] = {
     case () =>
       import scala.concurrent.ExecutionContext.Implicits.global

@@ -1,9 +1,7 @@
 package io.chymyst.ui.elm
 
-import java.util.concurrent.{LinkedBlockingQueue, ThreadPoolExecutor, TimeUnit, ConcurrentMap, ConcurrentHashMap}
-import scala.concurrent.{ExecutionContext, Future}
+import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap}
 import scala.jdk.CollectionConverters.SetHasAsScala
-import scala.util.{Failure, Success}
 
 object Elm {
 
@@ -30,16 +28,12 @@ object Elm {
   type SimpleProgram[M, V[_], E] = (M, M => V[E], M => E => M)
 
   // We never stop the runloop. This code is independent of any backends and can be run on any thread.
-  def run[M, V[_], E](program: SimpleProgram[M, V, E], render: V[E] => Future[E])(implicit ec: ExecutionContext): Unit = {
+  def runSimpleProgram[M, V[_], E](program: SimpleProgram[M, V, E], render: V[E] => Consume[E]): Unit = {
     val (m, display, update) = program
     val view = display(m)
-    val event: Future[E] = render(view)
-    event.onComplete {
-      case Success(e) =>
-        val newM = update(m)(e)
-        run((newM, display, update), render)
-      case Failure(error) =>
-        println(s"DEBUG: this should not happen, $event failed: $error")
+    render(view) { e: E => // We assume that this callback will be always called on the GUI thread.
+      val newM = update(m)(e)
+      runSimpleProgram((newM, display, update), render)
     }
   }
 
@@ -47,77 +41,69 @@ object Elm {
   type ConsumeOrCancel[E] = (E => Unit) => Cancel // Call the function of type E => Unit to consume an event. Call the function of type Cancel to cancel the subscription. No further events should be consumed after the Cancel function returns.
   type Consume[E] = (E => Unit) => Unit // Call the function of type E => Unit to consume an event.
 
-  // This creates a runloop that can be started and stopped.
+  trait Backend[V[_], E] {
+    // Render the view graphically and return the first user-generated event asynchronously by calling the callback on the GUI thread.
+    def render: V[E] => Consume[E]
+
+    // Call the callback on the GUI thread.
+    def onGuiThread[L](label: L, callback: E => Unit): E => Unit = callback
+
+    def removePending[L](label: L): Unit = ()
+  }
+
+  // This creates a runloop that runs a full Elm program.
   final class RunLoop[M, V[_], E, C[_], S[_]](
                                                program: Program[M, V, E, C, S],
-                                               render: V[E] => Future[E], // Render the view graphically and return the first user-generated event asynchronously.
-                                               runCommand: C[E] => Consume[E], // Run the command and consume its resulting events.
-                                               listen: S[E] => ConsumeOrCancel[E], // Allow these events to enter the runloop.
+                                               backend: Backend[V, E],
+                                               runCommand: C[E] => Consume[E], // Run the command and consume its resulting events. The backend will make sure that events go to the GUI thread.
+                                               listen: S[E] => ConsumeOrCancel[E], // Consume these events unless canceled. The backend will make sure that events go to the GUI thread.
                                              ) {
-    // Single-thread executor for event queue.
-    private val eventExecutor: ThreadPoolExecutor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue[Runnable]())
-    private val singleThreadedExecutor: ExecutionContext = ExecutionContext.fromExecutor(eventExecutor)
-
     @volatile private var currentModel: M = program.init
 
-    final case class RunnableForSubscriptions(sub: S[E], e: E) extends Runnable {
-      override def run(): Unit = inputStep(e)
-    }
-
-    private val consume: E => Unit = e => eventExecutor.execute(() => inputStep(e))
-
+    // Store the cancel function for each subscription.
     private val currentSubs: ConcurrentMap[S[E], Cancel] = new ConcurrentHashMap[S[E], Cancel]()
 
     private def outputStep(): Unit = {
       val oldM = currentModel
       val view = program.display(oldM)
       val subs = program.subscriptions(oldM)
-      val eventFromUI: Future[E] = render(view)
-      eventFromUI.onComplete {
-        case Success(e) => consume(e)
-        case Failure(error) => println(s"DEBUG: this should not happen, $eventFromUI failed: $error")
-      }(singleThreadedExecutor)
+      backend.render(view) { e: E => // TODO: make sure this callback is always called on the GUI thread!
+        runSingleStep(e)
+      }
       // Find out which subscriptions are new and which have disappeared.
       val oldSubs = Set.from(currentSubs.keySet.asScala)
       val addedSubs = subs.diff(oldSubs)
       val deletedSubs = oldSubs.diff(subs)
       addedSubs foreach { sub =>
-        val cancel = listen(sub)(e => eventExecutor.execute(RunnableForSubscriptions(sub, e)))
+        val cancel = listen(sub)(backend.onGuiThread(sub, runSingleStep))
         currentSubs.put(sub, cancel)
       }
       deletedSubs foreach { sub =>
         val cancel = currentSubs.remove(sub)
+        backend.removePending(sub)
         cancel(())
-        // Remove all tasks that have already been scheduled for this subscription.
-        eventExecutor.getQueue.removeIf { (t: Runnable) =>
-          t.isInstanceOf[RunnableForSubscriptions] && t.asInstanceOf[RunnableForSubscriptions].sub == sub
-        }
       }
     }
 
-    private def inputStep(event: E): Unit = {
+    private def runSingleStep(event: E): Unit = {
       val oldM = currentModel
-      val enabled = program.enable(event)(oldM)
-      lazy val modelUpdateNeeded = program.update.isDefinedAt(event)
-      if (enabled) {
+      val eventIsEnabled = program.enable(event)(oldM)
+      if (eventIsEnabled) {
+        val modelUpdateNeeded = program.update.isDefinedAt(event)
         if (modelUpdateNeeded) {
           currentModel = program.update(event)(oldM)
         }
         if (program.commands.isDefinedAt(event)) {
           val commands = program.commands(event)(oldM)
           commands foreach { command =>
-            runCommand(command)(consume)
+            runCommand(command)(backend.onGuiThread((), runSingleStep))
           }
         }
-        if (enabled && modelUpdateNeeded) outputStep()
+        if (eventIsEnabled && modelUpdateNeeded) outputStep()
       }
     }
 
     def start(): Unit = outputStep()
-
-    def stop(): Unit = {
-      eventExecutor.shutdownNow()
-    }
   }
 
 }

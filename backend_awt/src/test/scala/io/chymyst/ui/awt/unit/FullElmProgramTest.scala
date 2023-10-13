@@ -11,13 +11,12 @@ object FullElmProgramTest extends TestSuite {
     test - {
       val runLoop = new RunLoop[ExampleFullElmProgram.M, View, ExampleFullElmProgram.E, ExampleFullElmProgram.C, ExampleFullElmProgram.S](
         ExampleFullElmProgram.program,
-        AwtRunner.renderView,
+        AwtRunner.backend[ExampleFullElmProgram.E],
         ExampleFullElmProgram.runCommand,
         ExampleFullElmProgram.listen,
       )
       runLoop.start()
       Thread.sleep(60000L)
-      runLoop.stop()
     }
   }
 }

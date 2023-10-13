@@ -1,29 +1,29 @@
 package io.chymyst.ui.awt
 
+import io.chymyst.ui.elm.Elm.{Backend, Consume}
 import io.chymyst.ui.elm.{LabelAlignment, View}
 
 import java.awt._
 import java.awt.event.{ActionEvent, WindowAdapter, WindowEvent}
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.{LinkedBlockingQueue, ThreadPoolExecutor, TimeUnit}
 import javax.swing.{Box, BoxLayout}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, Promise}
-import scala.util.Success
 
 object AwtRunner {
-  lazy val (frame, panel) = getFrameAndPanel()
+  private lazy val (frame, panel) = getFrameAndPanel()
 
-  def toAwtLabelAlignment: LabelAlignment => Int = {
+  private def toAwtLabelAlignment: LabelAlignment => Int = {
     case LabelAlignment.Left => Label.LEFT
     case LabelAlignment.Center => Label.CENTER
     case LabelAlignment.Right => Label.RIGHT
   }
 
-  def getFrameAndPanel() = {
+  private def getFrameAndPanel() = {
     val f = new Frame()
     f.setTitle("AWT Runner example")
     f.setBounds(400, 400, 640, 480)
-    f.setLayout(new BoxLayout(f, BoxLayout.X_AXIS))  // TODO better layout, or just use Swing instead of AWT.
+    f.setLayout(new BoxLayout(f, BoxLayout.X_AXIS)) // TODO better layout, or just use Swing instead of AWT.
     val p = new Panel()
     p.setLayout(new BoxLayout(p, BoxLayout.X_AXIS))
     p.setName("main panel")
@@ -39,20 +39,46 @@ object AwtRunner {
     (f, p)
   }
 
-  val counter = new AtomicInteger(0)
-
   // Return the first future that succeeds.
-  def first[T](f: Future[T], g: Future[T]): Future[T] = {
+  private def first[T](f: Future[T], g: Future[T]): Future[T] = {
     val p = Promise[T]
     f.foreach { x => p.trySuccess(x) }
     g.foreach { x => p.trySuccess(x) }
     p.future
   }
 
-  def renderView[E](view: View[E]): Future[E] = {
-    def render(subview: View[E], inPanel: => Panel = panel, clearPanel: Boolean = true): Future[E] = {
+  final class LabeledRunnable[L](label: L, code: () => Unit) extends Runnable {
+    def is(l: L): Boolean = label == l
+
+    override def run(): Unit = code()
+  }
+
+  object LabeledRunnable {
+    def apply[L](label: L, code: => Unit): LabeledRunnable[L] = new LabeledRunnable(label, () => code)
+
+    def apply(code: => Unit): LabeledRunnable[Unit] = new LabeledRunnable[Unit]((), () => code)
+  }
+
+  def backend[E]: Backend[View, E] = new Backend[View, E] {
+    private val singleThreadExecutor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue[Runnable]())
+
+    override def render: View[E] => Consume[E] = renderView[E]
+
+    override def onGuiThread[L](label: L, callback: E => Unit): E => Unit = { e =>
+      if (EventQueue.isDispatchThread)
+        callback(e)
+      else
+        singleThreadExecutor.execute(LabeledRunnable(label, EventQueue.invokeLater(() => callback(e))))
+    }
+
+    override def removePending[L](label: L): Unit = {
+      singleThreadExecutor.getQueue.removeIf(t => t.isInstanceOf[LabeledRunnable[L]] && t.asInstanceOf[LabeledRunnable[L]].is(label))
+    }
+  }
+
+  def renderView[E](view: View[E]): Consume[E] = {
+    def render(subview: View[E], inPanel: => Panel = panel, clearPanel: Boolean = true): Consume[E] = consume => {
       //    println(s"DEBUG: adding view $view in panel $inPanel; panel is valid: ${inPanel.isValid}, on dispatch thread: ${EventQueue.isDispatchThread}")
-      val p = Promise[E]
       //    EventQueue.invokeLater { () =>
       if (clearPanel) inPanel.removeAll() //else println(s"DEBUG: Not clearing panel for view $view")
       subview match {
@@ -62,7 +88,7 @@ object AwtRunner {
         case View.Button(text, event: E) =>
           val button = new Button(text)
           button.addActionListener { (_: ActionEvent) =>
-            p.trySuccess(event)
+            consume(event)
           }
           inPanel.add(button)
 
@@ -72,10 +98,9 @@ object AwtRunner {
           n.setName(s"Panel for $subview")
           //        n.setVisible(true) // Not necessary.
           inPanel.add(n)
-          val f1 = render(left, n, false)
-          val f2 = render(right, n, false)
+          render(left, n, false)(consume)
+          render(right, n, false)(consume)
           n.add(Box.createHorizontalGlue)
-          first(f1, f2).onComplete { case Success(e: E) => p.success(e) }
 
         case View.TileV(top, bottom) =>
           val n = new Panel()
@@ -83,14 +108,11 @@ object AwtRunner {
           n.setName(s"Panel for $subview")
           //        n.setVisible(true) // Not necessary.
           inPanel.add(n)
-          val f1 = render(top, n, false)
-          val f2 = render(bottom, n, false)
+          render(top, n, false)(consume)
+          render(bottom, n, false)(consume)
           n.add(Box.createVerticalGlue)
-          first(f1, f2).onComplete { case Success(e: E) => p.success(e) }
       }
       frame.setVisible(true) // Need to do this after any changes in layout or adding components. Otherwise nothing is shown and frame.isValid == false.
-      //    }
-      p.future
     }
 
     render(view)
