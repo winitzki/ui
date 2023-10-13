@@ -48,7 +48,7 @@ object AwtRunner {
   }
 
   final class LabeledRunnable[L](label: L, code: () => Unit) extends Runnable {
-    def is(l: L): Boolean = label == l
+    def hasLabel(l: L): Boolean = label == l
 
     override def run(): Unit = code()
   }
@@ -72,7 +72,7 @@ object AwtRunner {
     }
 
     override def removePendingEvents[L](label: L): Unit = {
-      singleThreadExecutor.getQueue.removeIf(t => t.isInstanceOf[LabeledRunnable[L]] && t.asInstanceOf[LabeledRunnable[L]].is(label))
+      singleThreadExecutor.getQueue.removeIf(t => t.isInstanceOf[LabeledRunnable[L]] && t.asInstanceOf[LabeledRunnable[L]].hasLabel(label))
     }
   }
 
