@@ -7,7 +7,7 @@ import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 object ExampleFullElmProgram {
 
-  def effectRunner: EffectRunner[E, C, S] = new EffectRunner[E, C, S] {
+  val effectRunner: EffectRunner[E, C, S] = new EffectRunner[E, C, S] {
     override def listen: S[E] => ConsumeOrCancel[E] = {
       case TimerSub(duration) =>
         import java.util.{Timer, TimerTask}
