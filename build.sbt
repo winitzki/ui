@@ -64,4 +64,4 @@ lazy val backend_swing = (project in file("backend_swing")).settings(
   libraryDependencies ++= Seq(
     utest,
   ),
-).dependsOn(core_elm, macros, example_elm % "test->compile")
+).dependsOn(core_elm, macros, backend_awt, example_elm % "test->compile")

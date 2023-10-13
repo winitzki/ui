@@ -1,5 +1,6 @@
 package io.chymyst.ui.awt
 
+import io.chymyst.ui.awt.AwtRunner.LabeledRunnable
 import io.chymyst.ui.elm.Elm.{Consume, UiBackend}
 import io.chymyst.ui.elm.{LabelAlignment, View}
 
@@ -9,6 +10,31 @@ import java.util.concurrent.{LinkedBlockingQueue, ThreadPoolExecutor, TimeUnit}
 import javax.swing.{Box, BoxLayout}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, Promise}
+
+trait UiEventThread[V[_], E] extends UiBackend[V, E] with AutoCloseable {
+  private val singleThreadExecutor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue[Runnable]())
+
+  override def runOnEventThread[L](label: L, callback: E => Unit): E => Unit = { e =>
+    if (EventQueue.isDispatchThread)
+      callback(e)
+    else
+      singleThreadExecutor.execute(LabeledRunnable(label, () => EventQueue.invokeLater(() => callback(e))))
+  }
+
+  override def removePendingEvents[L](label: L): Unit = {
+    singleThreadExecutor.getQueue.removeIf(t => t.isInstanceOf[LabeledRunnable[L]] && t.asInstanceOf[LabeledRunnable[L]].hasLabel(label))
+  }
+
+  override def close(): Unit = {
+    singleThreadExecutor.shutdown()
+  }
+}
+
+object UiEventThread {
+  def createStandardBackend[V[_], E](render: V[E] => Consume[E]): UiBackend[V, E] = new UiBackend[V, E] with UiEventThread[V, E] {
+    override def renderView: V[E] => Consume[E] = render
+  }
+}
 
 object AwtRunner {
   private lazy val (frame, panel) = getFrameAndPanel()
@@ -53,22 +79,7 @@ object AwtRunner {
     override def run(): Unit = code()
   }
 
-  def backend[E]: UiBackend[View, E] = new UiBackend[View, E] {
-    private val singleThreadExecutor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue[Runnable]())
-
-    override def renderView: View[E] => Consume[E] = AwtRunner.renderView[E]
-
-    override def runOnEventThread[L](label: L, callback: E => Unit): E => Unit = { e =>
-      if (EventQueue.isDispatchThread)
-        callback(e)
-      else
-        singleThreadExecutor.execute(LabeledRunnable(label, () => EventQueue.invokeLater(() => callback(e))))
-    }
-
-    override def removePendingEvents[L](label: L): Unit = {
-      singleThreadExecutor.getQueue.removeIf(t => t.isInstanceOf[LabeledRunnable[L]] && t.asInstanceOf[LabeledRunnable[L]].hasLabel(label))
-    }
-  }
+  def backend[E]: UiBackend[View, E] = UiEventThread.createStandardBackend(AwtRunner.renderView)
 
   def renderView[E](view: View[E]): Consume[E] = {
     def render(subview: View[E], inPanel: => Panel = panel, clearPanel: Boolean = true): Consume[E] = consume => {
