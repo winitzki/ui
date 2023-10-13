@@ -1,35 +1,38 @@
 package io.chymyst.ui.elm
 
-import io.chymyst.ui.elm.Elm.{Consume, ConsumeOrCancel, Program}
+import io.chymyst.ui.elm.Elm.{Consume, ConsumeOrCancel, EffectRunner, Program}
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 object ExampleFullElmProgram {
-  val listen: S[E] => ConsumeOrCancel[E] = {
-    case TimerSub(duration) =>
-      import java.util.{Timer, TimerTask}
-      val timer = new Timer()
-      consume =>
-        val timerTask = new TimerTask {
-          override def run(): Unit = consume(TimerTick(duration))
-        }
-        timer.scheduleAtFixedRate(timerTask, 0L, duration.toMillis)
-        _ => timer.cancel()
 
-  }
+  def effectRunner[C[_], S[_]]: EffectRunner[E, C, S] = new EffectRunner[E, C, S] {
+    override def listen: S[E] => ConsumeOrCancel[E] = {
+      case TimerSub(duration) =>
+        import java.util.{Timer, TimerTask}
+        val timer = new Timer()
+        consume =>
+          val timerTask = new TimerTask {
+            override def run(): Unit = consume(TimerTick(duration))
+          }
+          timer.scheduleAtFixedRate(timerTask, 0L, duration.toMillis)
+          _ => timer.cancel()
 
-  // A command consists of a random answer (success or fail) after a delay of 0.5 seconds.
-  val runCommand: C[E] => Consume[E] = {
-    case () =>
-      import scala.concurrent.ExecutionContext.Implicits.global
-      import scala.concurrent.Future
-      val result: Consume[E] = { consume =>
-        Future {
-          Thread.sleep(500L)
-          consume(if (scala.util.Random.nextBoolean()) CommandSucceeded else CommandFailed)
+    }
+
+    // A command consists of a random answer (success or fail) after a delay of 0.5 seconds.
+    override def runCommand: C[E] => Consume[E] = {
+      case () =>
+        import scala.concurrent.ExecutionContext.Implicits.global
+        import scala.concurrent.Future
+        val result: Consume[E] = { consume =>
+          Future {
+            Thread.sleep(500L)
+            consume(if (scala.util.Random.nextBoolean()) CommandSucceeded else CommandFailed)
+          }
         }
-      }
-      result
+        result
+    }
   }
 
   final case class Model(

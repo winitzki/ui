@@ -45,18 +45,25 @@ object Elm {
     // Render the view graphically and return the first user-generated event asynchronously by calling the callback on the GUI thread.
     def render: V[E] => Consume[E]
 
-    // Call the callback on the GUI thread.
+    // Call the callback on the GUI thread, even when this function was called on another thread.
     def onGuiThread[L](label: L, callback: E => Unit): E => Unit = callback
 
     def removePending[L](label: L): Unit = ()
   }
 
-  // This creates a runloop that runs a full Elm program.
+  trait EffectRunner[E, C[_], S[_]] {
+    // Run the command and consume its resulting event(s). The backend will make sure that events go to the GUI thread. The command cannot be canceled once started.
+    def runCommand: C[E] => Consume[E]
+
+    // Consume these events unless canceled. The backend will make sure that events go to the GUI thread. Events created before canceling but not yet delivered will not be delivered.
+    def listen: S[E] => ConsumeOrCancel[E]
+  }
+
+  // This creates a runloop that can run a full Elm program given a backend and an effect runner.
   final class RunLoop[M, V[_], E, C[_], S[_]](
                                                program: Program[M, V, E, C, S],
                                                backend: Backend[V, E],
-                                               runCommand: C[E] => Consume[E], // Run the command and consume its resulting events. The backend will make sure that events go to the GUI thread.
-                                               listen: S[E] => ConsumeOrCancel[E], // Consume these events unless canceled. The backend will make sure that events go to the GUI thread.
+                                               effectRunner: EffectRunner[E, C, S],
                                              ) {
     @volatile private var currentModel: M = program.init
 
@@ -67,15 +74,13 @@ object Elm {
       val oldM = currentModel
       val view = program.display(oldM)
       val subs = program.subscriptions(oldM)
-      backend.render(view) { e: E => // TODO: make sure this callback is always called on the GUI thread!
-        runSingleStep(e)
-      }
+      backend.render(view)(backend.onGuiThread((), runSingleStep))
       // Find out which subscriptions are new and which have disappeared.
       val oldSubs = Set.from(currentSubs.keySet.asScala)
       val addedSubs = subs.diff(oldSubs)
       val deletedSubs = oldSubs.diff(subs)
       addedSubs foreach { sub =>
-        val cancel = listen(sub)(backend.onGuiThread(sub, runSingleStep))
+        val cancel = effectRunner.listen(sub)(backend.onGuiThread(sub, runSingleStep))
         currentSubs.put(sub, cancel)
       }
       deletedSubs foreach { sub =>
@@ -96,7 +101,7 @@ object Elm {
         if (program.commands.isDefinedAt(event)) {
           val commands = program.commands(event)(oldM)
           commands foreach { command =>
-            runCommand(command)(backend.onGuiThread((), runSingleStep))
+            effectRunner.runCommand(command)(backend.onGuiThread((), runSingleStep))
           }
         }
         if (eventIsEnabled && modelUpdateNeeded) outputStep()

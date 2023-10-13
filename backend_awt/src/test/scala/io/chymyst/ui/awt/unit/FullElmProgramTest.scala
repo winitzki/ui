@@ -12,8 +12,7 @@ object FullElmProgramTest extends TestSuite {
       val runLoop = new RunLoop[ExampleFullElmProgram.M, View, ExampleFullElmProgram.E, ExampleFullElmProgram.C, ExampleFullElmProgram.S](
         ExampleFullElmProgram.program,
         AwtRunner.backend[ExampleFullElmProgram.E],
-        ExampleFullElmProgram.runCommand,
-        ExampleFullElmProgram.listen,
+        ExampleFullElmProgram.effectRunner,
       )
       runLoop.start()
       Thread.sleep(60000L)
