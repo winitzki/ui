@@ -1,7 +1,6 @@
-package io.chymyst.ui.awt.unit
+package io.chymyst.ui.elm
 
 import io.chymyst.ui.elm.Elm.{Consume, ConsumeOrCancel, Program}
-import io.chymyst.ui.elm.View
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 

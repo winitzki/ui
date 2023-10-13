@@ -1,7 +1,6 @@
-package io.chymyst.ui.awt.unit
+package io.chymyst.ui.elm
 
 import io.chymyst.ui.elm.Elm.SimpleProgram
-import io.chymyst.ui.elm.View
 
 object ExampleSimpleElmProgram {
   final case class Model(clicks: Int = 0, showButtons: Boolean = true)

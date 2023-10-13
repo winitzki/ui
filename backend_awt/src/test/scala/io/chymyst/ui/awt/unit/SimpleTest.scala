@@ -2,7 +2,7 @@ package io.chymyst.ui.awt.unit
 
 import io.chymyst.ui.awt.AwtRunner
 import io.chymyst.ui.elm.Elm.{SimpleProgram, run}
-import io.chymyst.ui.elm.View
+import io.chymyst.ui.elm.{ExampleSimpleElmProgram, View}
 import utest._
 
 import scala.concurrent.ExecutionContext.Implicits.global

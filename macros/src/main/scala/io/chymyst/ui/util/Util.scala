@@ -30,13 +30,9 @@ object SequenceGenerator {
 
 class SequenceGenerator // Let SequenceGenerator generate a nodeId
 {
-  this.nodeId = createNodeId
-  final private var nodeId = 0
+  final private var nodeId = createNodeId
   @volatile private var lastTimestamp = -1L
   @volatile private var sequence = 0L
-
-  // Create SequenceGenerator with a nodeId
-  def this(nodeId: Int)
 
   def nextId: Long = {
     var currentTimestamp = SequenceGenerator.timestamp

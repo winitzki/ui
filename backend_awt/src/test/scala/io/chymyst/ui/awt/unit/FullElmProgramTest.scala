@@ -2,7 +2,7 @@ package io.chymyst.ui.awt.unit
 
 import io.chymyst.ui.awt.AwtRunner
 import io.chymyst.ui.elm.Elm.RunLoop
-import io.chymyst.ui.elm.View
+import io.chymyst.ui.elm.{ExampleFullElmProgram, View}
 import utest.{TestSuite, test}
 
 object FullElmProgramTest extends TestSuite {
