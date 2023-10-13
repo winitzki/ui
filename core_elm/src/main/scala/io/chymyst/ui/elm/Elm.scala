@@ -62,6 +62,7 @@ object Elm {
   // This creates a runloop that can run a full Elm program given a backend and an effect runner.
   final class RunLoop[M, V[_], E, C[_], S[_]](
                                                program: Program[M, V, E, C, S],
+                                             )(
                                                backend: Backend[V, E],
                                                effectRunner: EffectRunner[E, C, S],
                                              ) {

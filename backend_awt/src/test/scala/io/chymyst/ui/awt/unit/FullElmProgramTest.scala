@@ -9,9 +9,10 @@ object FullElmProgramTest extends TestSuite {
 
   val tests = this {
     test - {
-      val runLoop = new RunLoop[ExampleFullElmProgram.M, View, ExampleFullElmProgram.E, ExampleFullElmProgram.C, ExampleFullElmProgram.S](
+      val runLoop = new RunLoop(
         ExampleFullElmProgram.program,
-        AwtRunner.backend[ExampleFullElmProgram.E],
+      )(
+        AwtRunner.backend,
         ExampleFullElmProgram.effectRunner,
       )
       runLoop.start()

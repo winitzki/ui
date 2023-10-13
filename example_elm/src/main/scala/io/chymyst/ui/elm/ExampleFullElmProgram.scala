@@ -2,11 +2,12 @@ package io.chymyst.ui.elm
 
 import io.chymyst.ui.elm.Elm.{Consume, ConsumeOrCancel, EffectRunner, Program}
 
+import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 object ExampleFullElmProgram {
 
-  def effectRunner[C[_], S[_]]: EffectRunner[E, C, S] = new EffectRunner[E, C, S] {
+  def effectRunner: EffectRunner[E, C, S] = new EffectRunner[E, C, S] {
     override def listen: S[E] => ConsumeOrCancel[E] = {
       case TimerSub(duration) =>
         import java.util.{Timer, TimerTask}
@@ -20,6 +21,8 @@ object ExampleFullElmProgram {
 
     }
 
+    private val commandCounter = new AtomicInteger(0)
+
     // A command consists of a random answer (success or fail) after a delay of 0.5 seconds.
     override def runCommand: C[E] => Consume[E] = {
       case () =>
@@ -28,7 +31,7 @@ object ExampleFullElmProgram {
         val result: Consume[E] = { consume =>
           Future {
             Thread.sleep(500L)
-            consume(if (scala.util.Random.nextBoolean()) CommandSucceeded else CommandFailed)
+            consume(CommandResult(commandCounter.incrementAndGet()))
           }
         }
         result
@@ -38,7 +41,7 @@ object ExampleFullElmProgram {
   final case class Model(
                           clicks: Int = 0,
                           showButtons: Boolean = true,
-                          lastCommandStatus: Option[Boolean] = None,
+                          lastCommandStatus: Option[Int] = None,
                           lastTimerTickHadInterval: Option[FiniteDuration] = None,
                           isListening1: Boolean = false,
                           isListening2: Boolean = false,
@@ -64,9 +67,7 @@ object ExampleFullElmProgram {
 
   case object SendCommand extends Events
 
-  case object CommandSucceeded extends Events
-
-  case object CommandFailed extends Events
+  case class CommandResult(x: Int) extends Events
 
   type E = Events
 
@@ -105,8 +106,7 @@ object ExampleFullElmProgram {
     case StartTimer2 => _.copy(isListening2 = true)
     case StopAllTimers => _.copy(isListening1 = false, isListening2 = false)
     case TimerTick(duration) => _.copy(lastTimerTickHadInterval = Some(duration))
-    case CommandFailed => _.copy(lastCommandStatus = Some(false))
-    case CommandSucceeded => _.copy(lastCommandStatus = Some(true))
+    case CommandResult(x) => _.copy(lastCommandStatus = Some(x))
   }
 
   sealed trait Subscriptions[+E]
