@@ -5,6 +5,8 @@ val scalaV = scala2V
 val utest = "com.lihaoyi" %% "utest" % "0.8.1" % Test
 def utestFramework = new TestFramework("utest.runner.Framework")
 
+val fastparse = "com.lihaoyi" %% "fastparse" % "3.0.2"
+
 lazy val root = (project in file(".")).settings(
   scalaVersion := scalaV,
   crossScalaVersions := Seq(scalaV),
@@ -14,6 +16,7 @@ lazy val root = (project in file(".")).settings(
   core_elm,
   example_elm,
   backend_awt,
+  dhall,
 )
 
 lazy val macros = (project in file("macros")).settings(
@@ -65,3 +68,13 @@ lazy val backend_swing = (project in file("backend_swing")).settings(
     utest,
   ),
 ).dependsOn(core_elm, macros, backend_awt, example_elm % "test->compile")
+
+lazy val dhall = (project in file("dhall")).settings(
+  scalaVersion := scalaV,
+  crossScalaVersions := Seq(scala2V, scala3V),
+  testFrameworks += utestFramework,
+  libraryDependencies ++= Seq(
+    fastparse,
+    utest,
+  ),
+)
