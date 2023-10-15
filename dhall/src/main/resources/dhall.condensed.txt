@@ -1,10 +1,212 @@
-
+)
+def end_of_line[$: P] = P(
+      %x0A     //  "\n"
+    / %x0D.0A  //  "\r\n"
+)
+def valid_non_ascii[$: P] = P(
+      %x80_D7FF
+    //  %xD800_DFFF = surrogate pairs
+    / %xE000_FFFD
+    //  %xFFFE_FFFF = non_characters
+    / %x10000_1FFFD
+    //  %x1FFFE_1FFFF = non_characters
+    / %x20000_2FFFD
+    //  %x2FFFE_2FFFF = non_characters
+    / %x30000_3FFFD
+    //  %x3FFFE_3FFFF = non_characters
+    / %x40000_4FFFD
+    //  %x4FFFE_4FFFF = non_characters
+    / %x50000_5FFFD
+    //  %x5FFFE_5FFFF = non_characters
+    / %x60000_6FFFD
+    //  %x6FFFE_6FFFF = non_characters
+    / %x70000_7FFFD
+    //  %x7FFFE_7FFFF = non_characters
+    / %x80000_8FFFD
+    //  %x8FFFE_8FFFF = non_characters
+    / %x90000_9FFFD
+    //  %x9FFFE_9FFFF = non_characters
+    / %xA0000_AFFFD
+    //  %xAFFFE_AFFFF = non_characters
+    / %xB0000_BFFFD
+    //  %xBFFFE_BFFFF = non_characters
+    / %xC0000_CFFFD
+    //  %xCFFFE_CFFFF = non_characters
+    / %xD0000_DFFFD
+    //  %xDFFFE_DFFFF = non_characters
+    / %xE0000_EFFFD
+    //  %xEFFFE_EFFFF = non_characters
+    / %xF0000_FFFFD
+    //  %xFFFFE_FFFFF = non_characters
+    / %x100000_10FFFD
+    //  %x10FFFE_10FFFF = non_characters
+)
+def tab[$: P] = P(
+    %x09  //  "\t"
+)
+def block_comment[$: P] = P(
+    "{-" block_comment_continue
+)
+def block_comment_char[$: P] = P(
+      %x20_7F
+    / valid_non_ascii
+    / tab
+    / end_of_line
+)
+def block_comment_continue[$: P] = P(
+    "-}"
+    / block_comment block_comment_continue
+    / block_comment_char block_comment_continue
+)
+def not_end_of_line[$: P] = P(
+    %x20_7F / valid_non_ascii / tab
+)
+def line_comment_prefix[$: P] = P(
+    "--" *not_end_of_line
+)
+def line_comment[$: P] = P(
+    line_comment_prefix end_of_line
+)
+def whitespace_chunk[$: P] = P(
+      " "
+    / tab
+    / end_of_line
+    / line_comment
+    / block_comment
+)
+def whsp[$: P] = P(
+    *whitespace_chunk
+)
+def whsp1[$: P] = P(
+    1*whitespace_chunk
+)
+def ALPHA[$: P] = P(
+    %x41_5A / %x61_7A
+)
+def DIGIT[$: P] = P(
+    %x30_39  //  0_9
+)
+def ALPHANUM[$: P] = P(
+    ALPHA / DIGIT
+)
+def HEXDIG[$: P] = P(
+    DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
+)
+def simple_label_first_char[$: P] = P(
+    ALPHA / "_"
+)
+def simple_label_next_char[$: P] = P(
+    ALPHANUM / "-" / "/" / "_"
+)
+def simple_label[$: P] = P(
+    simple_label_first_char *simple_label_next_char
+)
+def quoted_label_char[$: P] = P(
+      %x20_5F
+        //  %x60 = '`'
+    / %x61_7E
+)
+def quoted_label[$: P] = P(
+    *quoted_label_char
+)
+def label[$: P] = P(
+    ("`" quoted_label "`" / simple_label)
+)
+def nonreserved_label[$: P] = P(
+    label
+)
+def any_label[$: P] = P(
+    label
+)
+def any_label_or_some[$: P] = P(
+    any_label / Some
+)
+def with_component[$: P] = P(
+    any_label_or_some / "?"
+)
+def double_quote_chunk[$: P] = P(
+      interpolation
+      //  '\'    Beginning of escape sequence
+    / %x5C double_quote_escaped
+    / double_quote_char
+)
+def double_quote_escaped[$: P] = P(
+      %x22                 //  '"'    quotation mark  U+0022
+    / %x24                 //  '$'    dollar sign     U+0024
+    / %x5C                 //  '\'    reverse solidus U+005C
+    / %x2F                 //  '/'    solidus         U+002F
+    / %x62                 //  'b'    backspace       U+0008
+    / %x66                 //  'f'    form feed       U+000C
+    / %x6E                 //  'n'    line feed       U+000A
+    / %x72                 //  'r'    carriage return U+000D
+    / %x74                 //  't'    tab             U+0009
+    / %x75 unicode_escape  //  'uXXXX' / 'u{XXXX}'    U+XXXX
+)
+def unicode_escape[$: P] = P(
+    unbraced_escape / "{" braced_escape "}"
+)
+def unicode_suffix[$: P] = P(
+    (DIGIT / "A" / "B" / "C" / "D" / "E") 3HEXDIG
+               / "F" 2HEXDIG (DIGIT / "A" / "B" / "C" / "D")
+)
+def unbraced_escape[$: P] = P(
+      (DIGIT / "A" / "B" / "C") 3HEXDIG
+    / "D" ("0" / "1" / "2" / "3" / "4" / "5" / "6" / "7") HEXDIG HEXDIG
+    //  %xD800_DFFF Surrogate pairs
+    / "E" 3HEXDIG
+    / "F" 2HEXDIG (DIGIT / "A" / "B" / "C" / "D")
+    //  %xFFFE_FFFF Non_characters
+)
+def braced_codepoint[$: P] = P(
+      ("1" / "2" / "3" / "4" / "5" / "6" / "7" / "8" / "9" / "A" / "B" / "C" / "D" / "E" / "F" / "10") unicode_suffix; (Planes 1_16)
+    / unbraced_escape //  (Plane 0)
+    / 1*3HEXDIG //  %x000_FFF
+)
+def braced_escape[$: P] = P(
+    *"0" braced_codepoint
+)
+def double_quote_char[$: P] = P(
+      %x20_21
+        //  %x22 = '"'
+    / %x23_5B
+        //  %x5C = "\"
+    / %x5D_7F
+    / valid_non_ascii
+)
+def double_quote_literal[$: P] = P(
+    %x22 *double_quote_chunk %x22
+)
+def single_quote_continue[$: P] = P(
+      interpolation single_quote_continue
+    / escaped_quote_pair single_quote_continue
+    / escaped_interpolation single_quote_continue
+    / "''" //  End of text literal
+    / single_quote_char single_quote_continue
+)
+def escaped_quote_pair[$: P] = P(
+    "'''"
+)
+def escaped_interpolation[$: P] = P(
+    "''${"
+)
+def single_quote_char[$: P] = P(
+      %x20_7F
+    / valid_non_ascii
+    / tab
+    / end_of_line
+)
+def single_quote_literal[$: P] = P(
+    "''" end_of_line single_quote_continue
+)
+def interpolation[$: P] = P(
+    "${" complete_expression "}"
+)
 def text_literal[$: P] = P(
     (double_quote_literal / single_quote_literal)
 )
 def bytes_literal[$: P] = P(
-    // Hexadecimal with "0x" prefix
-    // %x22 = '"'
+    //  Hexadecimal with "0x" prefix
+    //  %x22 = '"'
       "0" %x78 %x22 *(HEXDIG HEXDIG) %x22
 )
 def if[$: P] = P(
@@ -50,10 +252,10 @@ def assert[$: P] = P(
     %x61.73.73.65.72.74
 )
 def forall_keyword[$: P] = P(
-    %x66.6f.72.61.6c.6c // "forall"
+    %x66.6f.72.61.6c.6c //  "forall"
 )
 def forall_symbol[$: P] = P(
-    %x2200 // Unicode FOR ALL
+    %x2200 //  Unicode FOR ALL
 )
 def forall[$: P] = P(
     forall_symbol / forall_keyword
@@ -278,71 +480,71 @@ def plus_infinity_literal[$: P] = P(
     Infinity
 )
 def double_literal[$: P] = P(
-    // "-Infinity"
+    //  "-Infinity"
       minus_infinity_literal
-    // "Infinity"
+    //  "Infinity"
     / plus_infinity_literal
-    // "NaN"
+    //  "NaN"
     / NaN
-    // "2.0"
+    //  "2.0"
     / numeric_double_literal
 )
 def natural_literal[$: P] = P(
-    // Hexadecimal with "0x" prefix
+    //  Hexadecimal with "0x" prefix
       "0" %x78 1*HEXDIG
-    // Decimal; leading 0 digits are not allowed
+    //  Decimal; leading 0 digits are not allowed
     / ("1" / "2" / "3" / "4" / "5" / "6" / "7" / "8" / "9") *DIGIT
-    // ... except for 0 itself
+    //  ... except for 0 itself
     / "0"
 )
 def integer_literal[$: P] = P(
     ( "+" / "-" ) natural_literal
 )
 def temporal_literal[$: P] = P(
-    // "YYYY_MM_DDThh:mm:ss[+-]HH:MM", parsed as a `{ date : Date, time : Time, timeZone : TimeZone }`
+    //  "YYYY_MM_DDThh:mm:ss[+-]HH:MM", parsed as a `{ date : Date, time : Time, timeZone : TimeZone }`
       full_date "T" partial_time time_offset
-    // "YYYY_MM_DDThh:mm:ss", parsed as a `{ date : Date, time : Time }`
+    //  "YYYY_MM_DDThh:mm:ss", parsed as a `{ date : Date, time : Time }`
     / full_date "T" partial_time
-    // "hh:mm:ss[+-]HH:MM", parsed as a `{ time : Time, timeZone, TimeZone }`
+    //  "hh:mm:ss[+-]HH:MM", parsed as a `{ time : Time, timeZone, TimeZone }`
     / partial_time time_offset
-    // "YYYY_MM_DD", parsed as a `Date`
+    //  "YYYY_MM_DD", parsed as a `Date`
     / full_date
-    // "hh:mm:ss", parsed as a `Time`
+    //  "hh:mm:ss", parsed as a `Time`
     / partial_time
-    // "[+-]HH:MM", parsed as a `TimeZone`
-    ;
-    // Carefully note that this `time_numoffset` and not `time_offset`, meaning
-    // that a standalone `Z` is not a valid Dhall literal for a `TimeZone`
+    //  "[+-]HH:MM", parsed as a `TimeZone`
+    // 
+    //  Carefully note that this `time_numoffset` and not `time_offset`, meaning
+    //  that a standalone `Z` is not a valid Dhall literal for a `TimeZone`
     / time_numoffset
 )
 def date_fullyear[$: P] = P(
     4DIGIT
 )
 def date_month[$: P] = P(
-    2DIGIT  // 01_12
+    2DIGIT  //  01_12
 )
 def date_mday[$: P] = P(
-    2DIGIT  // 01_28, 01_29, 01_30, 01_31 based on
-                          // month/year
+    2DIGIT  //  01_28, 01_29, 01_30, 01_31 based on
+                          //  month/year
 )
 def time_hour[$: P] = P(
-    2DIGIT  // 00_23
+    2DIGIT  //  00_23
 )
 def time_minute[$: P] = P(
-    2DIGIT  // 00_59
+    2DIGIT  //  00_59
 )
 def time_second[$: P] = P(
-    2DIGIT  // 00_59 (**UNLIKE** RFC 3339, we don't support leap
-                          // seconds)
+    2DIGIT  //  00_59 (**UNLIKE** RFC 3339, we don't support leap
+                          //  seconds)
 )
 def time_secfrac[$: P] = P(
-    "." 1*DIGIT  // RFC 3339
+    "." 1*DIGIT  //  RFC 3339
 )
 def time_numoffset[$: P] = P(
     ("+" / "-") time_hour ":" time_minute
 )
 def time_offset[$: P] = P(
-    "Z" / time_numoffset  // "Z" desugars to "+00:00"
+    "Z" / time_numoffset  //  "Z" desugars to "+00:00"
 )
 def partial_time[$: P] = P(
     time_hour ":" time_minute ":" time_second
@@ -358,37 +560,37 @@ def variable[$: P] = P(
     nonreserved_label [ whsp "@" whsp natural_literal ]
 )
 def path_character[$: P] = P(
-        // %x20 = " "
+        //  %x20 = " "
       %x21
-        // %x22 = "\""
-        // %x23 = "#"
+        //  %x22 = "\""
+        //  %x23 = "#"
     / %x24_27
-        // %x28 = "("
-        // %x29 = ")"
+        //  %x28 = "("
+        //  %x29 = ")"
     / %x2A_2B
-        // %x2C = ","
+        //  %x2C = ","
     / %x2D_2E
-        // %x2F = "/"
+        //  %x2F = "/"
     / %x30_3B
-        // %x3C = "<"
+        //  %x3C = "<"
     / %x3D
-        // %x3E = ">"
-        // %x3F = "?"
+        //  %x3E = ">"
+        //  %x3F = "?"
     / %x40_5A
-        // %x5B = "["
-        // %x5C = "\"
-        // %x5D = "]"
+        //  %x5B = "["
+        //  %x5C = "\"
+        //  %x5D = "]"
     / %x5E_7A
-        // %x7B = "{"
+        //  %x7B = "{"
     / %x7C
-        // %x7D = "}"
+        //  %x7D = "}"
     / %x7E
 )
 def quoted_path_character[$: P] = P(
       %x20_21
-        // %x22 = "\""
+        //  %x22 = "\""
     / %x23_2E
-        // %x2F = "/"
+        //  %x2F = "/"
     / %x30_7F
     / valid_non_ascii
 )
@@ -408,27 +610,27 @@ def local[$: P] = P(
     parent_path
     / here_path
     / home_path
-    // NOTE: Backtrack if parsing this alternative fails
-    ;
-    // This is because the first character of this alternative will be "/", but
-    // if the second character is "/" or "\" then this should have been parsed
-    // as an operator instead of a path
+    //  NOTE: Backtrack if parsing this alternative fails
+    // 
+    //  This is because the first character of this alternative will be "/", but
+    //  if the second character is "/" or "\" then this should have been parsed
+    //  as an operator instead of a path
     / absolute_path
 )
 def parent_path[$: P] = P(
-    ".." path  // Relative path
+    ".." path  //  Relative path
 )
 def here_path[$: P] = P(
-    "."  path  // Relative path
+    "."  path  //  Relative path
 )
 def home_path[$: P] = P(
-    "~"  path  // Home_anchored path
+    "~"  path  //  Home_anchored path
 )
 def absolute_path[$: P] = P(
-    path  // Absolute path
+    path  //  Absolute path
 )
 def scheme[$: P] = P(
-    %x68.74.74.70 [ %x73 ]  // "http" [ "s" ]
+    %x68.74.74.70 [ %x73 ]  //  "http" [ "s" ]
 )
 def http_raw[$: P] = P(
     scheme "://" authority path_abempty [ "?" query ]
@@ -475,11 +677,11 @@ def IPv4address[$: P] = P(
     dec_octet "." dec_octet "." dec_octet "." dec_octet
 )
 def dec_octet[$: P] = P(
-    "25" %x30_35       // 250_255
-          / "2" %x30_34 DIGIT  // 200_249
-          / "1" 2DIGIT         // 100_199
-          / %x31_39 DIGIT      // 10_99
-          / DIGIT              // 0_9
+    "25" %x30_35       //  250_255
+          / "2" %x30_34 DIGIT  //  200_249
+          / "1" 2DIGIT         //  100_199
+          / %x31_39 DIGIT      //  10_99
+          / DIGIT              //  0_9
 )
 def domain[$: P] = P(
     domainlabel *("." domainlabel) [ "." ]
@@ -521,31 +723,31 @@ def posix_environment_variable[$: P] = P(
     1*posix_environment_variable_character
 )
 def posix_environment_variable_character[$: P] = P(
-      %x5C                 // '\'    Beginning of escape sequence
-      ( %x22               // '"'    quotation mark  U+0022
-      / %x5C               // '\'    reverse solidus U+005C
-      / %x61               // 'a'    alert           U+0007
-      / %x62               // 'b'    backspace       U+0008
-      / %x66               // 'f'    form feed       U+000C
-      / %x6E               // 'n'    line feed       U+000A
-      / %x72               // 'r'    carriage return U+000D
-      / %x74               // 't'    tab             U+0009
-      / %x76               // 'v'    vertical tab    U+000B
+      %x5C                 //  '\'    Beginning of escape sequence
+      ( %x22               //  '"'    quotation mark  U+0022
+      / %x5C               //  '\'    reverse solidus U+005C
+      / %x61               //  'a'    alert           U+0007
+      / %x62               //  'b'    backspace       U+0008
+      / %x66               //  'f'    form feed       U+000C
+      / %x6E               //  'n'    line feed       U+000A
+      / %x72               //  'r'    carriage return U+000D
+      / %x74               //  't'    tab             U+0009
+      / %x76               //  'v'    vertical tab    U+000B
       )
-    // Printable characters except double quote, backslash and equals
+    //  Printable characters except double quote, backslash and equals
     / %x20_21
-        // %x22 = '"'
+        //  %x22 = '"'
     / %x23_3C
-        // %x3D = '='
+        //  %x3D = '='
     / %x3E_5B
-        // %x5C = "\"
+        //  %x5C = "\"
     / %x5D_7E
 )
 def import_type[$: P] = P(
     missing / local / http / env
 )
 def hash[$: P] = P(
-    %x73.68.61.32.35.36.3a 64HEXDIG // "sha256:XXX...XXX"
+    %x73.68.61.32.35.36.3a 64HEXDIG //  "sha256:XXX...XXX"
 )
 def import_hashed[$: P] = P(
     import_type [ whsp1 hash ]
@@ -554,55 +756,55 @@ def import[$: P] = P(
     import_hashed [ whsp as whsp1 (Text / Location) ]
 )
 def expression[$: P] = P(
-    // "\(x : a) -> b"
+    //  "\(x : a) -> b"
       lambda whsp "(" whsp nonreserved_label whsp ":" whsp1 expression whsp ")" whsp arrow whsp expression
-    ;
-    // "if a then b else c"
+    // 
+    //  "if a then b else c"
     / if whsp1 expression whsp then whsp1 expression whsp else whsp1 expression
-    ;
-    // "let x : t = e1 in e2"
-    // "let x     = e1 in e2"
-    // We allow dropping the `in` between adjacent let_expressions; the following are equivalent:
-    // "let x = e1 let y = e2 in e3"
-    // "let x = e1 in let y = e2 in e3"
+    // 
+    //  "let x : t = e1 in e2"
+    //  "let x     = e1 in e2"
+    //  We allow dropping the `in` between adjacent let_expressions; the following are equivalent:
+    //  "let x = e1 let y = e2 in e3"
+    //  "let x = e1 in let y = e2 in e3"
     / 1*let_binding in whsp1 expression
-    ;
-    // "forall (x : a) -> b"
+    // 
+    //  "forall (x : a) -> b"
     / forall whsp "(" whsp nonreserved_label whsp ":" whsp1 expression whsp ")" whsp arrow whsp expression
-    ;
-    // "a -> b"
-    ;
-    // NOTE: Backtrack if parsing this alternative fails
+    // 
+    //  "a -> b"
+    // 
+    //  NOTE: Backtrack if parsing this alternative fails
     / operator_expression whsp arrow whsp expression
-    ;
-    // "a with x = b"
-    ;
-    // NOTE: Backtrack if parsing this alternative fails
+    // 
+    //  "a with x = b"
+    // 
+    //  NOTE: Backtrack if parsing this alternative fails
     / with_expression
-    ;
-    // "merge e1 e2 : t"
-    ;
-    // NOTE: Backtrack if parsing this alternative fails since we can't tell
-    // from the keyword whether there will be a type annotation or not
+    // 
+    //  "merge e1 e2 : t"
+    // 
+    //  NOTE: Backtrack if parsing this alternative fails since we can't tell
+    //  from the keyword whether there will be a type annotation or not
     / merge whsp1 import_expression whsp1 import_expression whsp ":" whsp1 expression
-    ;
-    // "[] : t"
-    ;
-    // NOTE: Backtrack if parsing this alternative fails since we can't tell
-    // from the opening bracket whether or not this will be an empty list or
-    // a non_empty list
+    // 
+    //  "[] : t"
+    // 
+    //  NOTE: Backtrack if parsing this alternative fails since we can't tell
+    //  from the opening bracket whether or not this will be an empty list or
+    //  a non_empty list
     / empty_list_literal
-    ;
-    // "toMap e : t"
-    ;
-    // NOTE: Backtrack if parsing this alternative fails since we can't tell
-    // from the keyword whether there will be a type annotation or not
+    // 
+    //  "toMap e : t"
+    // 
+    //  NOTE: Backtrack if parsing this alternative fails since we can't tell
+    //  from the keyword whether there will be a type annotation or not
     / toMap whsp1 import_expression whsp ":" whsp1 expression
-    ;
-    // "assert : Natural/even 1 === False"
+    // 
+    //  "assert : Natural/even 1 === False"
     / assert whsp ":" whsp1 expression
-    ;
-    // "x : t"
+    // 
+    //  "x : t"
     / annotated_expression
 )
 def annotated_expression[$: P] = P(
@@ -666,18 +868,18 @@ def application_expression[$: P] = P(
     first_application_expression *(whsp1 import_expression)
 )
 def first_application_expression[$: P] = P(
-    // "merge e1 e2"
+    //  "merge e1 e2"
       merge whsp1 import_expression whsp1 import_expression
-    ;
-    // "Some e"
+    // 
+    //  "Some e"
     / Some whsp1 import_expression
-    ;
-    // "toMap e"
+    // 
+    //  "toMap e"
     / toMap whsp1 import_expression
-    ;
-    // "showConstructor e"
+    // 
+    //  "showConstructor e"
     / showConstructor whsp1 import_expression
-    ;
+    // 
     / import_expression
 )
 def import_expression[$: P] = P(
@@ -700,38 +902,38 @@ def type_selector[$: P] = P(
 )
 def primitive_expression[$: P] = P(
       temporal_literal
-    ;
-    // "2.0"
+    // 
+    //  "2.0"
     / double_literal
-    ;
-    // "2"
+    // 
+    //  "2"
     / natural_literal
-    ;
-    // "+2"
+    // 
+    //  "+2"
     / integer_literal
-    ;
-    // '"ABC"'
+    // 
+    //  '"ABC"'
     / text_literal
-    ;
-    // '0x"01234567689abcdef"'
+    // 
+    //  '0x"01234567689abcdef"'
     / bytes_literal
-    ;
-    // "{ foo = 1      , bar = True }"
-    // "{ foo : Integer, bar : Bool }"
+    // 
+    //  "{ foo = 1      , bar = True }"
+    //  "{ foo : Integer, bar : Bool }"
     / "{" whsp [ "," whsp ] record_type_or_literal whsp "}"
-    ;
-    // "< Foo : Integer | Bar : Bool >"
-    // "< Foo | Bar : Bool >"
+    // 
+    //  "< Foo : Integer | Bar : Bool >"
+    //  "< Foo | Bar : Bool >"
     / "<" whsp [ "|" whsp ] union_type whsp ">"
-    ;
-    // "[1, 2, 3]"
+    // 
+    //  "[1, 2, 3]"
     / non_empty_list_literal
-    ;
-    // "x"
-    // "x@2"
+    // 
+    //  "x"
+    //  "x@2"
     / identifier
-    ;
-    // "( e )"
+    // 
+    //  "( e )"
     / "(" complete_expression ")"
 )
 def record_type_or_literal[$: P] = P(
@@ -768,3 +970,8 @@ def union_type_entry[$: P] = P(
 def non_empty_list_literal[$: P] = P(
     "[" whsp [ "," whsp ] expression whsp *("," whsp expression whsp) [ "," whsp ] "]"
 )
+def shebang[$: P] = P(
+    "#!" *not_end_of_line end_of_line
+)
+def complete_expression[$: P] = P(
+    *shebang whsp expression whsp [ line_comment_prefix ]
