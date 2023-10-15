@@ -1,9 +1,11 @@
 package io.chymyst.ui.dhall
 
 import enumeratum._
+import io.chymyst.ui.dhall.Syntax.Expression
 
+import java.time.{LocalDate, LocalTime, ZoneOffset}
 
-object Syntax {
+object SyntaxConstants {
   sealed abstract class Operator(val op: String) extends EnumEntry
 
   object Operator extends Enum[Operator] {
@@ -145,91 +147,132 @@ object Syntax {
     case object Location extends ImportMode
   }
 
+  sealed trait Scheme
+
+  object Scheme {
+    case object HTTP extends Scheme
+
+    case object HTTPS extends Scheme
+  }
+
+  sealed trait FilePrefix
+
+  object FilePrefix {
+    case object Absolute extends FilePrefix
+
+    case object Here extends FilePrefix // ./something relative to the current working directory
+
+    case object Parent extends FilePrefix // ./something relative to the parent working directory
+
+    case object Home extends FilePrefix // ~/something relative to the user's home directory
+  }
+
+  sealed trait ImportType
+
+  object ImportType {
+    final case object Missing extends ImportType
+
+    final case class Remote(url: URL, headers: Expression) extends ImportType
+
+    final case class Path(filePrefix: FilePrefix, file: File) extends ImportType
+
+    final case class Env(envVarName: String) extends ImportType
+  }
+
+  final case class URL(scheme: Scheme, authority: String, path: File, query: Option[String])
+
+  final case class File(directoryPath: List[String], name: String)
+
+}
+
+object Syntax {
+  // TODO: use Natural from spires if needed
+  type Natural = Int
+
   sealed trait Expression
 
   object Expression {
-    final case class Variable(name: String, index: Int)
-    final case class Lambda(name: String, tipe: Expression, body: Expression)
-    final case class Forall(name: String, tipe: Expression, body: Expression)
-    final case class Let(name: String, tipe: Option[Expression], subst: Expression, body: Expression)
-    final case class If(cond: Expression, ifTrue: Expression, ifFalse: Expression)
-  }
-  /*
-  data Expression
-      = Variable Text Natural
-        -- ^ > x@n
-      | Lambda Text Expression Expression
-        -- ^ > λ(x : A) → b
-      | Forall Text Expression Expression
-        -- ^ > ∀(x : A) → B
-      | Let Text (Maybe Expression) Expression Expression
-        -- ^ > let x : A = a in b
-        --   > let x     = a in b
-      | If Expression Expression Expression
-        -- ^ > if t then l else r
-      | Merge Expression Expression (Maybe Expression)
-        -- ^ > merge t u : T
-        -- ^ > merge t u
-      | ToMap Expression (Maybe Expression)
-        -- ^ > toMap t : T
-        -- ^ > toMap t
-      | EmptyList Expression
-        -- ^ > [] : T
-      | NonEmptyList (NonEmpty Expression)
-        -- ^ > [ t, ts… ]
-      | Annotation Expression Expression
-        -- ^ > t : T
-      | Operator Expression Operator Expression
-        -- ^ > l □ r
-      | Application Expression Expression
-        -- ^ > f a
-      | Field Expression Text
-        -- ^ > t.x
-      | ProjectByLabels Expression [Text]
-        -- ^ > t.{ xs… }
-      | ProjectByType Expression Expression
-        -- ^ > t.(s)
-      | Completion Expression Expression
-        -- ^ > T::r
-      | Assert Expression
-        -- ^ > assert : T
-      | With Expression (NonEmpty PathComponent) Expression
-        -- ^ > e with k.ks… = v
-      | DoubleLiteral Double
-        -- ^ > n.n
-      | NaturalLiteral Natural
-        -- ^ > n
-      | IntegerLiteral Integer
-        -- ^ > ±n
-      | TextLiteral TextLiteral
-        -- ^ > "s"
-        --   > "s${t}ss…"
-      | BytesLiteral ByteString
-        -- ^ > 0x"abcdef0123456789"
-      | DateLiteral Time.Day
-      | TimeLiteral
-          Time.TimeOfDay
-          Int
-          -- ^ Precision
-      | TimeZoneLiteral Time.TimeZone
-      | RecordType [(Text, Expression)]
-        -- ^ > {}
-        --   > { k : T, ks… }
-      | RecordLiteral [(Text, Expression)]
-        -- ^ > {=}
-        --   > { k = t, ks… }
-      | UnionType [(Text, Maybe Expression)]
-        -- ^ > <>
-        --   > < k : T | ks… >
-        --   > < k | ks… >
-      | ShowConstructor Expression
-        -- ^ > showConstructor t
-      | Import ImportType ImportMode (Maybe (Digest SHA256))
-      | Some Expression
-        -- ^ > Some s
-      | Builtin Builtin
-      | Constant Constant
-   */
+    final case class Variable(name: String, index: Int) extends Expression
 
-  final case class TextLiteral(interpolations: List[(String, Expression)], trailing: String)
+    final case class Lambda(name: String, tipe: Expression, body: Expression) extends Expression
+
+    final case class Forall(name: String, tipe: Expression, body: Expression) extends Expression
+
+    final case class Let(name: String, tipe: Option[Expression], subst: Expression, body: Expression) extends Expression
+
+    final case class If(cond: Expression, ifTrue: Expression, ifFalse: Expression) extends Expression
+
+    final case class Merge(record: Expression, update: Expression, tipe: Option[Expression]) extends Expression
+
+    final case class ToMap(data: Expression, tipe: Option[Expression]) extends Expression
+
+    final case class EmptyList(tipe: Expression) extends Expression
+
+    final case class NonEmptyList(head: Expression, tail: List[Expression]) extends Expression
+
+    final case class Annotation(data: Expression, tipe: Expression) extends Expression
+
+    final case class Operator(lop: Expression, op: SyntaxConstants.Operator, rop: Expression) extends Expression
+
+    final case class Application(func: Expression, arg: Expression) extends Expression
+
+    final case class Field(data: Expression, name: String) extends Expression
+
+    final case class ProjectByLabels(data: Expression, labels: List[String]) extends Expression
+
+
+    final case class ProjectByType(data: Expression, by: Expression) extends Expression
+
+    final case class Completion(data: Expression, tipe: Expression) extends Expression
+
+    final case class Assert(assertion: Expression) extends Expression
+
+    final case class With(data: Expression, pathComponents: List[PathComponent], body: Expression) extends Expression
+
+
+    final case class DoubleLiteral(value: Double) extends Expression
+
+
+    final case class NaturalLiteral(value: Natural) extends Expression
+
+    final case class IntegerLiteral(value: Int) extends Expression
+
+    final case class TextLiteralNoInterp(value: String) extends Expression
+
+    final case class TextLiteral(interpolations: List[(String, Expression)], trailing: String) extends Expression
+
+    final case class BytesLiteral(value: Array[Byte]) extends Expression
+
+    final case class DateLiteral(date: LocalDate) extends Expression
+
+    final case class TimeLiteral(time: LocalTime) extends Expression
+
+    final case class TimeZoneLiteral(tz: ZoneOffset) extends Expression
+
+    final case class RecordType(defs: List[(String, Expression)]) extends Expression
+
+    final case class RecordLiteral(defs: List[(String, Expression)]) extends Expression
+
+    final case class UnionType(defs: List[(String, Option[Expression])]) extends Expression
+
+    final case class ShowConstructor(data: Expression) extends Expression
+
+    final case class Import(importType: SyntaxConstants.ImportType, importMode: SyntaxConstants.ImportMode, digest: Option[Array[Byte]]) extends Expression
+
+    final case class Some(data: Expression) extends Expression
+
+
+    final case class Builtin(builtin: SyntaxConstants.Builtin) extends Expression
+
+    final case class Constant(constant: SyntaxConstants.Constant) extends Expression
+
+  }
+
+  sealed trait PathComponent
+
+  object PathComponent {
+    final case class Label(dirName: String) extends PathComponent
+
+    final case object DescendOptional extends PathComponent
+  }
 }
