@@ -6,6 +6,7 @@ val utest = "com.lihaoyi" %% "utest" % "0.8.1" % Test
 def utestFramework = new TestFramework("utest.runner.Framework")
 
 val fastparse = "com.lihaoyi" %% "fastparse" % "3.0.2"
+val assertVerbose = "com.eed3si9n.expecty" %% "expecty" % "0.16.0" % Test
 
 lazy val root = (project in file(".")).settings(
   scalaVersion := scalaV,
@@ -76,5 +77,6 @@ lazy val dhall = (project in file("dhall")).settings(
   libraryDependencies ++= Seq(
     fastparse,
     utest,
+    assertVerbose,
   ),
 )

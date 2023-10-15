@@ -13,6 +13,9 @@ object Grammar {
     shebang.rep ~ whsp ~ expression ~ whsp ~ line_comment_prefix.rep(min = 0, max = 1)
   )
 
+  // TODO: replace this
+  def expression[$:P] = P(CharIn("a"))
+
   def end_of_line[$: P] = P("\n" / "\r\n")
 
   def valid_non_ascii[$: P] = P(
