@@ -7,6 +7,7 @@ def utestFramework = new TestFramework("utest.runner.Framework")
 
 val fastparse = "com.lihaoyi" %% "fastparse" % "3.0.2"
 val assertVerbose = "com.eed3si9n.expecty" %% "expecty" % "0.16.0" % Test
+val enumeratum = "com.beachape" %% "enumeratum" % "1.7.3"
 
 lazy val root = (project in file(".")).settings(
   scalaVersion := scalaV,
@@ -78,5 +79,6 @@ lazy val dhall = (project in file("dhall")).settings(
     fastparse,
     utest,
     assertVerbose,
+    enumeratum,
   ),
 )
