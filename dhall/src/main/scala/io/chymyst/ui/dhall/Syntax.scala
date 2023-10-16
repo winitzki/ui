@@ -2,10 +2,15 @@ package io.chymyst.ui.dhall
 
 import enumeratum._
 import io.chymyst.ui.dhall.Syntax.Expression
+import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, VarName}
 
 import java.time.{LocalDate, LocalTime, ZoneOffset}
 
 object SyntaxConstants {
+  final case class VarName(name: String) extends AnyVal
+
+  final case class FieldName(name: String) extends AnyVal
+
   sealed abstract class Operator(val op: String) extends EnumEntry
 
   object Operator extends Enum[Operator] {
@@ -186,7 +191,9 @@ object SyntaxConstants {
 }
 
 object Syntax {
-  // TODO: use Natural from spires if needed
+
+  final case class DhallFile(shebangs: Seq[String], value: Expression)
+
   type Natural = Int
 
   sealed trait Expression
@@ -194,11 +201,11 @@ object Syntax {
   object Expression {
     final case class Variable(name: String, index: Int) extends Expression
 
-    final case class Lambda(name: String, tipe: Expression, body: Expression) extends Expression
+    final case class Lambda(name: VarName, tipe: Expression, body: Expression) extends Expression
 
-    final case class Forall(name: String, tipe: Expression, body: Expression) extends Expression
+    final case class Forall(name: VarName, tipe: Expression, body: Expression) extends Expression
 
-    final case class Let(name: String, tipe: Option[Expression], subst: Expression, body: Expression) extends Expression
+    final case class Let(name: VarName, tipe: Option[Expression], subst: Expression, body: Expression) extends Expression
 
     final case class If(cond: Expression, ifTrue: Expression, ifFalse: Expression) extends Expression
 
@@ -216,10 +223,9 @@ object Syntax {
 
     final case class Application(func: Expression, arg: Expression) extends Expression
 
-    final case class Field(data: Expression, name: String) extends Expression
+    final case class Field(data: Expression, name: FieldName) extends Expression
 
     final case class ProjectByLabels(data: Expression, labels: List[String]) extends Expression
-
 
     final case class ProjectByType(data: Expression, by: Expression) extends Expression
 
@@ -229,9 +235,7 @@ object Syntax {
 
     final case class With(data: Expression, pathComponents: List[PathComponent], body: Expression) extends Expression
 
-
     final case class DoubleLiteral(value: Double) extends Expression
-
 
     final case class NaturalLiteral(value: Natural) extends Expression
 
@@ -261,7 +265,6 @@ object Syntax {
 
     final case class Some(data: Expression) extends Expression
 
-
     final case class Builtin(builtin: SyntaxConstants.Builtin) extends Expression
 
     final case class Constant(constant: SyntaxConstants.Constant) extends Expression
@@ -271,7 +274,7 @@ object Syntax {
   sealed trait PathComponent
 
   object PathComponent {
-    final case class Label(dirName: String) extends PathComponent
+    final case class Label(dirName: String) extends AnyVal with PathComponent
 
     final case object DescendOptional extends PathComponent
   }

@@ -1,7 +1,8 @@
 package io.chymyst.ui.dhall
 
-import fastparse.{CharIn, _}
+import fastparse._
 import NoWhitespace._
+import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
 
 object Grammar {
 
@@ -127,7 +128,7 @@ object Grammar {
   )
 
   def label[$: P] = P(
-    ("`" ~ quoted_label ~ "`" / simple_label)
+    ("`" ~ quoted_label.! ~ "`" / simple_label.!)
   )
 
   def nonreserved_label[$: P] = P(
@@ -139,7 +140,7 @@ object Grammar {
   )
 
   def any_label_or_some[$: P] = P(
-    any_label / "Some" // keyword "Some"
+    any_label / requireKeyword("Some")
   )
 
   def with_component[$: P] = P(
@@ -253,7 +254,7 @@ object Grammar {
     "0x\"" ~ (HEXDIG.rep(exactly = 2)).rep ~ "\""
   )
 
-  val simpleKeywords = Seq(
+  val simpleKeywords = Set(
     "if",
     "then",
     "else",
@@ -278,14 +279,14 @@ object Grammar {
   )
 
   def forall[$: P] = P(
-    forall_symbol / "forall" // keyword "forall"
+    forall_symbol / requireKeyword("forall")
   )
 
   def keyword[$: P] = P(
-    simpleKeywords.map(P(_)).reduceLeft(_ / _)
+    simpleKeywords.map(P(_)).reduce(_ / _)
   )
 
-  val builtinSymbols = Seq(
+  val builtinSymbols = Set(
     "Natural/fold",
     "Natural/build",
     "Natural/isZero",
@@ -330,7 +331,7 @@ object Grammar {
   )
 
   def builtin[$: P] = P(
-    builtinSymbols.map(P(_)).reduceLeft(_ / _)
+    builtinSymbols.map(P(_)).reduce(_ / _)
   )
 
   def combine[$: P] = P(
@@ -371,11 +372,11 @@ object Grammar {
   )
 
   def minus_infinity_literal[$: P] = P(
-    "-" ~ "Infinity" // keyword "Infinity"
+    "-" ~ requireKeyword("Infinity")
   )
 
   def plus_infinity_literal[$: P] = P(
-    "Infinity" // keyword "Infinity"
+    requireKeyword("Infinity")
   )
 
   def double_literal[$: P] = P(
@@ -640,7 +641,7 @@ object Grammar {
   )
 
   def http[$: P]: P[Unit] = P(
-    http_raw ~ (whsp ~ "using" ~ whsp1 ~ import_expression).? // keyword "using"
+    http_raw ~ (whsp ~ requireKeyword("using") ~ whsp1 ~ import_expression).?
   )
 
   def env[$: P] = P(
@@ -682,7 +683,7 @@ object Grammar {
   )
 
   def import_type[$: P] = P(
-    "missing" / local / http / env // keyword "missing"
+    requireKeyword("missing") / local / http / env
   )
 
   def hash[$: P] = P(
@@ -694,25 +695,27 @@ object Grammar {
   )
 
   def import_[$: P] = P(
-    import_hashed ~ (whsp ~ "as" ~ whsp1 ~ ("Text" / "Location")).? // keywords "as", "Text", "Location"
+    import_hashed ~ (whsp ~ requireKeyword("as") ~ whsp1 ~ (requireKeyword("Text") / requireKeyword("Location"))).?
   )
 
-  def expression[$: P]: P[Unit] = P(
+  def expression[$: P]: P[Expression] = P(
     //  "\(x : a) -> b"
-    lambda ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression
+    (lambda ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression)
+      .map { case (name,tipe, body) => Syntax.Expression.Lambda(name, tipe, body)}
       //
       //  "if a then b else c"
-      / ("if" ~ whsp1 ~ expression ~ whsp ~ "then" ~ whsp1 ~ expression ~ whsp ~ "else" ~ whsp1 ~ expression) // keywords "if", "then", "else"
+      / (requireKeyword("if") ~ whsp1 ~ expression ~ whsp ~ requireKeyword("then") ~ whsp1 ~ expression ~ whsp ~ requireKeyword("else") ~ whsp1 ~ expression)
+      .map {case (cond, ifTrue, ifFalse) => Syntax.Expression.If(cond, ifTrue, ifFalse)}
       //
       //  "let x : t = e1 in e2"
       //  "let x     = e1 in e2"
       //  We allow dropping the `in` between adjacent let_expressions; the following are equivalent:
       //  "let x = e1 let y = e2 in e3"
       //  "let x = e1 in let y = e2 in e3"
-      / (let_binding.rep(1) ~ "in" ~ whsp1 ~ expression) // keyword "in"
+      / (let_binding.rep(1) ~ requireKeyword("in") ~ whsp1 ~ expression)
       //
       //  "forall (x : a) -> b"
-      / ("forall" ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression) // keyword "forall"
+      / (requireKeyword("forall") ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression)
       //
       //  "a -> b"
       //
@@ -728,7 +731,7 @@ object Grammar {
       //
       //  NOTE: Backtrack if parsing this alternative fails since we can't tell
       //  from the keyword whether there will be a type annotation or not
-      / ("merge" ~ whsp1 ~ import_expression ~ whsp1 ~ import_expression ~ whsp ~ ":" ~ whsp1 ~ expression) // keyword "merge"
+      / (requireKeyword("merge") ~ whsp1 ~ import_expression ~ whsp1 ~ import_expression ~ whsp ~ ":" ~ whsp1 ~ expression)
       //
       //  "[] : t"
       //
@@ -741,10 +744,10 @@ object Grammar {
       //
       //  NOTE: Backtrack if parsing this alternative fails since we can't tell
       //  from the keyword whether there will be a type annotation or not
-      / ("toMap" ~ whsp1 ~ import_expression ~ whsp ~ ":" ~ whsp1 ~ expression) // keyword "toMap"
+      / (requireKeyword("toMap") ~ whsp1 ~ import_expression ~ whsp ~ ":" ~ whsp1 ~ expression)
       //
       //  "assert : Natural/even 1 === False"
-      / ("assert" ~ whsp ~ ":" ~ whsp1 ~ expression) // keyword "assert"
+      / (requireKeyword("assert") ~ whsp ~ ":" ~ whsp1 ~ expression)
       //
       //  "x : t"
       / annotated_expression
@@ -755,7 +758,7 @@ object Grammar {
   )
 
   def let_binding[$: P] = P(
-    "let" ~ whsp1 ~ nonreserved_label ~ whsp ~ (":" ~ whsp1 ~ expression ~ whsp).? ~ "=" ~ whsp ~ expression ~ whsp1 // keyword "let"
+    requireKeyword("let") ~ whsp1 ~ nonreserved_label ~ whsp ~ (":" ~ whsp1 ~ expression ~ whsp).? ~ "=" ~ whsp ~ expression ~ whsp1
   )
 
   def empty_list_literal[$: P] = P(
@@ -830,18 +833,18 @@ object Grammar {
     first_application_expression ~ (whsp1 ~ import_expression).rep
   )
 
-  def first_application_expression[$: P] = P( // keywords: Some, toMap, showConstructor, merge
+  def first_application_expression[$: P] = P(
     //  "merge e1 e2"
-    "merge" ~ whsp1 ~ import_expression ~ whsp1 ~ import_expression
+    (requireKeyword("merge") ~ whsp1 ~ import_expression ~ whsp1 ~ import_expression)
       //
       //  "Some e"
-      / "Some" ~ whsp1 ~ import_expression
+      / requireKeyword("Some") ~ whsp1 ~ import_expression
       //
       //  "toMap e"
-      / "toMap" ~ whsp1 ~ import_expression
+      / requireKeyword("toMap") ~ whsp1 ~ import_expression
       //
       //  "showConstructor e"
-      / "showConstructor" ~ whsp1 ~ import_expression
+      / requireKeyword("showConstructor") ~ whsp1 ~ import_expression
       //
       / import_expression
   )
@@ -953,20 +956,21 @@ object Grammar {
   )
 
   def shebang[$: P] = P(
-    "#!" ~ not_end_of_line.rep ~ end_of_line
+    "#!" ~ not_end_of_line.rep.! ~ end_of_line
   )
 
   def complete_expression[$: P] = P(
     shebang.rep ~ whsp ~ expression ~ whsp ~ line_comment_prefix.?
-  )
+  ).map { case (shebangContents, expr ) => DhallFile(shebangContents , expr )}
+
+  def requireKeyword[$: P](name: String) = {
+    assert(simpleKeywords contains name, s"Keyword $name must be one of the supported Dhall keywords")
+    P(name).!
+  }
 }
 
 
 object Parser {
-  /*
-  Generate dhall.condensed.txt from dhall.abnf.txt by:
-
-  grep -v  '^;' dhall/src/main/resources/dhall.abnf.txt |grep -v '^\s*$'|sed -e 's|^\([^ ]*\) = |\1 =\n    |'|sed -e 's/^\([^ ]*\) =/def \1[$: P] = P(/; s! ; ! // !; s|\([a-z0-9]\)-\([a-z0-9]\)|\1_\2|g;' > dhall/src/main/resources/dhall.condensed.txt
-  */
+  def parseFile(source: String): Parsed[DhallFile] = parse(source, Grammar.complete_expression(_))
 
 }
