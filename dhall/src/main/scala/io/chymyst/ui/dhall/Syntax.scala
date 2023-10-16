@@ -2,7 +2,7 @@ package io.chymyst.ui.dhall
 
 import enumeratum._
 import io.chymyst.ui.dhall.Syntax.Expression
-import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, VarName, DirName}
+import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, DirName, FieldName, VarName}
 
 import java.time.{LocalDate, LocalTime, ZoneOffset}
 
@@ -10,6 +10,8 @@ object SyntaxConstants {
   final case class VarName(name: String) extends AnyVal
 
   final case class FieldName(name: String) extends AnyVal
+
+  final case class ConstructorName(name: String) extends AnyVal
 
   final case class DirName(name: String) extends AnyVal
 
@@ -154,9 +156,11 @@ object SyntaxConstants {
     case object Location extends ImportMode
   }
 
-  sealed trait Scheme
+  sealed trait Scheme extends EnumEntry
 
-  object Scheme {
+  object Scheme extends Enum[Scheme] {
+    val values = findValues
+
     case object HTTP extends Scheme
 
     case object HTTPS extends Scheme
@@ -188,7 +192,7 @@ object SyntaxConstants {
 
   final case class URL(scheme: Scheme, authority: String, path: File, query: Option[String])
 
-  final case class File(directoryPath: List[String], name: String)
+  final case class File(segments: Seq[String])
 
 }
 
@@ -219,7 +223,7 @@ object Syntax {
 
     final case class EmptyList(tipe: Expression) extends Expression
 
-    final case class NonEmptyList(head: Expression, tail: List[Expression]) extends Expression
+    final case class NonEmptyList(head: Expression, tail: Seq[Expression]) extends Expression
 
     final case class Annotation(data: Expression, tipe: Expression) extends Expression
 
@@ -229,7 +233,7 @@ object Syntax {
 
     final case class Field(data: Expression, name: FieldName) extends Expression
 
-    final case class ProjectByLabels(data: Expression, labels: List[String]) extends Expression
+    final case class ProjectByLabels(data: Expression, labels: Seq[String]) extends Expression
 
     final case class ProjectByType(data: Expression, by: Expression) extends Expression
 
@@ -237,7 +241,7 @@ object Syntax {
 
     final case class Assert(assertion: Expression) extends Expression
 
-    final case class With(data: Expression, pathComponents: List[PathComponent], body: Expression) extends Expression
+    final case class With(data: Expression, pathComponents: Seq[PathComponent], body: Expression) extends Expression
 
     final case class DoubleLiteral(value: Double) extends Expression
 
@@ -247,7 +251,7 @@ object Syntax {
 
     final case class TextLiteralNoInterp(value: String) extends Expression
 
-    final case class TextLiteral(interpolations: List[(String, Expression)], trailing: String) extends Expression
+    final case class TextLiteral(interpolations: Seq[(String, Expression)], trailing: String) extends Expression
 
     final case class BytesLiteral(value: Array[Byte]) extends Expression
 
@@ -257,15 +261,15 @@ object Syntax {
 
     final case class TimeZoneLiteral(tz: ZoneOffset) extends Expression
 
-    final case class RecordType(defs: List[(String, Expression)]) extends Expression
+    final case class RecordType(defs: Seq[(FieldName, Expression)]) extends Expression
 
-    final case class RecordLiteral(defs: List[(String, Expression)]) extends Expression
+    final case class RecordLiteral(defs: Seq[(FieldName, Expression)]) extends Expression
 
-    final case class UnionType(defs: List[(String, Option[Expression])]) extends Expression
+    final case class UnionType(defs: Seq[(ConstructorName, Option[Expression])]) extends Expression
 
     final case class ShowConstructor(data: Expression) extends Expression
 
-    final case class Import(importType: SyntaxConstants.ImportType, importMode: SyntaxConstants.ImportMode, digest: Option[Array[Byte]]) extends Expression
+    final case class Import(importType: SyntaxConstants.ImportType, importMode: SyntaxConstants.ImportMode, digest: Option[String]) extends Expression
 
     final case class Some(data: Expression) extends Expression
 
@@ -282,4 +286,5 @@ object Syntax {
 
     final case object DescendOptional extends PathComponent
   }
+
 }

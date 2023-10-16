@@ -3,7 +3,11 @@ package io.chymyst.ui.dhall
 import fastparse._
 import NoWhitespace._
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
-import io.chymyst.ui.dhall.SyntaxConstants.VarName
+import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, File, ImportType, VarName}
+import Expression.{Annotation, Application, Builtin, DateLiteral, DoubleLiteral, EmptyList, Forall, If, Import, IntegerLiteral, Lambda, Let, Merge, NaturalLiteral, Operator, RecordLiteral, RecordType, ShowConstructor, TextLiteral, TimeLiteral, TimeZoneLiteral, ToMap}
+
+import java.time.{LocalDate, LocalTime, ZoneOffset}
+import scala.util.{Failure, Success, Try}
 
 object Grammar {
 
@@ -385,53 +389,56 @@ object Grammar {
     "e" ~ ("+" / "-").? ~ DIGIT.rep(1)
   )
 
-  def numeric_double_literal[$: P]: P[Expression.DoubleLiteral] = P(
+  def numeric_double_literal[$: P]: P[DoubleLiteral] = P(
     // [ "+" / "-" ] 1*DIGIT ( "." 1*DIGIT [ exponent ] / exponent)
     (("+" / "-").? ~ DIGIT.rep(1) ~ ("." ~ DIGIT.rep(1) ~ exponent.? / exponent)).!
-  ).map(digits => Expression.DoubleLiteral(digits.toDouble))
+  ).map(digits => DoubleLiteral(digits.toDouble))
 
-  def minus_infinity_literal[$: P]: P[Expression.DoubleLiteral] = P(
+  def minus_infinity_literal[$: P]: P[DoubleLiteral] = P(
     "-" ~ requireKeyword("Infinity")
-  ).map(_ => Expression.DoubleLiteral(Double.NegativeInfinity))
+  ).map(_ => DoubleLiteral(Double.NegativeInfinity))
 
-  def plus_infinity_literal[$: P]: P[Expression.DoubleLiteral] = P(
+  def plus_infinity_literal[$: P]: P[DoubleLiteral] = P(
     requireKeyword("Infinity")
-  ).map(_ => Expression.DoubleLiteral(Double.PositiveInfinity))
+  ).map(_ => DoubleLiteral(Double.PositiveInfinity))
 
-  def double_literal[$: P]: P[Expression.DoubleLiteral] = P(
+  def double_literal[$: P]: P[DoubleLiteral] = P(
     // "-Infinity"
     minus_infinity_literal
       // "Infinity"
       / plus_infinity_literal
       // "NaN"
-      / requireKeyword("NaN").map(_ => Expression.DoubleLiteral(Double.NaN))
+      / requireKeyword("NaN").map(_ => DoubleLiteral(Double.NaN))
       // "2.0"
       / numeric_double_literal
   )
 
-  def natural_literal[$: P]: P[Expression.NaturalLiteral] = P(
+  def natural_literal[$: P]: P[NaturalLiteral] = P(
     // Hexadecimal with "0x" prefix
     ("0x" ~ HEXDIG.rep(1).!).map(hexdigits => BigInt(hexdigits, 16))
       // Decimal; leading 0 digits are not allowed
       / (CharIn("1-9") ~ DIGIT.rep).!.map(digits => BigInt(digits, 10))
       // ... except for 0 itself
       / P("0").map(_ => BigInt(0))
-  ).map(Expression.NaturalLiteral)
+  ).map(NaturalLiteral)
 
-  def integer_literal[$: P]: P[Expression.IntegerLiteral] = P(
+  def integer_literal[$: P]: P[IntegerLiteral] = P(
     ("+" / "-").! ~ natural_literal
   ).map {
     case ("+", nat) => nat.value
     case ("-", nat) => -nat.value
-  }.map(Expression.IntegerLiteral)
+  }.map(IntegerLiteral)
 
   def temporal_literal[$: P]: P[Expression] = P(
     // "YYYY_MM_DDThh:mm:ss[+-]HH:MM", parsed as a `{ date : Date, time : Time, timeZone : TimeZone }`
-    full_date ~ "T" ~ partial_time ~ time_offset
+    (full_date ~ "T" ~ partial_time ~ time_offset)
+      .map { case (date, time, zone) => Parser.localDateTimeWithZone(date, time, zone) }
       // "YYYY_MM_DDThh:mm:ss", parsed as a `{ date : Date, time : Time }`
-      / full_date ~ "T" ~ partial_time
+      / (full_date ~ "T" ~ partial_time)
+      .map { case (date, time) => Parser.localDateTime(date, time) }
       // "hh:mm:ss[+-]HH:MM", parsed as a `{ time : Time, timeZone, TimeZone }`
-      / partial_time ~ time_offset
+      / (partial_time ~ time_offset)
+      .map { case (time, zone) => Parser.localTimeWithZone(time, zone) }
       // "YYYY_MM_DD", parsed as a `Date`
       / full_date
       // "hh:mm:ss", parsed as a `Time`
@@ -439,54 +446,73 @@ object Grammar {
       // "[+-]HH:MM", parsed as a `TimeZone`
       // Carefully note that this `time_numoffset` and not `time_offset`, meaning
       // that a standalone `Z` is not a valid Dhall literal for a `TimeZone`
-      / time_numoffset
+      / time_numoffset.map(TimeZoneLiteral)
   )
 
-  def date_fullyear[$: P] = P(
+  def date_fullyear[$: P]: P[Int] = P(
     DIGIT.rep(exactly = 4)
-  )
+  ).!.map(_.toInt)
 
-  def date_month[$: P] = P(
-    DIGIT.rep(exactly = 2) // 01_12
-  )
+  def date_month[$: P]: P[Int] = P(
+    DIGIT.rep(exactly = 2)
+    //("0" ~ CharIn("1-9")) / "1" ~ CharIn("0-2") // 01, 02, ..., 11, 12
+  ).!.map(_.toInt)
 
-  def date_mday[$: P] = P(
-    DIGIT.rep(exactly = 2) // 01_28, 01_29, 01_30, 01_31 based on
+  def date_mday[$: P]: P[Int] = P(
+    DIGIT.rep(exactly = 2)
+    //    ("0" ~ CharIn("1-9")) / (CharIn("12") ~ DIGIT) / ("3" ~ CharIn("01")) // 01_28, 01_29, 01_30, 01_31 based on
     // month/year
-  )
+  ).!.map(_.toInt)
 
-  def time_hour[$: P] = P(
+  def time_hour[$: P]: P[Int] = P(
     DIGIT.rep(exactly = 2) // 00_23
-  )
+  ).!.map(_.toInt)
 
-  def time_minute[$: P] = P(
+  def time_minute[$: P]: P[Int] = P(
     DIGIT.rep(exactly = 2) // 00_59
-  )
+  ).!.map(_.toInt)
 
-  def time_second[$: P] = P(
+  def time_second[$: P]: P[Int] = P(
     DIGIT.rep(exactly = 2) // 00_59 (**UNLIKE** RFC 3339, we don't support leap seconds)
-  )
+  ).!.map(_.toInt)
 
-  def time_secfrac[$: P] = P(
-    "." ~ DIGIT.rep(1) // RFC 3339
+  def time_secfrac[$: P]: P[Int] = P( // Convert trailing fraction of a second, like .2345, into nanoseconds, like 234500000.
+    "." ~ (DIGIT.!
+      .rep(1) // RFC 3339
+      .map(digits => (digits ++ Seq.fill(9)("0")).take(9).mkString("").toInt)
+      )
   )
 
   def time_numoffset[$: P] = P(
-    ("+" / "-") ~ time_hour ~ ":" ~ time_minute
+    ("+" / "-").! ~ time_hour ~ ":" ~ time_minute
+  ).map {
+    case ("+", h, m) => ZoneOffset.ofHoursMinutes(h, m)
+    case ("-", h, m) => ZoneOffset.ofHoursMinutes(-h, -m)
+  }
+
+  def time_offset[$: P]: P[ZoneOffset] = P(
+    P("Z").map(_ => ZoneOffset.ofHours(0)) // "Z" desugars to "+00:00"
+      / time_numoffset
   )
 
-  def time_offset[$: P] = P(
-    "Z" / time_numoffset // "Z" desugars to "+00:00"
-  )
-
-  def partial_time[$: P] = P(
+  def partial_time[$: P]: P[TimeLiteral] = P(
     time_hour ~ ":" ~ time_minute ~ ":" ~ time_second
       ~ time_secfrac.?
-  )
+  ).flatMap { case (h, m, s, nanos) =>
+    Try(TimeLiteral(LocalTime.of(h, m, s, nanos.getOrElse(0)))) match {
+      case Failure(exception) => Fail(s"Invalid local time literal $h:$m:$s:$nanos - $exception")
+      case Success(value) => Pass(value)
+    }
+  }
 
-  def full_date[$: P] = P(
+  def full_date[$: P]: P[DateLiteral] = P(
     date_fullyear ~ "-" ~ date_month ~ "-" ~ date_mday
-  )
+  ).flatMap { case (y, m, d) =>
+    Try(DateLiteral(LocalDate.of(y, m, d))) match {
+      case Failure(exception) => Fail(s"Invalid date literal $y-$m-$d - $exception")
+      case Success(value) => Pass(value)
+    }
+  }
 
   def identifier[$: P] = P(
     variable / builtin
@@ -514,7 +540,7 @@ object Grammar {
   )
 
   def path_component[$: P] = P(
-    "/" ~ (unquoted_path_component / ("\"" ~ quoted_path_component ~ "\""))
+    "/" ~ (unquoted_path_component / ("\"" ~ quoted_path_component ~ "\"")).!
   )
 
   def path[$: P] = P(
@@ -534,32 +560,32 @@ object Grammar {
 
   def parent_path[$: P] = P(
     ".." ~ path // Relative path
-  )
+  ).map(segments => ImportType.Path(SyntaxConstants.FilePrefix.Parent, SyntaxConstants.File(segments)))
 
   def here_path[$: P] = P(
     "." ~ path // Relative path
-  )
+  ).map(segments => ImportType.Path(SyntaxConstants.FilePrefix.Here, SyntaxConstants.File(segments)))
 
   def home_path[$: P] = P(
     "~" ~ path // Home_anchored path
-  )
+  ).map(segments => ImportType.Path(SyntaxConstants.FilePrefix.Home, SyntaxConstants.File(segments)))
 
   def absolute_path[$: P] = P(
     path // Absolute path
-  )
+  ).map(segments => ImportType.Path(SyntaxConstants.FilePrefix.Absolute, SyntaxConstants.File(segments)))
 
 
-  def scheme[$: P] = P(
+  def scheme[$: P]: P[SyntaxConstants.Scheme] = P(
     "http" ~ "s".?
-  )
+  ).!.map(s => SyntaxConstants.Scheme.withNameInsensitive(s))
 
-  def http_raw[$: P] = P(
-    scheme ~ "://" ~ authority ~ path_abempty ~ ("?" ~ query).?
-  )
+  def http_raw[$: P]: P[SyntaxConstants.URL] = P(
+    scheme ~ "://" ~ authority.! ~ path_abempty ~ ("?" ~ query.!).?
+  ).map { case (s, a, p, q) => SyntaxConstants.URL(s, a, p, q) }
 
-  def path_abempty[$: P] = P(
-    ("/" ~ segment).rep
-  )
+  def path_abempty[$: P]: P[SyntaxConstants.File] = P(
+    ("/" ~ segment.!).rep
+  ).map { segments => SyntaxConstants.File(segments) }
 
   def authority[$: P] = P(
     (userinfo ~ "@").? ~ host ~ (":" ~ port).?
@@ -662,16 +688,21 @@ object Grammar {
     "!" / "$" / "&" / "'" / "*" / "+" / ";" / "="
   )
 
-  def http[$: P]: P[Unit] = P(
-    http_raw ~ (whsp ~ requireKeyword("using") ~ whsp1 ~ import_expression).?
-  )
+  val emptyHeaders: Expression = Expression.EmptyList(Expression.RecordType(Seq(
+    (FieldName("mapKey"), Expression.Builtin(SyntaxConstants.Builtin.Text)),
+    (FieldName("mapValue"), Expression.Builtin(SyntaxConstants.Builtin.Text)),
+  )))
 
-  def env[$: P] = P(
+  def http[$: P]: P[ImportType.Remote] = P(
+    http_raw ~ (whsp ~ requireKeyword("using") ~ whsp1 ~ import_expression).?
+  ).map { case (url, headers) => ImportType.Remote(url, headers.getOrElse(emptyHeaders)) }
+
+  def env[$: P]: P[ImportType.Env] = P(
     "env:" ~
-      (bash_environment_variable
-        / ("\u0022" ~ posix_environment_variable ~ "\u0022")
+      (bash_environment_variable.!
+        / ("\u0022" ~ posix_environment_variable.! ~ "\u0022")
         )
-  )
+  ).map(name => ImportType.Env(name))
 
   def bash_environment_variable[$: P] = P(
     (ALPHA / "_") ~ (ALPHANUM / "_").rep
@@ -704,8 +735,11 @@ object Grammar {
     //      / %x5D_7E
   )
 
-  def import_type[$: P] = P(
-    requireKeyword("missing") / local / http / env
+  def import_type[$: P]: P[ImportType] = P(
+    requireKeyword("missing").map(_ => ImportType.Missing)
+      / local
+      / http
+      / env
   )
 
   def hash[$: P] = P(
@@ -713,21 +747,31 @@ object Grammar {
   )
 
   def import_hashed[$: P] = P(
-    import_type(whsp1 ~ hash).?
+    import_type ~ (whsp1 ~ hash.!).?
   )
 
-  def import_[$: P] = P(
-    import_hashed ~ (whsp ~ requireKeyword("as") ~ whsp1 ~ (requireKeyword("Text") / requireKeyword("Location"))).?
-  )
+  def import_[$: P]: P[Import] = P(
+    import_hashed ~ (whsp ~ requireKeyword("as") ~ whsp1 ~ ((requireKeyword("Text") / requireKeyword("Location") / requireKeyword("Bytes"))).!).?
+  ).map { case (importType, digest, mode) =>
+    val importMode = mode match {
+      case Some("Bytes") => SyntaxConstants.ImportMode.RawBytes
+      case Some("Location") => SyntaxConstants.ImportMode.Location
+      case Some("Text") => SyntaxConstants.ImportMode.RawText
+      case None => SyntaxConstants.ImportMode.Code
+    }
+    Import(importType, importMode, digest)
+  }
 
   def expression[$: P]: P[Expression] = P(
     //  "\(x : a) -> b"
     (lambda ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression)
-      .map { case (name, tipe, body) => Syntax.Expression.Lambda(VarName(name), tipe, body) }
+      .map { case (name, tipe, body) => Lambda(name, tipe, body) }
       //
       //  "if a then b else c"
       / (requireKeyword("if") ~ whsp1 ~ expression ~ whsp ~ requireKeyword("then") ~ whsp1 ~ expression ~ whsp ~ requireKeyword("else") ~ whsp1 ~ expression)
-      .map { case (cond, ifTrue, ifFalse) => Syntax.Expression.If(cond, ifTrue, ifFalse) }
+      .map { case (cond, ifTrue, ifFalse) =>
+        If(cond, ifTrue, ifFalse)
+      }
       //
       //  "let x : t = e1 in e2"
       //  "let x     = e1 in e2"
@@ -736,18 +780,18 @@ object Grammar {
       //  "let x = e1 in let y = e2 in e3"
       / (let_binding.rep(1) ~ requireKeyword("in") ~ whsp1 ~ expression)
       .map { case (letBindings, expr) =>
-        letBindings.foldLeft(expr) { case (prev, (varName, tipe, body)) => Syntax.Expression.Let(varName, tipe, body, prev) }
+        letBindings.foldLeft(expr) { case (prev, (varName, tipe, body)) => Let(varName, tipe, body, prev) }
       }
       //
       //  "forall (x : a) -> b"
       / (requireKeyword("forall") ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression)
-      .map { case (varName, tipe, body) => Syntax.Expression.Forall(varName, tipe, body) }
+      .map { case (varName, tipe, body) => Forall(varName, tipe, body) }
       //
       //  "a -> b"
       //
       //  NOTE: Backtrack if parsing this alternative fails
       / (operator_expression ~ whsp ~ arrow ~ whsp ~ expression)
-      .map { case (head, body) => Syntax.Expression.F }
+      .map { case (head, body) => body } // TODO: figure out what this expression does!
       //
       //  "a with x = b"
       //
@@ -790,7 +834,7 @@ object Grammar {
 
   def empty_list_literal[$: P] = P(
     "[" ~ whsp ~ ("," ~ whsp).? ~ "]" ~ whsp ~ ":" ~ whsp1 ~ expression
-  ).map(expr => Syntax.Expression.EmptyList(expr))
+  ).map(expr => EmptyList(expr))
 
   def with_expression[$: P] = P(
     import_expression ~ (whsp1 ~ "with" ~ whsp1 ~ with_clause).rep(1)
@@ -800,83 +844,91 @@ object Grammar {
     with_component ~ (whsp ~ "." ~ whsp ~ with_component).rep ~ whsp ~ "=" ~ whsp ~ operator_expression
   )
 
-  def operator_expression[$: P]: P[Expression.Operator] = P(
+  def operator_expression[$: P]: P[Expression] = P(
     equivalent_expression
   )
 
-  def equivalent_expression[$: P]: P[Expression.Operator] = P(
+  private implicit class FoldOpExpression(parser: P[(Expression, Seq[Expression])]) {
+    def withOperator(op: SyntaxConstants.Operator): P[Expression] = parser.map { case (head, tail) => tail.foldLeft(head)((prev, arg) => Operator(prev, op, arg)) }
+  }
+
+  def equivalent_expression[$: P]: P[Expression] = P(
     import_alt_expression ~ (whsp ~ equivalent ~ whsp ~ import_alt_expression).rep
-  )
+  ).withOperator(SyntaxConstants.Operator.Equivalent)
 
-  def import_alt_expression[$: P]: P[Expression.Operator] = P(
+  def import_alt_expression[$: P]: P[Expression] = P(
     or_expression ~ (whsp ~ opAlternative ~ whsp1 ~ or_expression).rep
-  )
+  ).withOperator(SyntaxConstants.Operator.Alternative)
 
-  def or_expression[$: P]: P[Expression.Operator] = P(
+  def or_expression[$: P]: P[Expression] = P(
     plus_expression ~ (whsp ~ opOr ~ whsp ~ plus_expression).rep
-  )
+  ).withOperator(SyntaxConstants.Operator.Or)
 
-  def plus_expression[$: P] = P(
+  def plus_expression[$: P]: P[Expression] = P(
     text_append_expression ~ (whsp ~ opPlus ~ whsp1 ~ text_append_expression).rep
-  )
+  ).withOperator(SyntaxConstants.Operator.Plus)
 
-  def text_append_expression[$: P]: P[Expression.Operator] = P(
+  def text_append_expression[$: P]: P[Expression] = P(
     list_append_expression ~ (whsp ~ opTextAppend ~ whsp ~ list_append_expression).rep
-  )
+  ).withOperator(SyntaxConstants.Operator.TextAppend)
 
-  def list_append_expression[$: P]: P[Expression.Operator] = P(
+  def list_append_expression[$: P]: P[Expression] = P(
     and_expression ~ (whsp ~ opListAppend ~ whsp ~ and_expression).rep
-  )
+  ).withOperator(SyntaxConstants.Operator.ListAppend)
 
-  def and_expression[$: P]: P[Expression.Operator] = P(
+  def and_expression[$: P]: P[Expression] = P(
     combine_expression ~ (whsp ~ opAnd ~ whsp ~ combine_expression).rep
-  )
+  ).withOperator(SyntaxConstants.Operator.And)
 
-  def combine_expression[$: P]: P[Expression.Operator] = P(
+  def combine_expression[$: P]: P[Expression] = P(
     prefer_expression ~ (whsp ~ combine ~ whsp ~ prefer_expression).rep
-  )
+  ).withOperator(SyntaxConstants.Operator.CombineRecordTerms)
 
-  def prefer_expression[$: P]: P[Expression.Operator] = P(
+  def prefer_expression[$: P]: P[Expression] = P(
     combine_types_expression ~ (whsp ~ prefer ~ whsp ~ combine_types_expression).rep
-  )
+  ).withOperator(SyntaxConstants.Operator.Prefer)
 
-  def combine_types_expression[$: P]: P[Expression.Operator] = P(
+  def combine_types_expression[$: P]: P[Expression] = P(
     times_expression ~ (whsp ~ combine_types ~ whsp ~ times_expression).rep
-  )
+  ).withOperator(SyntaxConstants.Operator.CombineRecordTypes)
 
-  def times_expression[$: P]: P[Expression.Operator] = P(
+  def times_expression[$: P]: P[Expression] = P(
     equal_expression ~ (whsp ~ opTimes ~ whsp ~ equal_expression).rep
-  )
+  ).withOperator(SyntaxConstants.Operator.Times)
 
-  def equal_expression[$: P]: P[Expression.Operator] = P(
+  def equal_expression[$: P]: P[Expression] = P(
     not_equal_expression ~ (whsp ~ opEqual ~ whsp ~ not_equal_expression).rep
-  )
+  ).withOperator(SyntaxConstants.Operator.Equal)
 
-  def not_equal_expression[$: P]: P[Expression.Operator] = P(
+  def not_equal_expression[$: P]: P[Expression] = P(
     application_expression ~ (whsp ~ opNotEqual ~ whsp ~ application_expression).rep
-  )
+  ).withOperator(SyntaxConstants.Operator.NotEqual)
 
-  def application_expression[$: P] = P(
+  def application_expression[$: P]: P[Expression] = P(
     first_application_expression ~ (whsp1 ~ import_expression).rep
-  )
+  ).map { case (head, tail) => tail.foldLeft(head)((prev, expr) => Application(prev, expr)) }
 
-  def first_application_expression[$: P] = P(
+  def first_application_expression[$: P]: P[Expression] = P(
     //  "merge e1 e2"
     (requireKeyword("merge") ~ whsp1 ~ import_expression ~ whsp1 ~ import_expression)
+      .map { case (e1, e2) => Merge(e1, e2, None) }
       //
       //  "Some e"
-      / requireKeyword("Some") ~ whsp1 ~ import_expression
+      / (requireKeyword("Some") ~ whsp1 ~ import_expression)
+      .map(expr => Expression.Some(expr))
       //
       //  "toMap e"
-      / requireKeyword("toMap") ~ whsp1 ~ import_expression
+      / (requireKeyword("toMap") ~ whsp1 ~ import_expression)
+      .map(expr => ToMap(expr, None))
       //
       //  "showConstructor e"
-      / requireKeyword("showConstructor") ~ whsp1 ~ import_expression
+      / (requireKeyword("showConstructor") ~ whsp1 ~ import_expression)
+      .map(expr => ShowConstructor(expr))
       //
       / import_expression
   )
 
-  def import_expression[$: P] = P(
+  def import_expression[$: P]: P[Expression] = P(
     import_ / completion_expression
   )
 
@@ -998,8 +1050,34 @@ object Grammar {
 
 }
 
-
 object Parser {
-  def parseFile(source: String): Parsed[DhallFile] = parse(source, Grammar.complete_expression(_))
+  // Fail with a message.  See https://github.com/com-lihaoyi/fastparse/issues/213
+  // The message shows up as "Expected ..."; phrase it appropriately.
+  //  private def Fail[T](expected: String)(implicit ctx: P[_]): P[T] = {
+  //    val res = ctx.freshFailure()
+  //    if (ctx.verboseFailures) ctx.setMsg(ctx.index, () => expected)
+  //    res
+  //  }
 
+  def parseDhall(source: String): Parsed[DhallFile] = parse(source, Grammar.complete_expression(_))
+
+  private def localDateTimeZone(dateOption: Option[DateLiteral], timeOption: Option[TimeLiteral], zoneOption: Option[ZoneOffset]): Expression = {
+    val dateR = dateOption.map { date => (FieldName("date"), date) }
+    val dateT = dateOption.map { date => (FieldName("date"), Builtin(SyntaxConstants.Builtin.Date)) }
+    val timeR = timeOption.map { time => (FieldName("time"), time) }
+    val timeT = timeOption.map { time => (FieldName("time"), Builtin(SyntaxConstants.Builtin.Time)) }
+    val zoneR = zoneOption.map { zone => (FieldName("timeZone"), TimeZoneLiteral(zone)) }
+    val zoneT = zoneOption.map { zone => (FieldName("timeZone"), Builtin(SyntaxConstants.Builtin.TimeZone)) }
+
+    val record = RecordLiteral(Seq(dateR, timeR, zoneR).flatten)
+    val recordType = RecordType(Seq(dateT, timeT, zoneT).flatten)
+
+    Annotation(record, recordType) // Return { date : Date, time : Time, timeZone : TimeZone } or some subset of that record.
+  }
+
+  def localDateTimeWithZone(date: DateLiteral, time: TimeLiteral, zone: ZoneOffset): Expression = localDateTimeZone(Some(date), Some(time), Some(zone))
+
+  def localTimeWithZone(time: TimeLiteral, zone: ZoneOffset): Expression = localDateTimeZone(None, Some(time), Some(zone))
+
+  def localDateTime(date: DateLiteral, time: TimeLiteral): Expression = localDateTimeZone(Some(date), Some(time), None)
 }
