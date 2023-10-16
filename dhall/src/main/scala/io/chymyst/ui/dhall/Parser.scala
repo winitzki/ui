@@ -4,7 +4,7 @@ import fastparse._
 import NoWhitespace._
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
 import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, File, ImportType, VarName}
-import Expression.{Annotation, Application, Builtin, DateLiteral, DoubleLiteral, EmptyList, Forall, If, Import, IntegerLiteral, Lambda, Let, Merge, NaturalLiteral, Operator, RecordLiteral, RecordType, ShowConstructor, TextLiteral, TimeLiteral, TimeZoneLiteral, ToMap}
+import Expression.{Annotation, Application, Assert, Builtin, DateLiteral, DoubleLiteral, EmptyList, Forall, If, Import, IntegerLiteral, Lambda, Let, Merge, NaturalLiteral, Operator, RecordLiteral, RecordType, ShowConstructor, TextLiteral, TimeLiteral, TimeZoneLiteral, ToMap, With}
 
 import java.time.{LocalDate, LocalTime, ZoneOffset}
 import scala.util.{Failure, Success, Try}
@@ -796,32 +796,40 @@ object Grammar {
       //  "a with x = b"
       //
       //  NOTE: Backtrack if parsing this alternative fails
-      / with_expression
+      / with_expression.map { case (expr, substs) => With(expr, Seq(), expr) } // TODO: figure out what this expression does!
       //
       //  "merge e1 e2 : t"
       //
       //  NOTE: Backtrack if parsing this alternative fails since we can't tell
       //  from the keyword whether there will be a type annotation or not
       / (requireKeyword("merge") ~ whsp1 ~ import_expression ~ whsp1 ~ import_expression ~ whsp ~ ":" ~ whsp1 ~ expression)
+      .map { case (e1, e2, t) => Merge(e1, e2, Some(t)) }
       //
       //  "[] : t"
       //
       //  NOTE: Backtrack if parsing this alternative fails since we can't tell
       //  from the opening bracket whether or not this will be an empty list or
       //  a non_empty list
-      / empty_list_literal
+      / empty_list_literal.map(tipe => EmptyList(tipe))
       //
       //  "toMap e : t"
       //
       //  NOTE: Backtrack if parsing this alternative fails since we can't tell
       //  from the keyword whether there will be a type annotation or not
       / (requireKeyword("toMap") ~ whsp1 ~ import_expression ~ whsp ~ ":" ~ whsp1 ~ expression)
+      .map { case (e1, e2) => ToMap(e1, Some(e2)) }
       //
       //  "assert : Natural/even 1 === False"
       / (requireKeyword("assert") ~ whsp ~ ":" ~ whsp1 ~ expression)
+      .map { expr => Assert(expr) }
       //
       //  "x : t"
-      / annotated_expression
+      / annotated_expression.map { case (expr, tipe) =>
+      tipe match {
+        case Some(t) => Annotation(expr, t)
+        case None => expr
+      }
+    }
   )
 
   def annotated_expression[$: P] = P(
@@ -841,7 +849,7 @@ object Grammar {
   )
 
   def with_clause[$: P] = P(
-    with_component ~ (whsp ~ "." ~ whsp ~ with_component).rep ~ whsp ~ "=" ~ whsp ~ operator_expression
+    with_component.map(VarName) ~ (whsp ~ "." ~ whsp ~ with_component.map(FieldName)).rep ~ whsp ~ "=" ~ whsp ~ operator_expression
   )
 
   def operator_expression[$: P]: P[Expression] = P(
