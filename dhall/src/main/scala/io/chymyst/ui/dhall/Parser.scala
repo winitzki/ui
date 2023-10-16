@@ -133,7 +133,7 @@ object Grammar {
   )
 
   def nonreserved_label[$: P] = P(
-    label
+    label.map(VarName)
   )
 
   def any_label[$: P] = P(
@@ -275,6 +275,24 @@ object Grammar {
     "showConstructor",
   )
 
+  def opOr[$: P] = P("||")
+
+  def opPlus[$: P] = P("+")
+
+  def opTextAppend[$: P] = P("++")
+
+  def opListAppend[$: P] = P("#")
+
+  def opAnd[$: P] = P("&&")
+
+  def opTimes[$: P] = P("*")
+
+  def opEqual[$: P] = P("==")
+
+  def opNotEqual[$: P] = P("!=")
+
+  def opAlternative[$: P] = P("?")
+
   def forall_symbol[$: P] = P(
     "\u2200" // Unicode FOR ALL
   )
@@ -367,44 +385,47 @@ object Grammar {
     "e" ~ ("+" / "-").? ~ DIGIT.rep(1)
   )
 
-  def numeric_double_literal[$: P] = P(
+  def numeric_double_literal[$: P]: P[Expression.DoubleLiteral] = P(
     // [ "+" / "-" ] 1*DIGIT ( "." 1*DIGIT [ exponent ] / exponent)
-    ("+" / "-").? ~ DIGIT.rep(1) ~ ("." ~ DIGIT.rep(1) ~ exponent.? / exponent)
-  )
+    (("+" / "-").? ~ DIGIT.rep(1) ~ ("." ~ DIGIT.rep(1) ~ exponent.? / exponent)).!
+  ).map(digits => Expression.DoubleLiteral(digits.toDouble))
 
-  def minus_infinity_literal[$: P] = P(
+  def minus_infinity_literal[$: P]: P[Expression.DoubleLiteral] = P(
     "-" ~ requireKeyword("Infinity")
-  )
+  ).map(_ => Expression.DoubleLiteral(Double.NegativeInfinity))
 
-  def plus_infinity_literal[$: P] = P(
+  def plus_infinity_literal[$: P]: P[Expression.DoubleLiteral] = P(
     requireKeyword("Infinity")
-  )
+  ).map(_ => Expression.DoubleLiteral(Double.PositiveInfinity))
 
-  def double_literal[$: P] = P(
+  def double_literal[$: P]: P[Expression.DoubleLiteral] = P(
     // "-Infinity"
     minus_infinity_literal
       // "Infinity"
       / plus_infinity_literal
       // "NaN"
-      / "NaN"
+      / requireKeyword("NaN").map(_ => Expression.DoubleLiteral(Double.NaN))
       // "2.0"
       / numeric_double_literal
   )
 
-  def natural_literal[$: P] = P(
+  def natural_literal[$: P]: P[Expression.NaturalLiteral] = P(
     // Hexadecimal with "0x" prefix
-    "0x" ~ HEXDIG.rep(1)
+    ("0x" ~ HEXDIG.rep(1).!).map(hexdigits => BigInt(hexdigits, 16))
       // Decimal; leading 0 digits are not allowed
-      / CharIn("1-9") ~ (DIGIT.rep)
+      / (CharIn("1-9") ~ DIGIT.rep).!.map(digits => BigInt(digits, 10))
       // ... except for 0 itself
-      / "0"
-  )
+      / P("0").map(_ => BigInt(0))
+  ).map(Expression.NaturalLiteral)
 
-  def integer_literal[$: P] = P(
-    ("+" / "-") ~ natural_literal
-  )
+  def integer_literal[$: P]: P[Expression.IntegerLiteral] = P(
+    ("+" / "-").! ~ natural_literal
+  ).map {
+    case ("+", nat) => nat.value
+    case ("-", nat) => -nat.value
+  }.map(Expression.IntegerLiteral)
 
-  def temporal_literal[$: P] = P(
+  def temporal_literal[$: P]: P[Expression] = P(
     // "YYYY_MM_DDThh:mm:ss[+-]HH:MM", parsed as a `{ date : Date, time : Time, timeZone : TimeZone }`
     full_date ~ "T" ~ partial_time ~ time_offset
       // "YYYY_MM_DDThh:mm:ss", parsed as a `{ date : Date, time : Time }`
@@ -714,15 +735,19 @@ object Grammar {
       //  "let x = e1 let y = e2 in e3"
       //  "let x = e1 in let y = e2 in e3"
       / (let_binding.rep(1) ~ requireKeyword("in") ~ whsp1 ~ expression)
-      .map { case (x) => ??? }
+      .map { case (letBindings, expr) =>
+        letBindings.foldLeft(expr) { case (prev, (varName, tipe, body)) => Syntax.Expression.Let(varName, tipe, body, prev) }
+      }
       //
       //  "forall (x : a) -> b"
       / (requireKeyword("forall") ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression)
+      .map { case (varName, tipe, body) => Syntax.Expression.Forall(varName, tipe, body) }
       //
       //  "a -> b"
       //
       //  NOTE: Backtrack if parsing this alternative fails
       / (operator_expression ~ whsp ~ arrow ~ whsp ~ expression)
+      .map { case (head, body) => Syntax.Expression.F }
       //
       //  "a with x = b"
       //
@@ -765,7 +790,7 @@ object Grammar {
 
   def empty_list_literal[$: P] = P(
     "[" ~ whsp ~ ("," ~ whsp).? ~ "]" ~ whsp ~ ":" ~ whsp1 ~ expression
-  )
+  ).map(expr => Syntax.Expression.EmptyList(expr))
 
   def with_expression[$: P] = P(
     import_expression ~ (whsp1 ~ "with" ~ whsp1 ~ with_clause).rep(1)
@@ -775,60 +800,60 @@ object Grammar {
     with_component ~ (whsp ~ "." ~ whsp ~ with_component).rep ~ whsp ~ "=" ~ whsp ~ operator_expression
   )
 
-  def operator_expression[$: P] = P(
+  def operator_expression[$: P]: P[Expression.Operator] = P(
     equivalent_expression
   )
 
-  def equivalent_expression[$: P] = P(
+  def equivalent_expression[$: P]: P[Expression.Operator] = P(
     import_alt_expression ~ (whsp ~ equivalent ~ whsp ~ import_alt_expression).rep
   )
 
-  def import_alt_expression[$: P] = P(
-    or_expression ~ (whsp ~ "?" ~ whsp1 ~ or_expression).rep
+  def import_alt_expression[$: P]: P[Expression.Operator] = P(
+    or_expression ~ (whsp ~ opAlternative ~ whsp1 ~ or_expression).rep
   )
 
-  def or_expression[$: P] = P(
-    plus_expression ~ (whsp ~ "||" ~ whsp ~ plus_expression).rep
+  def or_expression[$: P]: P[Expression.Operator] = P(
+    plus_expression ~ (whsp ~ opOr ~ whsp ~ plus_expression).rep
   )
 
   def plus_expression[$: P] = P(
-    text_append_expression ~ (whsp ~ "+" ~ whsp1 ~ text_append_expression).rep
+    text_append_expression ~ (whsp ~ opPlus ~ whsp1 ~ text_append_expression).rep
   )
 
-  def text_append_expression[$: P] = P(
-    list_append_expression ~ (whsp ~ "++" ~ whsp ~ list_append_expression).rep
+  def text_append_expression[$: P]: P[Expression.Operator] = P(
+    list_append_expression ~ (whsp ~ opTextAppend ~ whsp ~ list_append_expression).rep
   )
 
-  def list_append_expression[$: P] = P(
-    and_expression ~ (whsp ~ "#" ~ whsp ~ and_expression).rep
+  def list_append_expression[$: P]: P[Expression.Operator] = P(
+    and_expression ~ (whsp ~ opListAppend ~ whsp ~ and_expression).rep
   )
 
-  def and_expression[$: P] = P(
-    combine_expression ~ (whsp ~ "&&" ~ whsp ~ combine_expression).rep
+  def and_expression[$: P]: P[Expression.Operator] = P(
+    combine_expression ~ (whsp ~ opAnd ~ whsp ~ combine_expression).rep
   )
 
-  def combine_expression[$: P] = P(
+  def combine_expression[$: P]: P[Expression.Operator] = P(
     prefer_expression ~ (whsp ~ combine ~ whsp ~ prefer_expression).rep
   )
 
-  def prefer_expression[$: P] = P(
+  def prefer_expression[$: P]: P[Expression.Operator] = P(
     combine_types_expression ~ (whsp ~ prefer ~ whsp ~ combine_types_expression).rep
   )
 
-  def combine_types_expression[$: P] = P(
+  def combine_types_expression[$: P]: P[Expression.Operator] = P(
     times_expression ~ (whsp ~ combine_types ~ whsp ~ times_expression).rep
   )
 
-  def times_expression[$: P] = P(
-    equal_expression ~ (whsp ~ "*" ~ whsp ~ equal_expression).rep
+  def times_expression[$: P]: P[Expression.Operator] = P(
+    equal_expression ~ (whsp ~ opTimes ~ whsp ~ equal_expression).rep
   )
 
-  def equal_expression[$: P] = P(
-    not_equal_expression ~ (whsp ~ "==" ~ whsp ~ not_equal_expression).rep
+  def equal_expression[$: P]: P[Expression.Operator] = P(
+    not_equal_expression ~ (whsp ~ opEqual ~ whsp ~ not_equal_expression).rep
   )
 
-  def not_equal_expression[$: P] = P(
-    application_expression ~ (whsp ~ "!=" ~ whsp ~ application_expression).rep
+  def not_equal_expression[$: P]: P[Expression.Operator] = P(
+    application_expression ~ (whsp ~ opNotEqual ~ whsp ~ application_expression).rep
   )
 
   def application_expression[$: P] = P(
@@ -965,10 +990,12 @@ object Grammar {
     shebang.rep ~ whsp ~ expression ~ whsp ~ line_comment_prefix.?
   ).map { case (shebangContents, expr) => DhallFile(shebangContents, expr) }
 
+  // Helpers to make sure we are using valid keyword and operator names.
   def requireKeyword[$: P](name: String) = {
     assert(simpleKeywords contains name, s"Keyword $name must be one of the supported Dhall keywords")
     P(name)
   }
+
 }
 
 

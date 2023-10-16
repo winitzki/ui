@@ -2,7 +2,7 @@ package io.chymyst.ui.dhall
 
 import enumeratum._
 import io.chymyst.ui.dhall.Syntax.Expression
-import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, VarName}
+import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, VarName, DirName}
 
 import java.time.{LocalDate, LocalTime, ZoneOffset}
 
@@ -10,6 +10,8 @@ object SyntaxConstants {
   final case class VarName(name: String) extends AnyVal
 
   final case class FieldName(name: String) extends AnyVal
+
+  final case class DirName(name: String) extends AnyVal
 
   sealed abstract class Operator(val op: String) extends EnumEntry
 
@@ -194,7 +196,9 @@ object Syntax {
 
   final case class DhallFile(shebangs: Seq[String], value: Expression)
 
-  type Natural = Int
+  type Natural = BigInt
+
+  type Integer = BigInt
 
   sealed trait Expression
 
@@ -239,7 +243,7 @@ object Syntax {
 
     final case class NaturalLiteral(value: Natural) extends Expression
 
-    final case class IntegerLiteral(value: Int) extends Expression
+    final case class IntegerLiteral(value: Integer) extends Expression
 
     final case class TextLiteralNoInterp(value: String) extends Expression
 
@@ -274,7 +278,7 @@ object Syntax {
   sealed trait PathComponent
 
   object PathComponent {
-    final case class Label(dirName: String) extends AnyVal with PathComponent
+    final case class Label(dirName: DirName) extends PathComponent
 
     final case object DescendOptional extends PathComponent
   }
