@@ -1,5 +1,6 @@
 package io.chymyst.ui.swing
 
+import com.formdev.flatlaf.FlatLightLaf
 import io.chymyst.ui.elm.Elm.{Consume, UiBackend}
 import io.chymyst.ui.elm.{LabelAlignment, View}
 
@@ -8,7 +9,11 @@ import java.awt.event.ActionEvent
 import javax.swing.{Box, BoxLayout, JButton, JFrame, JLabel, JPanel, SwingConstants, WindowConstants}
 
 final class SwingRunner {
+  // This sets up the initial window for the entire GUI. Add any global setup here.
   private def getFrameAndContentPane(): (JFrame, Container) = {
+    // Setup flatlaf.
+    FlatLightLaf.setup()
+
     val f = new JFrame("Swing Runner")
     f.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE)
     f.setBounds(400, 400, 640, 480)

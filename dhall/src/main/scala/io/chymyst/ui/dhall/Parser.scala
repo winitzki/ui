@@ -3,6 +3,7 @@ package io.chymyst.ui.dhall
 import fastparse._
 import NoWhitespace._
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
+import io.chymyst.ui.dhall.SyntaxConstants.VarName
 
 object Grammar {
 
@@ -127,7 +128,7 @@ object Grammar {
     quoted_label_char.rep
   )
 
-  def label[$: P] = P(
+  def label[$: P]: P[String] = P(
     ("`" ~ quoted_label.! ~ "`" / simple_label.!)
   )
 
@@ -475,7 +476,7 @@ object Grammar {
   )
 
   def path_character[$: P] = P( // Note: character 002D is the hyphen and needs to be escaped when used under CharIn().
-        CharIn("\u0021\u0024-\u0027\u002A-\u002B\\-\u002E\u0030\u003B\u0040-\u005A\u005E-\u007A\u007C\u007E")
+    CharIn("\u0021\u0024-\u0027\u002A-\u002B\\-\u002E\u0030\u003B\u0040-\u005A\u005E-\u007A\u007C\u007E")
   )
 
   def quoted_path_character[$: P] = P(
@@ -701,11 +702,11 @@ object Grammar {
   def expression[$: P]: P[Expression] = P(
     //  "\(x : a) -> b"
     (lambda ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression)
-      .map { case (name,tipe, body) => Syntax.Expression.Lambda(name, tipe, body)}
+      .map { case (name, tipe, body) => Syntax.Expression.Lambda(VarName(name), tipe, body) }
       //
       //  "if a then b else c"
       / (requireKeyword("if") ~ whsp1 ~ expression ~ whsp ~ requireKeyword("then") ~ whsp1 ~ expression ~ whsp ~ requireKeyword("else") ~ whsp1 ~ expression)
-      .map {case (cond, ifTrue, ifFalse) => Syntax.Expression.If(cond, ifTrue, ifFalse)}
+      .map { case (cond, ifTrue, ifFalse) => Syntax.Expression.If(cond, ifTrue, ifFalse) }
       //
       //  "let x : t = e1 in e2"
       //  "let x     = e1 in e2"
@@ -713,6 +714,7 @@ object Grammar {
       //  "let x = e1 let y = e2 in e3"
       //  "let x = e1 in let y = e2 in e3"
       / (let_binding.rep(1) ~ requireKeyword("in") ~ whsp1 ~ expression)
+      .map { case (x) => ??? }
       //
       //  "forall (x : a) -> b"
       / (requireKeyword("forall") ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression)
@@ -961,11 +963,11 @@ object Grammar {
 
   def complete_expression[$: P] = P(
     shebang.rep ~ whsp ~ expression ~ whsp ~ line_comment_prefix.?
-  ).map { case (shebangContents, expr ) => DhallFile(shebangContents , expr )}
+  ).map { case (shebangContents, expr) => DhallFile(shebangContents, expr) }
 
   def requireKeyword[$: P](name: String) = {
     assert(simpleKeywords contains name, s"Keyword $name must be one of the supported Dhall keywords")
-    P(name).!
+    P(name)
   }
 }
 
