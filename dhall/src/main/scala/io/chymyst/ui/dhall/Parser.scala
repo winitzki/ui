@@ -6,6 +6,7 @@ import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
 import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, File, ImportType, VarName}
 import Expression.{Annotation, Application, Assert, Builtin, DateLiteral, DoubleLiteral, EmptyList, Forall, If, Import, IntegerLiteral, Lambda, Let, Merge, NaturalLiteral, Operator, RecordLiteral, RecordType, ShowConstructor, TextLiteral, TimeLiteral, TimeZoneLiteral, ToMap, With}
 
+import java.io.InputStream
 import java.time.{LocalDate, LocalTime, ZoneOffset}
 import scala.util.{Failure, Success, Try}
 
@@ -1068,6 +1069,8 @@ object Parser {
   //  }
 
   def parseDhall(source: String): Parsed[DhallFile] = parse(source, Grammar.complete_expression(_))
+
+  def parseDhall(source: InputStream): Parsed[DhallFile] = parse(source, Grammar.complete_expression(_))
 
   private def localDateTimeZone(dateOption: Option[DateLiteral], timeOption: Option[TimeLiteral], zoneOption: Option[ZoneOffset]): Expression = {
     val dateR = dateOption.map { date => (FieldName("date"), date) }
