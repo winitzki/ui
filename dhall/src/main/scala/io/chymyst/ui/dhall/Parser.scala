@@ -1034,19 +1034,19 @@ object Grammar {
   )
 
   def record_type_or_literal[$: P]: P[Expression] = P(
-    empty_record_literal.map(_ => Expression.RecordLiteral(Seq()))
+    empty_record_literal
       | non_empty_record_type_or_literal.?.map(_.toSeq.flatten).map(Expression.RecordLiteral)
   )
 
-  def empty_record_literal[$: P] = P(
+  def empty_record_literal[$: P]: P[Expression.RecordLiteral] = P(
     "=" ~ (whsp ~ ",").?
+  ).map(_ => Expression.RecordLiteral(Seq()))
+
+  def non_empty_record_type_or_literal[$: P]: P[Expression] = P(
+    non_empty_record_type | non_empty_record_literal
   )
 
-  def non_empty_record_type_or_literal[$: P]: P[Seq[(FieldName, Expression)]] = P(
-    non_empty_record_type | non_empty_record_literal
-  ).map { case (head, tail) => head +: tail }
-
-  def non_empty_record_type[$: P]: P[(FieldName, Expression, Seq[(FieldName, Expression)])] = P(
+  def non_empty_record_type[$: P]: P[Expression.RecordType] = P(
     record_type_entry ~ (whsp ~ "," ~ whsp ~ record_type_entry).rep ~ (whsp ~ ",").?
   )
 
@@ -1054,16 +1054,32 @@ object Grammar {
     any_label_or_some.map(FieldName) ~ whsp ~ ":" ~ whsp1 ~ expression
   )
 
-  def non_empty_record_literal[$: P]: P[(FieldName, Expression, Seq[(FieldName, Expression)])] = P(
+  def non_empty_record_literal[$: P]: P[Expression.RecordLiteral] = P(
     record_literal_entry ~ (whsp ~ "," ~ whsp ~ record_literal_entry).rep ~ (whsp ~ ",").?
   )
+/* See https://github.com/dhall-lang/dhall-lang/blob/master/standard/README.md#record-syntactic-sugar
 
-  def record_literal_entry[$: P]: P[(FieldName, Expression)] = P(
+... a record literal of the form:
+
+{ x.y = 1, x.z = 1 } }
+
+... first desugars dotted fields to nested records:
+
+{ x = { y = 1 }, x = { z = 1 } }
+
+... and then desugars duplicate fields by merging them using ∧:
+
+{ x = { y = 1 } ∧ { z = 1} }
+
+... this conversion occurs at parse-time ...
+
+ */
+  def record_literal_entry[$: P]: P[(Expression.Field, Expression)] = P(
     any_label_or_some.map(FieldName) ~ record_literal_normal_entry.?
-  )
+  ).map { case (fields, body) =}
 
-  def record_literal_normal_entry[$: P] = P(
-    (whsp ~ "." ~ whsp ~ any_label_or_some).rep ~ whsp ~ "=" ~ whsp ~ expression
+  def record_literal_normal_entry[$: P]: P[(Seq[FieldName], Expression)] = P(
+    (whsp ~ "." ~ whsp ~ any_label_or_some.map(FieldName)).rep ~ whsp ~ "=" ~ whsp ~ expression
   )
 
   def union_type[$: P]: P[Expression.UnionType] = P(
