@@ -25,9 +25,9 @@ object ParserTest extends TestSuite {
     }
 
     test("parse product.dhall") - {
-      val Parsed.Success(result, lastIndex) = Parser.parseDhall(getClass.getResourceAsStream("/product.dhall"))
-      val expected: Expression = Expression.Builtin(SyntaxConstants.Builtin.List)
-      assert(result == DhallFile(Seq(), expected))
+      val Parsed.Success(DhallFile(Seq(), result), lastIndex) = Parser.parseDhall(getClass.getResourceAsStream("/product.dhall"))
+      val expected = Expression.Builtin(SyntaxConstants.Builtin.List)
+      assert(result == expected)
     }
   }
 }
