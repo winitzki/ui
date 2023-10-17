@@ -1076,9 +1076,9 @@ object Grammar {
 See https://github.com/dhall-lang/dhall-lang/blob/master/standard/record.md
 
  */
-  def record_literal_entry[$: P]: P[(Expression.Field, Expression)] = P(
+  def record_literal_entry[$: P]: P[Expression.RawRecordLiteral] = P(
     any_label_or_some.map(FieldName) ~ record_literal_normal_entry.?
-  ).map { case (fields, body) =}
+  ).map { case (fields, body) => ??? }
 
   def record_literal_normal_entry[$: P]: P[(Seq[FieldName], Expression)] = P(
     (whsp ~ "." ~ whsp ~ any_label_or_some.map(FieldName)).rep ~ whsp ~ "=" ~ whsp ~ expression
