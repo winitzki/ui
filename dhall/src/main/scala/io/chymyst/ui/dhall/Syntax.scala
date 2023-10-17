@@ -210,7 +210,7 @@ object Syntax {
   sealed trait Expression
 
   object Expression {
-    final case class Variable(name: String, index: Int) extends Expression
+    final case class Variable(name: VarName, index: Natural) extends Expression
 
     final case class Lambda(name: VarName, tipe: Expression, body: Expression) extends Expression
 

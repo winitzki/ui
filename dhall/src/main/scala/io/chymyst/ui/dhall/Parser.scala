@@ -164,7 +164,7 @@ object Grammar {
     //    CharIn("\"$\\/bfnrt")
     CharIn("\u0022").! // '"'    quotation mark  U+0022
       | "$".!.map(_ => "\u0024") // '$'    dollar sign     U+0024
-      |  "\\".! //| % x5C // '\'    reverse solidus U+005C
+      | "\\".! //| % x5C // '\'    reverse solidus U+005C
       | "/".! // '/'    solidus         U+002F
       | "b".!.map(_ => "\b") // 'b'    backspace       U+0008
       | "f".!.map(_ => "\f") // 'f'    form feed       U+000C
@@ -217,7 +217,7 @@ object Grammar {
       | valid_non_ascii
   )
 
-  def double_quote_literal[$: P]:P[TextLiteral] = P(
+  def double_quote_literal[$: P]: P[TextLiteral] = P(
     "\"" ~ double_quote_chunk.rep ~ "\""
   ).map(_.map(literalOrInterp => literalOrInterp.map(TextLiteral.ofText).merge).reduce(_ ++ _))
 
@@ -252,11 +252,12 @@ object Grammar {
     "${" ~ complete_expression.map(_.omitShebangs) ~ "}"
   )
 
-  def text_literal[$: P]:P[TextLiteral] = P(
+  def text_literal[$: P]: P[TextLiteral] = P(
     double_quote_literal
       | single_quote_literal
   )
 
+  // See https://stackoverflow.com/questions/140131/convert-a-string-representation-of-a-hex-dump-to-a-byte-array-using-java
   private def hexStringToByteArray(s: String): Array[Byte] = { // `s` must be a String of even length.
     val len = s.length
     val data = new Array[Byte](len / 2)
@@ -268,7 +269,7 @@ object Grammar {
     data
   }
 
-  def bytes_literal[$: P]:P[Expression.BytesLiteral] = P(
+  def bytes_literal[$: P]: P[Expression.BytesLiteral] = P(
     "0x\"" ~ HEXDIG.rep(exactly = 2).rep.! ~ "\""
   ).map(hexStringToByteArray).map(Expression.BytesLiteral)
 
@@ -527,8 +528,9 @@ object Grammar {
     }
   }
 
-  def identifier[$: P] = P(
-    variable | builtin
+  def identifier[$: P]: P[Expression] = P(
+    variable.map { case (name, index) => Expression.Variable(name, index.map(_.value).getOrElse(BigInt(0))) }
+      | builtin
   )
 
   def variable[$: P] = P(
@@ -1019,6 +1021,7 @@ object Grammar {
       //  "< Foo : Integer | Bar : Bool >"
       //  "< Foo | Bar : Bool >"
       | ("<" ~ whsp ~ ("|" ~ whsp).? ~ union_type ~ whsp ~ ">")
+      .map { case x => }
       //
       //  "[1, 2, 3]"
       | non_empty_list_literal
@@ -1031,8 +1034,12 @@ object Grammar {
       | ("(" ~ complete_expression ~ ")").map(_.omitShebangs)
   )
 
-  def record_type_or_literal[$: P] = P(
-    empty_record_literal | non_empty_record_type_or_literal.?
+  def record_type_or_literal[$: P]: P[Expression] = P(
+    empty_record_literal.map(_ => Expression.RecordLiteral(Seq()))
+      | non_empty_record_type_or_literal.?.map {
+      case Some((headName, headType, tail)) => Expression.RecordLiteral((headName, headType) +: tail)
+      case None => Expression.RecordLiteral(Seq())
+    }
   )
 
   def empty_record_literal[$: P] = P(
@@ -1040,20 +1047,19 @@ object Grammar {
   )
 
   def non_empty_record_type_or_literal[$: P] = P(
-    (non_empty_record_type | non_empty_record_literal)
+    non_empty_record_type | non_empty_record_literal
   )
 
-  def non_empty_record_type[$: P] = P(
+  def non_empty_record_type[$: P]: P[(FieldName, Expression, Seq[(FieldName, Expression)])] = P(
     record_type_entry ~ (whsp ~ "," ~ whsp ~ record_type_entry).rep ~ (whsp ~ ",").?
   )
 
-  def record_type_entry[$: P] = P(
-    any_label_or_some ~ whsp ~ ":" ~ whsp1 ~ expression
+  def record_type_entry[$: P]: P[(FieldName, Expression)] = P(
+    any_label_or_some.map(FieldName) ~ whsp ~ ":" ~ whsp1 ~ expression
   )
 
-  def non_empty_record_literal[$: P] = P(
+  def non_empty_record_literal[$: P]: P[(FieldName, Expression, Seq[(FieldName, Expression)])] = P(
     record_literal_entry ~ (whsp ~ "," ~ whsp ~ record_literal_entry).rep ~ (whsp ~ ",").?
-
   )
 
   def record_literal_entry[$: P] = P(
@@ -1064,17 +1070,20 @@ object Grammar {
     (whsp ~ "." ~ whsp ~ any_label_or_some).rep ~ whsp ~ "=" ~ whsp ~ expression
   )
 
-  def union_type[$: P] = P(
+  def union_type[$: P]: P[Expression.UnionType] = P(
     (union_type_entry ~ (whsp ~ "|" ~ whsp ~ union_type_entry).rep ~ (whsp ~ "|").?).?
-  )
+  ).map {
+    case Some((headName, headType, tail)) => Expression.UnionType((headName, headType) +: tail)
+    case None => Expression.UnionType(Seq())
+  }
 
   def union_type_entry[$: P] = P(
     any_label_or_some ~ (whsp ~ ":" ~ whsp1 ~ expression).?
   )
 
-  def non_empty_list_literal[$: P] = P(
+  def non_empty_list_literal[$: P]: P[Expression.NonEmptyList] = P(
     "[" ~ whsp ~ ("," ~ whsp).? ~ expression ~ whsp ~ ("," ~ whsp ~ expression ~ whsp).rep ~ ("," ~ whsp).? ~ "]"
-  )
+  ).map { case (head, tail) => Expression.NonEmptyList(head, tail) }
 
   def shebang[$: P] = P(
     "#!" ~ not_end_of_line.rep.! ~ end_of_line
