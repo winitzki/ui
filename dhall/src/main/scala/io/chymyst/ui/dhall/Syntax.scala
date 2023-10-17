@@ -290,6 +290,9 @@ object Syntax {
 
     final case class RecordLiteral(defs: Seq[(FieldName, Expression)]) extends Expression
 
+    // Raw record syntax: { x.y.z = 1 } that needs to be processed further.
+    final case class RawRecordLiteral(defs: Seq[(Seq[FieldName], Expression)]) extends Expression
+
     final case class UnionType(defs: Seq[(ConstructorName, Option[Expression])]) extends Expression
 
     final case class ShowConstructor(data: Expression) extends Expression

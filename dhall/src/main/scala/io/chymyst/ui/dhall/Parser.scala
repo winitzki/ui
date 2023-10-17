@@ -1061,7 +1061,7 @@ object Grammar {
 
 ... a record literal of the form:
 
-{ x.y = 1, x.z = 1 } }
+{ x.y = 1, x.z = 1 }
 
 ... first desugars dotted fields to nested records:
 
@@ -1072,6 +1072,8 @@ object Grammar {
 { x = { y = 1 } ∧ { z = 1} }
 
 ... this conversion occurs at parse-time ...
+
+See https://github.com/dhall-lang/dhall-lang/blob/master/standard/record.md
 
  */
   def record_literal_entry[$: P]: P[(Expression.Field, Expression)] = P(
