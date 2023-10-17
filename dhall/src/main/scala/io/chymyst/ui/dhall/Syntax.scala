@@ -290,8 +290,12 @@ object Syntax {
 
     final case class RecordLiteral(defs: Seq[(FieldName, Expression)]) extends Expression
 
+    object RecordLiteral {
+      def of(value: Seq[RawRecordLiteral]): RecordLiteral = ??? // Parse a non-empty sequence of RawRecordLiteral's into a RecordLiteral.
+    }
+
     // Raw record syntax: { x.y.z = 1 } that needs to be processed further.
-    final case class RawRecordLiteral(defs: Seq[(Seq[FieldName], Expression)]) extends Expression
+    final case class RawRecordLiteral(defs: Seq[(FieldName, Seq[FieldName], Option[Expression])]) extends Expression
 
     final case class UnionType(defs: Seq[(ConstructorName, Option[Expression])]) extends Expression
 

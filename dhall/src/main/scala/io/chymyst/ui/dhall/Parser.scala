@@ -3,8 +3,8 @@ package io.chymyst.ui.dhall
 import fastparse._
 import NoWhitespace._
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
-import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, File, ImportType, VarName}
-import Expression.{Annotation, Application, Assert, Builtin, DateLiteral, DoubleLiteral, EmptyList, Forall, If, Import, IntegerLiteral, Lambda, Let, Merge, NaturalLiteral, Operator, RecordLiteral, RecordType, ShowConstructor, TextLiteral, TimeLiteral, TimeZoneLiteral, ToMap, With}
+import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, File, ImportType, VarName}
+import Expression.{Annotation, Application, Assert, Builtin, DateLiteral, DoubleLiteral, EmptyList, Forall, If, Import, IntegerLiteral, Lambda, Let, Merge, NaturalLiteral, Operator, RawRecordLiteral, RecordLiteral, RecordType, ShowConstructor, TextLiteral, TimeLiteral, TimeZoneLiteral, ToMap, With}
 
 import java.io.InputStream
 import java.time.{LocalDate, LocalTime, ZoneOffset}
@@ -319,8 +319,8 @@ object Grammar {
     forall_symbol | requireKeyword("forall")
   )
 
-  def keyword[$: P] = P(
-    simpleKeywords.map(P(_)).reduce(_ | _)
+  def keyword[$: P]: P[String] = P(
+    simpleKeywords.map(P(_).!).reduce(_ | _)
   )
 
   val builtinSymbols = Set(
@@ -1017,6 +1017,7 @@ object Grammar {
       //  "{ foo = 1      , bar = True }"
       //  "{ foo : Integer, bar : Bool }"
       | ("{" ~ whsp ~ ("," ~ whsp).? ~ record_type_or_literal ~ whsp ~ "}")
+      .map(_.getOrElse(Expression.RecordLiteral(Seq())))
       //
       //  "< Foo : Integer | Bar : Bool >"
       //  "< Foo | Bar : Bool >"
@@ -1033,9 +1034,9 @@ object Grammar {
       | ("(" ~ complete_expression ~ ")").map(_.omitShebangs)
   )
 
-  def record_type_or_literal[$: P]: P[Expression] = P(
-    empty_record_literal
-      | non_empty_record_type_or_literal.?.map(_.toSeq.flatten).map(Expression.RecordLiteral)
+  def record_type_or_literal[$: P]: P[Option[Expression]] = P(
+    empty_record_literal.map(Some.apply)
+      | non_empty_record_type_or_literal.?
   )
 
   def empty_record_literal[$: P]: P[Expression.RecordLiteral] = P(
@@ -1048,7 +1049,7 @@ object Grammar {
 
   def non_empty_record_type[$: P]: P[Expression.RecordType] = P(
     record_type_entry ~ (whsp ~ "," ~ whsp ~ record_type_entry).rep ~ (whsp ~ ",").?
-  )
+  ).map { case (headName, headExpr, tail) => (headName, headExpr) +: tail }.map(Expression.RecordType)
 
   def record_type_entry[$: P]: P[(FieldName, Expression)] = P(
     any_label_or_some.map(FieldName) ~ whsp ~ ":" ~ whsp1 ~ expression
@@ -1056,29 +1057,30 @@ object Grammar {
 
   def non_empty_record_literal[$: P]: P[Expression.RecordLiteral] = P(
     record_literal_entry ~ (whsp ~ "," ~ whsp ~ record_literal_entry).rep ~ (whsp ~ ",").?
-  )
-/* See https://github.com/dhall-lang/dhall-lang/blob/master/standard/README.md#record-syntactic-sugar
+  ).map { case (head, tail) => Expression.RecordLiteral.of(head +: tail) }
 
-... a record literal of the form:
+  /* See https://github.com/dhall-lang/dhall-lang/blob/master/standard/README.md#record-syntactic-sugar
 
-{ x.y = 1, x.z = 1 }
+  ... a record literal of the form:
 
-... first desugars dotted fields to nested records:
+  { x.y = 1, x.z = 1 }
 
-{ x = { y = 1 }, x = { z = 1 } }
+  ... first desugars dotted fields to nested records:
 
-... and then desugars duplicate fields by merging them using ∧:
+  { x = { y = 1 }, x = { z = 1 } }
 
-{ x = { y = 1 } ∧ { z = 1} }
+  ... and then desugars duplicate fields by merging them using ∧:
 
-... this conversion occurs at parse-time ...
+  { x = { y = 1 } ∧ { z = 1} }
 
-See https://github.com/dhall-lang/dhall-lang/blob/master/standard/record.md
+  ... this conversion occurs at parse-time ...
 
- */
-  def record_literal_entry[$: P]: P[Expression.RawRecordLiteral] = P(
+  See https://github.com/dhall-lang/dhall-lang/blob/master/standard/record.md
+
+   */
+  def record_literal_entry[$: P]: P[RawRecordLiteral] = P(
     any_label_or_some.map(FieldName) ~ record_literal_normal_entry.?
-  ).map { case (fields, body) => ??? }
+  ).map { case (fields, body) => RawRecordLiteral(Seq((fields, body.map(_._1).toSeq.flatten, body.map(_._2)))) }
 
   def record_literal_normal_entry[$: P]: P[(Seq[FieldName], Expression)] = P(
     (whsp ~ "." ~ whsp ~ any_label_or_some.map(FieldName)).rep ~ whsp ~ "=" ~ whsp ~ expression
@@ -1092,7 +1094,7 @@ See https://github.com/dhall-lang/dhall-lang/blob/master/standard/record.md
   }
 
   def union_type_entry[$: P] = P(
-    any_label_or_some ~ (whsp ~ ":" ~ whsp1 ~ expression).?
+    any_label_or_some.map(ConstructorName) ~ (whsp ~ ":" ~ whsp1 ~ expression).?
   )
 
   def non_empty_list_literal[$: P]: P[Expression.NonEmptyList] = P(
