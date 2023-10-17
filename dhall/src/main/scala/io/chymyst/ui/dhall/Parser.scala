@@ -12,7 +12,7 @@ import scala.util.{Failure, Success, Try}
 
 object Grammar {
 
-  def end_of_line[$: P] = P("\n" / "\r\n")
+  def end_of_line[$: P] = P("\n" | "\r\n")
 
   def valid_non_ascii[$: P] = P(
     CharIn(
@@ -20,37 +20,37 @@ object Grammar {
       // %xD800_DFFF = surrogate pairs
       "\uE000-\uFFFD",
       // %xFFFE_FFFF = non_characters
-      //        / % x10000_1FFFD
+      //        | % x10000_1FFFD
       //      // %x1FFFE_1FFFF = non_characters
-      //      / % x20000_2FFFD
+      //      | % x20000_2FFFD
       //        // %x2FFFE_2FFFF = non_characters
-      //        / % x30000_3FFFD
+      //        | % x30000_3FFFD
       //      // %x3FFFE_3FFFF = non_characters
-      //      / % x40000_4FFFD
+      //      | % x40000_4FFFD
       //        // %x4FFFE_4FFFF = non_characters
-      //        / % x50000_5FFFD
+      //        | % x50000_5FFFD
       //      // %x5FFFE_5FFFF = non_characters
-      //      / % x60000_6FFFD
+      //      | % x60000_6FFFD
       //        // %x6FFFE_6FFFF = non_characters
-      //        / % x70000_7FFFD
+      //        | % x70000_7FFFD
       //      // %x7FFFE_7FFFF = non_characters
-      //      / % x80000_8FFFD
+      //      | % x80000_8FFFD
       //        // %x8FFFE_8FFFF = non_characters
-      //        / % x90000_9FFFD
+      //        | % x90000_9FFFD
       //      // %x9FFFE_9FFFF = non_characters
-      //      / % xA0000_AFFFD
+      //      | % xA0000_AFFFD
       //        // %xAFFFE_AFFFF = non_characters
-      //        / % xB0000_BFFFD
+      //        | % xB0000_BFFFD
       //      // %xBFFFE_BFFFF = non_characters
-      //      / % xC0000_CFFFD
+      //      | % xC0000_CFFFD
       //        // %xCFFFE_CFFFF = non_characters
-      //        / % xD0000_DFFFD
+      //        | % xD0000_DFFFD
       //      // %xDFFFE_DFFFF = non_characters
-      //      / % xE0000_EFFFD
+      //      | % xE0000_EFFFD
       //        // %xEFFFE_EFFFF = non_characters
-      //        / % xF0000_FFFFD
+      //        | % xF0000_FFFFD
       //      // %xFFFFE_FFFFF = non_characters
-      //      / % x100000_10FFFD
+      //      | % x100000_10FFFD
       // %x10FFFE_10FFFF = non_characters
     ))
 
@@ -73,7 +73,7 @@ object Grammar {
   )
 
   def not_end_of_line[$: P] = P(
-    CharIn("\u0020-\u007F") / valid_non_ascii / tab
+    CharIn("\u0020-\u007F") | valid_non_ascii | tab
   )
 
   def line_comment_prefix[$: P] = P(
@@ -120,8 +120,18 @@ object Grammar {
     ALPHANUM | "-" | "/" | "_"
   )
 
+  // TODO: a simple label cannot be a keyword
+  /*
+  ; A simple label cannot be one of the reserved keywords
+  ; listed in the `keyword` rule.
+  ; A PEG parser could use negative lookahead to
+  ; enforce this, e.g. as follows:
+  ; simple-label =
+  ;       keyword 1*simple-label-next-char
+  ;     / !keyword (simple-label-first-char *simple-label-next-char)
+   */
   def simple_label[$: P] = P(
-    simple_label_first_char.rep ~ simple_label_next_char
+    simple_label_first_char ~ simple_label_next_char.rep
   )
 
   def quoted_label_char[$: P] = P(
@@ -134,7 +144,7 @@ object Grammar {
   )
 
   def label[$: P]: P[String] = P(
-    ("`" ~ quoted_label.! ~ "`" | simple_label.!)
+    ("`" ~ quoted_label.! ~ "`") | simple_label.!
   )
 
   def nonreserved_label[$: P] = P(
@@ -194,7 +204,7 @@ object Grammar {
 
 
   def braced_codepoint[$: P] = P(
-    (CharIn("1-9A-F") | "10") ~ unicode_suffix
+    ((CharIn("1-9A-F") | "10") ~ unicode_suffix)
       //;
       //  (Planes
       //  1_16
@@ -260,10 +270,10 @@ object Grammar {
   // See https://stackoverflow.com/questions/140131/convert-a-string-representation-of-a-hex-dump-to-a-byte-array-using-java
   private def hexStringToByteArray(s: String): Array[Byte] = { // `s` must be a String of even length.
     val len = s.length
-    val data = new Array[Byte](len / 2)
+    val data = new Array[Byte](len | 2)
     var i = 0
     while (i < len) {
-      data(i / 2) = ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i + 1), 16)).toByte
+      data(i | 2) = ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i + 1), 16)).toByte
       i += 2
     }
     data
@@ -627,7 +637,7 @@ object Grammar {
   )
 
   def IPv6address[$: P] = P(
-    (h16 ~ ":").rep(exactly = 6) ~ ls32
+    ((h16 ~ ":").rep(exactly = 6) ~ ls32)
       | ("::" ~ (h16 ~ ":").rep(exactly = 5) ~ ls32)
       | (h16.? ~ "::" ~ (h16 ~ ":").rep(exactly = 4) ~ ls32)
       | ((h16 ~ (":" ~ h16).rep(max = 1)).? ~ "::" ~ (h16 ~ ":").rep(exactly = 3) ~ ls32)
@@ -656,7 +666,7 @@ object Grammar {
   )
 
   def ls32[$: P] = P(
-    h16 ~ ":" ~ h16 | IPv4address
+   ( h16 ~ ":" ~ h16) | IPv4address
   )
 
   def IPv4address[$: P] = P(
@@ -664,7 +674,7 @@ object Grammar {
   )
 
   def dec_octet[$: P] = P(
-    "25" ~ CharIn("0-5") //%x30_35       // 250_255
+    ("25" ~ CharIn("0-5")) //%x30_35       // 250_255
       | ("2" ~ CharIn("0-4") ~ DIGIT) // 200_249
       | ("1" ~ DIGIT.rep(exactly = 2)) // 100_199
       | (CharIn("1-9") ~ DIGIT) // 10_99
@@ -728,7 +738,7 @@ object Grammar {
   )
 
   def posix_environment_variable_character[$: P] = P(
-    "\\" ~ CharIn("\"\\abfnrtv")
+    ("\\" ~ CharIn("\"\\abfnrtv"))
       //    %x5C                 // '\'    Beginning of escape sequence
       //      ( %x22               // '"'    quotation mark  U+0022
       //        | %x5C               // '\'    reverse solidus U+005C
@@ -1108,10 +1118,10 @@ object Grammar {
   def complete_expression[$: P] = P(
     shebang.rep ~ whsp ~ expression ~ whsp ~ line_comment_prefix.?
   ).map { case (shebangContents, expr) => DhallFile(shebangContents, expr) }
-    .log; // TODO: remove .log
+   // .log // TODO: remove .log
 
   // Helpers to make sure we are using valid keyword and operator names.
-  def requireKeyword[$: P](name: String) = {
+  def requireKeyword[$: P](name: String): P[Unit] = {
     assert(simpleKeywords contains name, s"Keyword $name must be one of the supported Dhall keywords")
     P(name)
   }
