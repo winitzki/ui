@@ -1021,7 +1021,6 @@ object Grammar {
       //  "< Foo : Integer | Bar : Bool >"
       //  "< Foo | Bar : Bool >"
       | ("<" ~ whsp ~ ("|" ~ whsp).? ~ union_type ~ whsp ~ ">")
-      .map { case x => }
       //
       //  "[1, 2, 3]"
       | non_empty_list_literal
@@ -1036,19 +1035,16 @@ object Grammar {
 
   def record_type_or_literal[$: P]: P[Expression] = P(
     empty_record_literal.map(_ => Expression.RecordLiteral(Seq()))
-      | non_empty_record_type_or_literal.?.map {
-      case Some((headName, headType, tail)) => Expression.RecordLiteral((headName, headType) +: tail)
-      case None => Expression.RecordLiteral(Seq())
-    }
+      | non_empty_record_type_or_literal.?.map(_.toSeq.flatten).map(Expression.RecordLiteral)
   )
 
   def empty_record_literal[$: P] = P(
     "=" ~ (whsp ~ ",").?
   )
 
-  def non_empty_record_type_or_literal[$: P] = P(
+  def non_empty_record_type_or_literal[$: P]: P[Seq[(FieldName, Expression)]] = P(
     non_empty_record_type | non_empty_record_literal
-  )
+  ).map { case (head, tail) => head +: tail }
 
   def non_empty_record_type[$: P]: P[(FieldName, Expression, Seq[(FieldName, Expression)])] = P(
     record_type_entry ~ (whsp ~ "," ~ whsp ~ record_type_entry).rep ~ (whsp ~ ",").?
@@ -1062,8 +1058,8 @@ object Grammar {
     record_literal_entry ~ (whsp ~ "," ~ whsp ~ record_literal_entry).rep ~ (whsp ~ ",").?
   )
 
-  def record_literal_entry[$: P] = P(
-    any_label_or_some ~ record_literal_normal_entry.?
+  def record_literal_entry[$: P]: P[(FieldName, Expression)] = P(
+    any_label_or_some.map(FieldName) ~ record_literal_normal_entry.?
   )
 
   def record_literal_normal_entry[$: P] = P(
