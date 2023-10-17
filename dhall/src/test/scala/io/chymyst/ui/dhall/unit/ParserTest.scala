@@ -1,9 +1,10 @@
 package io.chymyst.ui.dhall.unit
 
-import io.chymyst.ui.dhall.{Grammar, Parser}
+import io.chymyst.ui.dhall.{Grammar, Parser, SyntaxConstants}
 import utest.{TestSuite, Tests, test}
 import fastparse._
 import com.eed3si9n.expecty.Expecty.assert
+import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
 
 object ParserTest extends TestSuite {
   override def tests: Tests = Tests {
@@ -18,6 +19,8 @@ object ParserTest extends TestSuite {
 
     test - {
       val Parsed.Success(result, 1) = Parser.parseDhall(getClass.getResourceAsStream("/product.dhall"))
+      val expected: Expression = Expression.Builtin(SyntaxConstants.Builtin.List)
+      assert(result == DhallFile(Seq(), expected))
     }
   }
 }

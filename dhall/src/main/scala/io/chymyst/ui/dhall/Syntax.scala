@@ -47,9 +47,9 @@ object SyntaxConstants {
     case object Alternative extends Operator("?")
   }
 
-  sealed abstract class Builtin(val syntax: String)
+  sealed abstract class Builtin(override val entryName: String) extends EnumEntry
 
-  object Builtin {
+  object Builtin extends Enum[Builtin] {
     case object DateShow extends Builtin("Date/Show")
 
     case object DoubleShow extends Builtin("Double/Show")
@@ -128,6 +128,7 @@ object SyntaxConstants {
 
     case object True extends Builtin("True")
 
+    override def values = findValues
   }
 
   sealed trait Constant extends EnumEntry
@@ -198,7 +199,9 @@ object SyntaxConstants {
 
 object Syntax {
 
-  final case class DhallFile(shebangs: Seq[String], value: Expression)
+  final case class DhallFile(shebangs: Seq[String], value: Expression) {
+    val omitShebangs: Expression = value
+  }
 
   type Natural = BigInt
 
@@ -231,11 +234,11 @@ object Syntax {
 
     final case class Application(func: Expression, arg: Expression) extends Expression
 
-    final case class Field(data: Expression, name: FieldName) extends Expression
+    final case class Field(base: Expression, name: FieldName) extends Expression
 
-    final case class ProjectByLabels(data: Expression, labels: Seq[String]) extends Expression
+    final case class ProjectByLabels(base: Expression, labels: Seq[FieldName]) extends Expression
 
-    final case class ProjectByType(data: Expression, by: Expression) extends Expression
+    final case class ProjectByType(base: Expression, by: Expression) extends Expression
 
     final case class Completion(data: Expression, tipe: Expression) extends Expression
 
@@ -251,7 +254,29 @@ object Syntax {
 
     final case class TextLiteralNoInterp(value: String) extends Expression
 
-    final case class TextLiteral(interpolations: Seq[(String, Expression)], trailing: String) extends Expression
+    object TextLiteral {
+      def ofText(textLiteralNoInterp: TextLiteralNoInterp) = TextLiteral(List(), textLiteralNoInterp.value)
+
+      def empty = TextLiteral(List(), "")
+
+      def ofExpression(expression: Expression) = TextLiteral(interpolations = List(("", expression)), trailing = "")
+    }
+
+    final case class TextLiteral(interpolations: List[(String, Expression)], trailing: String) extends Expression {
+      /*
+      instance Semigroup TextLiteral where
+          Chunks xys₀ z₀ <> Chunks [] z₁ =
+              Chunks xys₀ (z₀ <> z₁)
+          Chunks xys₀ z₀ <> Chunks ((x₁, y₁) : xys₁) z₁ =
+              Chunks (xys₀ <> ((z₀ <> x₁, y₁) : xys₁)) z₁
+       */
+      def ++(other: TextLiteral): TextLiteral = other.interpolations match {
+        case List() =>
+          TextLiteral(interpolations, trailing ++ other.trailing)
+        case (headText, headExpr) :: tail =>
+          TextLiteral(interpolations ++ ((trailing ++ headText, headExpr) :: tail), other.trailing)
+      }
+    }
 
     final case class BytesLiteral(value: Array[Byte]) extends Expression
 
@@ -269,7 +294,7 @@ object Syntax {
 
     final case class ShowConstructor(data: Expression) extends Expression
 
-    final case class Import(importType: SyntaxConstants.ImportType, importMode: SyntaxConstants.ImportMode, digest: Option[String]) extends Expression
+    final case class Import(importType: SyntaxConstants.ImportType, importMode: SyntaxConstants.ImportMode, digest: Option[Array[Byte]]) extends Expression
 
     final case class Some(data: Expression) extends Expression
 
@@ -287,4 +312,10 @@ object Syntax {
     final case object DescendOptional extends PathComponent
   }
 
+}
+
+trait Monoid[A] {
+  def empty: A
+
+  def combine(x: A, y: A): A
 }
