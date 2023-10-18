@@ -118,6 +118,7 @@ object ParserTest extends TestSuite {
         check(Grammar.block_comment(_), input, (), input.length)
       }
     }
+
     test("whsp") - {
       Seq( // Examples may contain trailing whitespace or leading whitespace.
         "{- - }- } -}",
@@ -177,7 +178,46 @@ object ParserTest extends TestSuite {
       }
 
     }
+
+    test("whitespace_chunk") - {
+      Seq( // Examples should not contain trailing whitespace or leading whitespace.
+        "{- - }- } -}",
+        """{-
+          | - }-
+          |}  |
+          |-}""".stripMargin,
+        "{-фыва ç≈Ω⁄€‹›ﬁ° }}-}",
+        "{--}",
+        "{-{--}-}",
+        " ",
+        "--\n",
+        "-- \n",
+      ).foreach { input =>
+        check(Grammar.whitespace_chunk(_), input, (), input.length)
+      }
+      check(Grammar.whitespace_chunk(_), " -- \n", (), 1)
+    }
+
+    test("whsp1") - {
+      Seq( // Examples should not contain trailing whitespace or leading whitespace.
+        "{- - }- } -}",
+        """{-
+          | - }-
+          |}  |
+          |-}""".stripMargin,
+        "{-фыва ç≈Ω⁄€‹›ﬁ° }}-}",
+        "{--}",
+        "{-{--}-}",
+        " ",
+        " -- \n",
+        "-- \n  ",
+        " --{-\n",
+        "--\n",
+      ).foreach { input =>
+        check(Grammar.whsp1(_), input, (), input.length)
+      }
+
+    }
+
   }
-
-
 }
