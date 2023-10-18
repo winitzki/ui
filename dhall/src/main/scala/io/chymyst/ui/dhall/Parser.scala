@@ -816,8 +816,8 @@ object Grammar {
     import_type ~ (whsp1 ~ hash.!).?
   )
 
-  def import_[$: P]: P[Import] = P(
-    import_hashed ~ (whsp ~ requireKeyword("as") ~ whsp1 ~ ((requireKeyword("Text") | requireKeyword("Location") | requireKeyword("Bytes"))).!).?
+  def import_only[$: P]: P[Import] = P(
+    import_hashed ~ (whsp ~ requireKeyword("as") ~ whsp1 ~ (requireKeyword("Text") | requireKeyword("Location") | requireKeyword("Bytes")).!).?
   ).map { case (importType, digest, mode) =>
     val importMode = mode match {
       case Some("Bytes") => SyntaxConstants.ImportMode.RawBytes
@@ -1023,7 +1023,7 @@ object Grammar {
   )
 
   def import_expression[$: P]: P[Expression] = P(
-    import_ | completion_expression
+    import_only | completion_expression
   )
 
   def completion_expression[$: P]: P[Expression] = P(
