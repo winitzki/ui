@@ -284,7 +284,16 @@ object Syntax {
       }
     }
 
-    final case class BytesLiteral(value: Array[Byte]) extends Expression
+    final case class BytesLiteral(value: Array[Byte]) extends Expression {
+      override def equals(obj: Any): Boolean = obj match {
+        case byteArray: Array[Byte] =>
+          println(s"DEBUG: comparing byte arrays ${new String(value)} and ${new String(byteArray)}")
+          byteArray sameElements value
+        case _ => false
+      }
+
+      override def toString: String = s"BytesLiteral(${new String(value)})"
+    }
 
     final case class DateLiteral(date: LocalDate) extends Expression
 

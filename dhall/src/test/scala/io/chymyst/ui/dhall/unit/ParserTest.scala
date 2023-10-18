@@ -2,8 +2,9 @@ package io.chymyst.ui.dhall.unit
 
 import io.chymyst.ui.dhall.{Grammar, Parser, SyntaxConstants}
 import utest.{*, TestSuite, Tests, assertMatch, intercept, test}
-import fastparse.{P, _}
+import fastparse._
 import com.eed3si9n.expecty.Expecty.assert
+import io.chymyst.ui.dhall.Syntax.Expression.TextLiteral
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
 import io.chymyst.ui.dhall.SyntaxConstants.VarName
 
@@ -19,7 +20,7 @@ object ParserTest extends TestSuite {
       case Parsed.Failure(message, index, extra) =>
         println(s"Error: Parsing input '$input', expected Success($expectedResult, $index) but got Failure('$message', $index, ${extra.stack})")
     }
-    assertMatch(parsed) { case Parsed.Success(`expectedResult`, `lastIndex`) => }
+    assertMatch(parsed) { case Parsed.Success(r, i) if (r equals expectedResult) && (i == lastIndex) => }
   }
 
   def toFail[A](grammarRule: P[_] => P[A], input: String, parsedInput: String, expectedMessage: String, lastIndex: Int) = {
@@ -35,31 +36,21 @@ object ParserTest extends TestSuite {
 
   override def tests: Tests = Tests {
 
-    test("basic tests") - {
-      test("quoted_label_char") - {
-        val Parsed.Success((), 1) = parse("asdf", Grammar.quoted_label_char(_))
-        val f@Parsed.Failure(failure, index, _) = parse("`asdf", Grammar.quoted_label_char(_))
-        assert(failure == "")
-        assert(index == 0)
-        assert(f.msg == """Position 1:1, found "`asdf"""")
-      }
+    test("quoted_label_char") - {
+      val Parsed.Success((), 1) = parse("asdf", Grammar.quoted_label_char(_))
+      val f@Parsed.Failure(failure, index, _) = parse("`asdf", Grammar.quoted_label_char(_))
+      assert(failure == "")
+      assert(index == 0)
+      assert(f.msg == """Position 1:1, found "`asdf"""")
+    }
 
-      test("requireKeyword") - {
-        val Parsed.Success(_, 5) = parse("merge", Grammar.requireKeyword("merge")(_))
-        intercept[AssertionError] {
-          parse("blah", Grammar.requireKeyword("blah")(_))
-        }
-      }
-
-      test("parse product.dhall") - {
-        val Parsed.Success(DhallFile(Seq(), result), lastIndex) = Parser.parseDhall(getClass.getResourceAsStream("/product.dhall"))
-        // TODO: enable this test
-        //      val expected = Expression.Builtin(SyntaxConstants.Builtin.List)
-        //      assert(result == expected)
+    test("requireKeyword") - {
+      val Parsed.Success(_, 5) = parse("merge", Grammar.requireKeyword("merge")(_))
+      intercept[AssertionError] {
+        parse("blah", Grammar.requireKeyword("blah")(_))
       }
     }
 
-    //    test("parser rule") - {
     test("end_of_line") - {
       check(Grammar.end_of_line(_), "\n\n\n", (), 1)
       check(Grammar.end_of_line(_), "\r\n\n", (), 2)
@@ -332,6 +323,30 @@ object ParserTest extends TestSuite {
       toFail(Grammar.identifier(_), "/abc", "", "", 0)
     }
 
+    test("bytes_literal") - {
+      check(Grammar.bytes_literal(_), "0x\"64646464\"", Expression.BytesLiteral("dddd".getBytes), 12)
+    }
+
+    test("primitive_expression") - {
+      Seq(
+        "12345" -> Expression.NaturalLiteral(BigInt(12345)),
+        "-4312.2" -> Expression.DoubleLiteral(-4312.2),
+        "\"123\"" -> TextLiteral.ofText(Expression.TextLiteralNoInterp("123")),
+        """''
+          |line
+          |''""".stripMargin -> TextLiteral.ofText(Expression.TextLiteralNoInterp("line\n")),
+        "x" -> Expression.Variable(VarName("x"), BigInt(0)),
+        "a-b/c" -> Expression.Variable(VarName("a-b/c"), BigInt(0)),
+        "_xyz       @   \t\t\t\n\n           123451234512345123451234512345" -> Expression.Variable(VarName("_xyz"), BigInt("123451234512345123451234512345")),
+        "[1,2,3]" -> Expression.NonEmptyList(Expression.NaturalLiteral(BigInt(1)), Seq(Expression.NaturalLiteral(BigInt(2)), Expression.NaturalLiteral(BigInt(3)))),
+        "0x\"64646464\"" -> Expression.BytesLiteral("dddd".getBytes),
+        "Kind" -> Expression.Builtin(SyntaxConstants.Builtin.Kind),
+        "Natural/show" -> Expression.Builtin(SyntaxConstants.Builtin.NaturalShow),
+        "Natural" -> Expression.Builtin(SyntaxConstants.Builtin.Natural),
+      ).foreach { case (s, d) =>
+        check(Grammar.primitive_expression(_), s, d, s.length)
+      }
+    }
 
   }
 }

@@ -249,7 +249,7 @@ object Grammar {
       | (escaped_quote_pair ~ single_quote_continue)
       | (escaped_interpolation ~ single_quote_continue)
       | P("''").map(_ => Expression.TextLiteral.empty) // End of text literal
-      | (single_quote_char ~ single_quote_continue)
+      | (single_quote_char ~ single_quote_continue).map { case (char, tail) => TextLiteral.ofText(TextLiteralNoInterp(char)) ++ tail }
   )
 
   def escaped_quote_pair[$: P] = P(
@@ -265,7 +265,7 @@ object Grammar {
       | valid_non_ascii
       | tab
       | end_of_line
-  )
+  ).!
 
   def single_quote_literal[$: P] = P(
     "''" ~ end_of_line ~ single_quote_continue
@@ -281,12 +281,12 @@ object Grammar {
   )
 
   // See https://stackoverflow.com/questions/140131/convert-a-string-representation-of-a-hex-dump-to-a-byte-array-using-java
-  private def hexStringToByteArray(s: String): Array[Byte] = { // `s` must be a String of even length.
+  def hexStringToByteArray(s: String): Array[Byte] = { // `s` must be a String of even length.
     val len = s.length
-    val data = new Array[Byte](len | 2)
+    val data = new Array[Byte](len >> 1)
     var i = 0
     while (i < len) {
-      data(i | 2) = ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i + 1), 16)).toByte
+      data(i >> 1) = ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i + 1), 16)).toByte
       i += 2
     }
     data
@@ -812,7 +812,7 @@ object Grammar {
     "sha256:" ~ HEXDIG.rep(exactly = 64) // "sha256:XXX...XXX"
   )
 
-  def import_hashed[$: P] = P(
+  def import_hashed[$: P]: P[(ImportType, Option[String])] = P(
     import_type ~ (whsp1 ~ hash.!).?
   )
 
@@ -828,36 +828,58 @@ object Grammar {
     Import(importType, importMode, digest.map(hexStringToByteArray))
   }
 
+  // The ABNF spec does not define those sub-rules but we define them to aid debugging.
+
+  def expression_lambda[$: P]: P[Lambda] = (lambda ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression)
+    .map { case (name, tipe, body) => Lambda(name, tipe, body) }
+
+  def expression_if_then_else[$: P]: P[If] = (requireKeyword("if") ~ whsp1 ~ expression ~ whsp ~ requireKeyword("then") ~ whsp1 ~ expression ~ whsp ~ requireKeyword("else") ~ whsp1 ~ expression)
+    .map { case (cond, ifTrue, ifFalse) =>
+      If(cond, ifTrue, ifFalse)
+    }
+
+  def expression_let_binding[$: P]: P[Expression] = (let_binding.rep(1) ~ requireKeyword("in") ~ whsp1 ~ expression)
+    .map { case (letBindings, expr) =>
+      letBindings.foldLeft(expr) { case (prev, (varName, tipe, body)) => Let(varName, tipe, body, prev) }
+    }
+
+  def expression_forall[$: P]: P[Forall] = (forall ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression)
+    .map { case (varName, tipe, body) => Forall(varName, tipe, body) }
+
+  // This may not "cut" the parse.
+  def expression_arrow[$: P]: P[Expression] = (operator_expression ~ whsp ~ arrow ~ whsp ~ expression)
+    .map { case (head, body) => body } // TODO: figure out what this expression does! Is this a function type? If so, why "operator_expression"?
+
+  def expression_merge[$: P]: P[Merge] = (requireKeyword("merge") ~ whsp1 ~ import_expression ~ whsp1 ~ import_expression ~ whsp ~ ":" ~ whsp1 ~ expression)
+    .map { case (e1, e2, t) => Merge(e1, e2, Some(t)) }
+
+  def expression_toMap[$: P]: P[ToMap] = (requireKeyword("toMap") ~ whsp1 ~ import_expression ~ whsp ~ ":" ~ whsp1 ~ expression)
+    .map { case (e1, e2) => ToMap(e1, Some(e2)) }
+
+  def expression_assert[$: P]: P[Assert] = (requireKeyword("assert") ~ whsp ~ ":" ~ whsp1 ~ expression)
+    .map { expr => Assert(expr) }
+
   def expression[$: P]: P[Expression] = P(
     //  "\(x : a) -> b"
-    (lambda ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression)
-      .map { case (name, tipe, body) => Lambda(name, tipe, body) }
+    expression_lambda
       //
       //  "if a then b else c"
-      | (requireKeyword("if") ~ whsp1 ~ expression ~ whsp ~ requireKeyword("then") ~ whsp1 ~ expression ~ whsp ~ requireKeyword("else") ~ whsp1 ~ expression)
-      .map { case (cond, ifTrue, ifFalse) =>
-        If(cond, ifTrue, ifFalse)
-      }
+      | expression_if_then_else
       //
       //  "let x : t = e1 in e2"
       //  "let x     = e1 in e2"
       //  We allow dropping the `in` between adjacent let_expressions; the following are equivalent:
       //  "let x = e1 let y = e2 in e3"
       //  "let x = e1 in let y = e2 in e3"
-      | (let_binding.rep(1) ~ requireKeyword("in") ~ whsp1 ~ expression)
-      .map { case (letBindings, expr) =>
-        letBindings.foldLeft(expr) { case (prev, (varName, tipe, body)) => Let(varName, tipe, body, prev) }
-      }
+      | expression_let_binding
       //
       //  "forall (x : a) -> b"
-      | (forall ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression)
-      .map { case (varName, tipe, body) => Forall(varName, tipe, body) }
+      | expression_forall
       //
       //  "a -> b"
       //
       //  NOTE: Backtrack if parsing this alternative fails
-      | (operator_expression ~ whsp ~ arrow ~ whsp ~ expression)
-      .map { case (head, body) => body } // TODO: figure out what this expression does! Is this a function type? If so, why "operator_expression"?
+      | expression_arrow
       //
       //  "a with x = b"
       //
@@ -868,39 +890,36 @@ object Grammar {
       //
       //  NOTE: Backtrack if parsing this alternative fails since we can't tell
       //  from the keyword whether there will be a type annotation or not
-      | (requireKeyword("merge") ~ whsp1 ~ import_expression ~ whsp1 ~ import_expression ~ whsp ~ ":" ~ whsp1 ~ expression)
-      .map { case (e1, e2, t) => Merge(e1, e2, Some(t)) }
+      | expression_merge
       //
       //  "[] : t"
       //
       //  NOTE: Backtrack if parsing this alternative fails since we can't tell
       //  from the opening bracket whether or not this will be an empty list or
       //  a non_empty list
-      | empty_list_literal.map(tipe => EmptyList(tipe))
+      | empty_list_literal
       //
       //  "toMap e : t"
       //
       //  NOTE: Backtrack if parsing this alternative fails since we can't tell
       //  from the keyword whether there will be a type annotation or not
-      | (requireKeyword("toMap") ~ whsp1 ~ import_expression ~ whsp ~ ":" ~ whsp1 ~ expression)
-      .map { case (e1, e2) => ToMap(e1, Some(e2)) }
+      | expression_toMap
       //
       //  "assert : Natural/even 1 === False"
-      | (requireKeyword("assert") ~ whsp ~ ":" ~ whsp1 ~ expression)
-      .map { expr => Assert(expr) }
+      | expression_assert
       //
       //  "x : t"
-      | annotated_expression.map { case (expr, tipe) =>
-      tipe match {
-        case Some(t) => Annotation(expr, t)
-        case None => expr
-      }
-    }
+      | annotated_expression
   )
 
-  def annotated_expression[$: P] = P(
+  def annotated_expression[$: P]: P[Expression] = P(
     operator_expression ~ (whsp ~ ":" ~ whsp1 ~ expression).?
-  )
+  ).map { case (expr, tipe) =>
+    tipe match {
+      case Some(t) => Annotation(expr, t)
+      case None => expr
+    }
+  }
 
   def let_binding[$: P] = P(
     requireKeyword("let") ~ whsp1 ~ nonreserved_label ~ whsp ~ (":" ~ whsp1 ~ expression ~ whsp).? ~ "=" ~ whsp ~ expression ~ whsp1
@@ -910,6 +929,7 @@ object Grammar {
     "[" ~ whsp ~ ("," ~ whsp).? ~ "]" ~ whsp ~ ":" ~ whsp1 ~ expression
   ).map(expr => EmptyList(expr))
 
+  // with_expression may not "cut" the parse.
   def with_expression[$: P] = P(
     import_expression ~ (whsp1 ~ "with" ~ whsp1 ~ with_clause).rep(1)
   )
