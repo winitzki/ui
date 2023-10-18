@@ -50,83 +50,89 @@ object SyntaxConstants {
   sealed abstract class Builtin(override val entryName: String) extends EnumEntry
 
   object Builtin extends Enum[Builtin] {
-    case object DateShow extends Builtin("Date/Show")
-
-    case object DoubleShow extends Builtin("Double/Show")
-
-    case object IntegerClamp extends Builtin("Integer/Clamp")
-
-    case object IntegerNegate extends Builtin("Integer/Negate")
-
-    case object IntegerShow extends Builtin("Integer/Show")
-
-    case object IntegerToDouble extends Builtin("Integer/ToDouble")
-
-    case object ListBuild extends Builtin("List/Build")
-
-    case object ListFold extends Builtin("List/Fold")
-
-    case object ListHead extends Builtin("List/Head")
-
-    case object ListIndexed extends Builtin("List/Indexed")
-
-    case object ListLast extends Builtin("List/Last")
-
-    case object ListLength extends Builtin("List/Length")
-
-    case object ListReverse extends Builtin("List/Reverse")
-
-    case object NaturalBuild extends Builtin("Natural/Build")
-
-    case object NaturalEven extends Builtin("Natural/Even")
-
-    case object NaturalFold extends Builtin("Natural/Fold")
-
-    case object NaturalIsZero extends Builtin("Natural/IsZero")
-
-    case object NaturalOdd extends Builtin("Natural/Odd")
-
-    case object NaturalShow extends Builtin("Natural/Show")
-
-    case object NaturalSubtract extends Builtin("Natural/Subtract")
-
-    case object NaturalToInteger extends Builtin("Natural/ToInteger")
-
-    case object TextReplace extends Builtin("Text/Replace")
-
-    case object TextShow extends Builtin("Text/Show")
-
-    case object TimeShow extends Builtin("Time/Show")
-
-    case object TimeZoneShow extends Builtin("TimeZone/Show")
-
     case object Bool extends Builtin("Bool")
 
     case object Bytes extends Builtin("Bytes")
 
     case object Date extends Builtin("Date")
 
+    case object DateShow extends Builtin("Date/show")
+
     case object Double extends Builtin("Double")
+
+    case object DoubleShow extends Builtin("Double/show")
 
     case object False extends Builtin("False")
 
     case object Integer extends Builtin("Integer")
 
+    case object IntegerClamp extends Builtin("Integer/clamp")
+
+    case object IntegerNegate extends Builtin("Integer/negate")
+
+    case object IntegerShow extends Builtin("Integer/show")
+
+    case object IntegerToDouble extends Builtin("Integer/toDouble")
+
+    case object Kind extends Builtin("Kind")
+
     case object List extends Builtin("List")
 
+    case object ListBuild extends Builtin("List/build")
+
+    case object ListFold extends Builtin("List/fold")
+
+    case object ListHead extends Builtin("List/head")
+
+    case object ListIndexed extends Builtin("List/indexed")
+
+    case object ListLast extends Builtin("List/last")
+
+    case object ListLength extends Builtin("List/length")
+
+    case object ListReverse extends Builtin("List/reverse")
+
     case object Natural extends Builtin("Natural")
+
+    case object NaturalBuild extends Builtin("Natural/build")
+
+    case object NaturalEven extends Builtin("Natural/even")
+
+    case object NaturalFold extends Builtin("Natural/fold")
+
+    case object NaturalIsZero extends Builtin("Natural/isZero")
+
+    case object NaturalOdd extends Builtin("Natural/odd")
+
+    case object NaturalShow extends Builtin("Natural/show")
+
+    case object NaturalSubtract extends Builtin("Natural/subtract")
+
+    case object NaturalToInteger extends Builtin("Natural/toInteger")
 
     case object None extends Builtin("None")
 
     case object Optional extends Builtin("Optional")
 
+    case object Sort extends Builtin("Sort")
+
     case object Text extends Builtin("Text")
+
+    case object TextReplace extends Builtin("Text/replace")
+
+    case object TextShow extends Builtin("Text/show")
 
     case object Time extends Builtin("Time")
 
+    case object TimeShow extends Builtin("Time/show")
+
     case object TimeZone extends Builtin("TimeZone")
 
+    case object TimeZoneShow extends Builtin("TimeZone/show")
+
     case object True extends Builtin("True")
+
+    case object Type extends Builtin("Type")
 
     override def values = findValues
   }

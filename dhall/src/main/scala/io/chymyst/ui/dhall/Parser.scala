@@ -364,54 +364,50 @@ object Grammar {
       | requireKeyword("showConstructor")
   ).!
 
-  val builtinSymbols = Set(
-    "Natural/fold",
-    "Natural/build",
-    "Natural/isZero",
-    "Natural/even",
-    "Natural/odd",
-    "Natural/toInteger",
-    "Natural/show",
-    "Integer/toDouble",
-    "Integer/show",
-    "Integer/negate",
-    "Integer/clamp",
-    "Natural/subtract",
-    "Double/show",
-    "List/build",
-    "List/fold",
-    "List/length",
-    "List/head",
-    "List/last",
-    "List/indexed",
-    "List/reverse",
-    "Text/show",
-    "Text/replace",
-    "Date/show",
-    "Time/show",
-    "TimeZone/show",
-    "Bool",
-    "True",
-    "False",
-    "Optional",
-    "None",
-    "Natural",
-    "Integer",
-    "Double",
-    "Text",
-    "Date",
-    "Time",
-    "TimeZone",
-    "List",
-    "Type",
-    "Kind",
-    "Sort",
-  )
-
   def builtin[$: P]: P[Expression.Builtin] = P(
-    builtinSymbols.map(P(_).!.map(SyntaxConstants.Builtin.withName).map(Expression.Builtin))
-      .reduce { (a, b) => P(a) | P(b) }
-  )
+    P("Bool")
+      | P("Bytes")
+      | P("Date/show")
+      | P("Date")
+      | P("Double/show")
+      | P("Double")
+      | P("False")
+      | P("Integer/clamp")
+      | P("Integer/negate")
+      | P("Integer/show")
+      | P("Integer/toDouble")
+      | P("Integer")
+      | P("Kind")
+      | P("List/build")
+      | P("List/fold")
+      | P("List/head")
+      | P("List/indexed")
+      | P("List/last")
+      | P("List/length")
+      | P("List/reverse")
+      | P("List")
+      | P("Natural/build")
+      | P("Natural/even")
+      | P("Natural/fold")
+      | P("Natural/isZero")
+      | P("Natural/odd")
+      | P("Natural/show")
+      | P("Natural/subtract")
+      | P("Natural/toInteger")
+      | P("Natural")
+      | P("None")
+      | P("Optional")
+      | P("Sort")
+      | P("Text/replace")
+      | P("Text/show")
+      | P("Text")
+      | P("Time/show")
+      | P("TimeZone/show")
+      | P("TimeZone")
+      | P("Time")
+      | P("True")
+      | P("Type")
+  ).!.map(SyntaxConstants.Builtin.withName).map(Expression.Builtin)
 
   def combine[$: P] = P(
     "\u2227" | "/\\"
@@ -841,7 +837,7 @@ object Grammar {
       }
       //
       //  "forall (x : a) -> b"
-      |  (forall ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression)
+      | (forall ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression)
       .map { case (varName, tipe, body) => Forall(varName, tipe, body) }
       //
       //  "a -> b"

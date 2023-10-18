@@ -14,9 +14,9 @@ object ParserTest extends TestSuite {
     val parsed = parse(input, grammarRule)
     parsed match {
       case Parsed.Success(value, index) =>
-        println(s"Parsing input '$input', got Success($value, $index)")
+        println(s"Parsing input '$input', got Success($value, $index), expecting Success($expectedResult, $lastIndex)")
       case Parsed.Failure(message, index, extra) =>
-        println(s"Error: Parsing input '$input', expected Success but got Failure('$message', $index, ${extra.stack})")
+        println(s"Error: Parsing input '$input', expected Success($expectedResult, $index) but got Failure('$message', $index, ${extra.stack})")
     }
     assertMatch(parsed) { case Parsed.Success(`expectedResult`, `lastIndex`) => }
   }
@@ -27,7 +27,7 @@ object ParserTest extends TestSuite {
       case Parsed.Success(value, index) =>
         println(s"Error: Parsing input '$input', expected Failure but got Success($value, $index)")
       case f@Parsed.Failure(message, index, extra) =>
-        println(s"Parsing input '$input', got Failure('$message', $index, ${extra.stack}), message '${f.msg}' as expected")
+        println(s"Parsing input '$input', expected index $lastIndex, got Failure('$message', $index, ${extra.stack}), message '${f.msg}' as expected")
     }
     assertMatch(parsed) { case f@Parsed.Failure(`parsedInput`, `lastIndex`, extra) if f.msg contains expectedMessage => }
   }
@@ -245,6 +245,16 @@ object ParserTest extends TestSuite {
       check(Grammar.simple_label(_), "x∀ ", (), 1)
       toFail(Grammar.simple_label(_), "∀", "", "", 0)
       toFail(Grammar.simple_label(_), "∀x", "", "", 0)
+    }
+
+    test("builtin names") - {
+      val names = SyntaxConstants.Builtin.namesToValuesMap
+      assert(names.keySet.size == 42)
+      names.foreach { case (name, c) =>
+        val v = Expression.Builtin(c)
+        println(s"Checking builtin name $name -> $v")
+        check(Grammar.builtin(_), name, v, name.length)
+      }
     }
 
   }
