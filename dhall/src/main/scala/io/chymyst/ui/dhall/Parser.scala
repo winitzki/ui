@@ -566,8 +566,21 @@ object Grammar {
     }
   }
 
+  /*
+  If the identifier matches one of the names in the `builtin` rule, then it is a
+  builtin, and should be treated as the corresponding item in the list of
+  "Reserved identifiers for builtins" specified in the `standard/README.md` document.
+  It is a syntax error to specify a de Bruijn index in this case.
+  Otherwise, this is a variable with name and index matching the label and index.
+   */
   def identifier[$: P]: P[Expression] = P(
-    variable.map { case (name, index) => Expression.Variable(name, index.map(_.value).getOrElse(BigInt(0))) }
+    variable.flatMap { case (name, index) =>
+      SyntaxConstants.Builtin.namesToValuesMap.get(name.name) match {
+        case None => Pass(Expression.Variable(name, index.map(_.value).getOrElse(BigInt(0))))
+        case Some(builtinName) if index.contains(0) => Pass(Expression.Builtin(builtinName))
+        case Some(builtinName) => Fail(s"Identifier ${name.name} matches builtin but has invalid de Bruijn index $index")
+      }
+    }
       | builtin
   )
 

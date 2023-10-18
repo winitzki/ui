@@ -5,6 +5,7 @@ import utest.{*, TestSuite, Tests, assertMatch, intercept, test}
 import fastparse.{P, _}
 import com.eed3si9n.expecty.Expecty.assert
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
+import io.chymyst.ui.dhall.SyntaxConstants.VarName
 
 import java.nio.file.{Files, Paths}
 
@@ -308,5 +309,27 @@ object ParserTest extends TestSuite {
       toFail(Grammar.integer_literal(_), "1", "", "", 0)
       toFail(Grammar.integer_literal(_), " ", "", "", 0)
     }
+
+    // TODO: tests for date and time literals
+
+    test("identifier") - {
+      Seq(
+        "Natural-blahblah" -> Expression.Variable(VarName("Natural-blahblah"), BigInt(0)),
+        "Natural/blahblah" -> Expression.Variable(VarName("Natural/blahblah"), BigInt(0)),
+        "Natural/show123" -> Expression.Variable(VarName("Natural/show123"), BigInt(0)),
+        "abc" -> Expression.Variable(VarName("abc"), BigInt(0)),
+        "a-b/c" -> Expression.Variable(VarName("a-b/c"), BigInt(0)),
+        "_xyz@123451234512345123451234512345" -> Expression.Variable(VarName("_xyz"), BigInt("123451234512345123451234512345")),
+        "Kind" -> Expression.Builtin(SyntaxConstants.Builtin.Kind),
+        "Natural/show" -> Expression.Builtin(SyntaxConstants.Builtin.NaturalShow),
+        "Natural" -> Expression.Builtin(SyntaxConstants.Builtin.Natural),
+      ).foreach { case (s, d) =>
+        check(Grammar.identifier(_), s, d, s.length)
+      }
+
+      check(Grammar.identifier(_), "Natural+blahblah", Expression.Builtin(SyntaxConstants.Builtin.Natural), 7)
+    }
+
+
   }
 }
