@@ -69,7 +69,8 @@ object Grammar {
   def tab[$: P] = P("\t")
 
   def block_comment[$: P] = P(
-    "{-" ~ block_comment_continue)
+    "{-" ~ block_comment_continue
+  )
 
   def block_comment_char[$: P] = P(
     CharIn("\u0020-\u007F")

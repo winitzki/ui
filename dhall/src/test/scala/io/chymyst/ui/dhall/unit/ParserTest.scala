@@ -77,6 +77,19 @@ object ParserTest extends TestSuite {
       check(rule(_), input, (), 8)
     }
 
+    test("tab") - {
+      check(Grammar.tab(_), "\t", (), 1)
+      toFail(Grammar.tab(_), "\n\t", "", " found ", 0)
+    }
+
+    test("block_comment") - {
+      Seq( // Examples should not contain trailing whitespace or leading whitespace.
+        """{- }- -}""",
+        "{-фыва ç≈Ω⁄€‹›ﬁ° }}-}",
+      ).foreach { input =>
+        check(Grammar.block_comment(_), input, (), input.length)
+      }
+    }
     //    }
   }
 
