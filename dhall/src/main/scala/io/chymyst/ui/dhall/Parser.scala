@@ -19,40 +19,52 @@ object Grammar {
       "\u0080-\uD7FF",
       // %xD800_DFFF = surrogate pairs
       "\uE000-\uFFFD",
-      // %xFFFE_FFFF = non_characters
-      //        | % x10000_1FFFD
-      //      // %x1FFFE_1FFFF = non_characters
-      //      | % x20000_2FFFD
-      //        // %x2FFFE_2FFFF = non_characters
-      //        | % x30000_3FFFD
-      //      // %x3FFFE_3FFFF = non_characters
-      //      | % x40000_4FFFD
-      //        // %x4FFFE_4FFFF = non_characters
-      //        | % x50000_5FFFD
-      //      // %x5FFFE_5FFFF = non_characters
-      //      | % x60000_6FFFD
-      //        // %x6FFFE_6FFFF = non_characters
-      //        | % x70000_7FFFD
-      //      // %x7FFFE_7FFFF = non_characters
-      //      | % x80000_8FFFD
-      //        // %x8FFFE_8FFFF = non_characters
-      //        | % x90000_9FFFD
-      //      // %x9FFFE_9FFFF = non_characters
-      //      | % xA0000_AFFFD
-      //        // %xAFFFE_AFFFF = non_characters
-      //        | % xB0000_BFFFD
-      //      // %xBFFFE_BFFFF = non_characters
-      //      | % xC0000_CFFFD
-      //        // %xCFFFE_CFFFF = non_characters
-      //        | % xD0000_DFFFD
-      //      // %xDFFFE_DFFFF = non_characters
-      //      | % xE0000_EFFFD
-      //        // %xEFFFE_EFFFF = non_characters
-      //        | % xF0000_FFFFD
-      //      // %xFFFFE_FFFFF = non_characters
-      //      | % x100000_10FFFD
-      // %x10FFFE_10FFFF = non_characters
-    ))
+    )
+      | (CharIn("\uD800-\uD83E") ~ CharIn("\uDC00-\uDFFF"))
+      | (CharIn("\uD83F") ~ CharIn("\uDC00-\uDFFD"))
+    // TODO encode other Unicode ranges into Java's UTF-16
+    // %xFFFE_FFFF = non_characters
+    //        | % x10000_1FFFD
+    // U+10000 = "\uD800\uDC00"
+    // U+103FF = "\uD800\uDFFF"
+    // U+10400 = "\uD801\uDC00"
+    // U+1FFFD = "\uD83F\uDFFD"
+    //      // %x1FFFE_1FFFF = non_characters
+    //      | % x20000_2FFFD
+    //        // %x2FFFE_2FFFF = non_characters
+    //        | % x30000_3FFFD
+    //      // %x3FFFE_3FFFF = non_characters
+    //      | % x40000_4FFFD
+    //        // %x4FFFE_4FFFF = non_characters
+    //        | % x50000_5FFFD
+    //      // %x5FFFE_5FFFF = non_characters
+    //      | % x60000_6FFFD
+    //        // %x6FFFE_6FFFF = non_characters
+    //        | % x70000_7FFFD
+    //      // %x7FFFE_7FFFF = non_characters
+    //      | % x80000_8FFFD
+    //        // %x8FFFE_8FFFF = non_characters
+    //        | % x90000_9FFFD
+    //      // %x9FFFE_9FFFF = non_characters
+    //      | % xA0000_AFFFD
+    //        // %xAFFFE_AFFFF = non_characters
+    //        | % xB0000_BFFFD
+    //      // %xBFFFE_BFFFF = non_characters
+    //      | % xC0000_CFFFD
+    //        // %xCFFFE_CFFFF = non_characters
+    //        | % xD0000_DFFFD
+    //      // %xDFFFE_DFFFF = non_characters
+    //      | % xE0000_EFFFD
+    //        // %xEFFFE_EFFFF = non_characters
+    //        | % xF0000_FFFFD
+    // U+F0000 = "\uDB80\uDC00"
+    // U+FFFFD = "\uDBBFuDFFD"
+    //      // %xFFFFE_FFFFF = non_characters
+    //      | % x100000_10FFFD
+    // U+100000 = "\uDBC0\uDC00"
+    // U+10FFFD = "\uDBFF\uDFFD"
+    // %x10FFFE_10FFFF = non_characters
+  )
 
   def tab[$: P] = P("\t")
 
@@ -666,7 +678,7 @@ object Grammar {
   )
 
   def ls32[$: P] = P(
-   ( h16 ~ ":" ~ h16) | IPv4address
+    (h16 ~ ":" ~ h16) | IPv4address
   )
 
   def IPv4address[$: P] = P(
@@ -1118,7 +1130,7 @@ object Grammar {
   def complete_expression[$: P] = P(
     shebang.rep ~ whsp ~ expression ~ whsp ~ line_comment_prefix.?
   ).map { case (shebangContents, expr) => DhallFile(shebangContents, expr) }
-   // .log // TODO: remove .log
+  // .log // TODO: remove .log
 
   // Helpers to make sure we are using valid keyword and operator names.
   def requireKeyword[$: P](name: String): P[Unit] = {
