@@ -319,7 +319,7 @@ object ParserTest extends TestSuite {
         "Natural/show123" -> Expression.Variable(VarName("Natural/show123"), BigInt(0)),
         "abc" -> Expression.Variable(VarName("abc"), BigInt(0)),
         "a-b/c" -> Expression.Variable(VarName("a-b/c"), BigInt(0)),
-        "_xyz@123451234512345123451234512345" -> Expression.Variable(VarName("_xyz"), BigInt("123451234512345123451234512345")),
+        "_xyz       @   \t\t\t\n\n           123451234512345123451234512345" -> Expression.Variable(VarName("_xyz"), BigInt("123451234512345123451234512345")),
         "Kind" -> Expression.Builtin(SyntaxConstants.Builtin.Kind),
         "Natural/show" -> Expression.Builtin(SyntaxConstants.Builtin.NaturalShow),
         "Natural" -> Expression.Builtin(SyntaxConstants.Builtin.Natural),
@@ -328,6 +328,8 @@ object ParserTest extends TestSuite {
       }
 
       check(Grammar.identifier(_), "Natural+blahblah", Expression.Builtin(SyntaxConstants.Builtin.Natural), 7)
+      toFail(Grammar.identifier(_), "-abc", "", "", 0)
+      toFail(Grammar.identifier(_), "/abc", "", "", 0)
     }
 
 
