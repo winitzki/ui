@@ -2,13 +2,35 @@ package io.chymyst.ui.dhall.unit
 
 import io.chymyst.ui.dhall.{Grammar, Parser, SyntaxConstants}
 import utest.{*, TestSuite, Tests, assertMatch, intercept, test}
-import fastparse._
+import fastparse.{P, _}
 import com.eed3si9n.expecty.Expecty.assert
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
 
 import java.nio.file.{Files, Paths}
 
 object ParserTest extends TestSuite {
+
+  def check[A](grammarRule: P[_] => P[A], input: String, expectedResult: A, lastIndex: Int) = {
+    val parsed = parse(input, grammarRule)
+    parsed match {
+      case Parsed.Success(value, index) =>
+        println(s"Parsing input '$input', got Success($value, $index)")
+      case Parsed.Failure(message, index, extra) =>
+        println(s"Error: Parsing input '$input', expected Success but got Failure('$message', $index, ${extra.stack})")
+    }
+    assertMatch(parsed) { case Parsed.Success(`expectedResult`, `lastIndex`) => }
+  }
+
+  def toFail[A](grammarRule: P[_] => P[A], input: String, parsedInput: String, expectedMessage: String, lastIndex: Int) = {
+    val parsed = parse(input, grammarRule)
+    parsed match {
+      case Parsed.Success(value, index) =>
+        println(s"Error: Parsing input '$input', expected Failure but got Success($value, $index)")
+      case f@Parsed.Failure(message, index, extra) =>
+        println(s"Parsing input '$input', got Failure('$message', $index, ${extra.stack}), message '${f.msg}' as expected")
+    }
+    assertMatch(parsed) { case f@Parsed.Failure(`parsedInput`, `lastIndex`, extra) if f.msg contains expectedMessage => }
+  }
 
   override def tests: Tests = Tests {
 
@@ -96,28 +118,66 @@ object ParserTest extends TestSuite {
         check(Grammar.block_comment(_), input, (), input.length)
       }
     }
-    //    }
+    test("whsp") - {
+      Seq( // Examples may contain trailing whitespace or leading whitespace.
+        "{- - }- } -}",
+        """{-
+          | - }-
+          |}  |
+          |-}""".stripMargin,
+        "{-фыва ç≈Ω⁄€‹›ﬁ° }}-}",
+        "{--}",
+        "{-{--}-}",
+        "{-{--}-} ",
+        "{-{--}--}",
+        """ -- {-
+          | {-
+          | }- -}
+          |""".stripMargin,
+        """
+          |
+          |     -- asl;dkjfalskdjфыва ç≈Ω⁄€‹›ﬁ°flakj
+          |
+          |     {-
+          |
+          |     фыва ç≈Ω⁄€‹›ﬁ°
+          |
+          |     --  -}
+          |
+          |     """.stripMargin
+      ).foreach { input =>
+        check(Grammar.whsp(_), input, (), input.length)
+      }
+    }
+
+    test("whsp fails when not closed") - {
+      toFail(Grammar.whsp(_), "{-", "", "", 2)
+      toFail(Grammar.whsp(_), "{- {- -} -0", "", "", 8)
+
+    }
+
+    test("whsp fails when incomplete") - {
+
+      // Nothing gets parsed.
+      Seq( // Examples may contain trailing whitespace or leading whitespace.
+        "",
+        "фыва3 ç≈Ω⁄€‹›ﬁ° }}-}"
+      ).foreach { input =>
+        check(Grammar.whsp(_), input, (), 0)
+      }
+
+      Seq( // Examples may contain trailing whitespace or leading whitespace.
+        "   {- 1 - }- }  ",
+        """   {-2
+          | - }-
+          |}  |
+          |- }""".stripMargin,
+      ).foreach { input =>
+        toFail(Grammar.whsp(_), input, "", "", 5)
+      }
+
+    }
   }
 
-  def check[A](grammarRule: P[_] => P[A], input: String, expectedResult: A, lastIndex: Int) = {
-    val parsed = parse(input, grammarRule)
-    parsed match {
-      case Parsed.Success(value, index) =>
-        println(s"Parsing input '$input', got Success($value, $index)")
-      case Parsed.Failure(message, index, extra) =>
-        println(s"Error: Parsing input '$input', expected Success but got Failure('$message', $index, ${extra.stack})")
-    }
-    assertMatch(parsed) { case Parsed.Success(`expectedResult`, `lastIndex`) => }
-  }
 
-  def toFail[A](grammarRule: P[_] => P[A], input: String, parsedInput: String, expectedMessage: String, lastIndex: Int) = {
-    val parsed = parse(input, grammarRule)
-    parsed match {
-      case Parsed.Success(value, index) =>
-        println(s"Error: Parsing input '$input', expected Failure but got Success($value, $index)")
-      case f@Parsed.Failure(message, index, extra) =>
-        println(s"Parsing input '$input', got Failure('$message', $index, ${extra.stack}), message '${f.msg}' as expected")
-    }
-    assertMatch(parsed) { case f@Parsed.Failure(`parsedInput`, `lastIndex`, extra) if f.msg contains expectedMessage => }
-  }
 }

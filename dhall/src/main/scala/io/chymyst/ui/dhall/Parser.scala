@@ -69,7 +69,7 @@ object Grammar {
   def tab[$: P] = P("\t")
 
   def block_comment[$: P] = P(
-    "{-" ~ block_comment_continue
+    "{-" ~/ block_comment_continue
   )
 
   def block_comment_char[$: P] = P(
@@ -90,7 +90,7 @@ object Grammar {
   )
 
   def line_comment_prefix[$: P] = P(
-    "--" ~ (not_end_of_line.rep)
+    "--" ~/ (not_end_of_line.rep)
   )
 
   def line_comment[$: P] = P(
