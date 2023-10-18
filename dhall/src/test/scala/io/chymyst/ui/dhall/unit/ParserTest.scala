@@ -1,12 +1,13 @@
 package io.chymyst.ui.dhall.unit
 
-import io.chymyst.ui.dhall.{Grammar, Parser, SyntaxConstants}
-import utest.{*, TestSuite, Tests, assertMatch, intercept, test}
-import fastparse._
 import com.eed3si9n.expecty.Expecty.assert
+import fastparse._
+import io.chymyst.ui.dhall.Syntax.Expression
 import io.chymyst.ui.dhall.Syntax.Expression.TextLiteral
-import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
 import io.chymyst.ui.dhall.SyntaxConstants.VarName
+import io.chymyst.ui.dhall.unit.TestFixtures._
+import io.chymyst.ui.dhall.{Grammar, SyntaxConstants}
+import utest.{TestSuite, Tests, intercept, test}
 
 import java.nio.file.{Files, Paths}
 
@@ -20,7 +21,7 @@ object ParserTest extends TestSuite {
       case Parsed.Failure(message, index, extra) =>
         println(s"Error: Parsing input '$input', expected Success($expectedResult, $index) but got Failure('$message', $index, ${extra.stack})")
     }
-    assertMatch(parsed) { case Parsed.Success(r, i) if (r equals expectedResult) && (i == lastIndex) => }
+    assert(parsed == Parsed.Success(expectedResult, lastIndex))
   }
 
   def toFail[A](grammarRule: P[_] => P[A], input: String, parsedInput: String, expectedMessage: String, lastIndex: Int) = {
@@ -28,10 +29,11 @@ object ParserTest extends TestSuite {
     parsed match {
       case Parsed.Success(value, index) =>
         println(s"Error: Parsing input '$input', expected Failure but got Success($value, $index)")
+        assert(parsed == Parsed.Failure(parsedInput, lastIndex, null))
       case f@Parsed.Failure(message, index, extra) =>
         println(s"Parsing input '$input', expected index $lastIndex, got Failure('$message', $index, ${extra.stack}), message '${f.msg}' as expected")
+        assert((f.msg contains expectedMessage) && (f.index == lastIndex))
     }
-    assertMatch(parsed) { case f@Parsed.Failure(`parsedInput`, `lastIndex`, extra) if f.msg contains expectedMessage => }
   }
 
   override def tests: Tests = Tests {
@@ -82,7 +84,8 @@ object ParserTest extends TestSuite {
     }
 
     test("valid_non_ascii with large Unicode values from file") - {
-      import fastparse._, NoWhitespace._
+      import fastparse._
+      import NoWhitespace._
 
       val input: String = Files.readString(Paths.get(ParserTest.getClass.getResource("/valid_non_ascii.txt").toURI))
 
@@ -97,48 +100,13 @@ object ParserTest extends TestSuite {
     }
 
     test("block_comment") - {
-      Seq( // Examples should not contain trailing whitespace or leading whitespace.
-        "{- - }- } -}",
-        """{-
-          | - }-
-          |}  |
-          |-}""".stripMargin,
-        "{-фыва ç≈Ω⁄€‹›ﬁ° }}-}",
-        "{--}",
-        "{-{--}-}",
-      ).foreach { input =>
+      blockComments.foreach { input =>
         check(Grammar.block_comment(_), input, (), input.length)
       }
     }
 
     test("whsp") - {
-      Seq( // Examples may contain trailing whitespace or leading whitespace.
-        "{- - }- } -}",
-        """{-
-          | - }-
-          |}  |
-          |-}""".stripMargin,
-        "{-фыва ç≈Ω⁄€‹›ﬁ° }}-}",
-        "{--}",
-        "{-{--}-}",
-        "{-{--}-} ",
-        "{-{--}--}",
-        """ -- {-
-          | {-
-          | }- -}
-          |""".stripMargin,
-        """
-          |
-          |     -- asl;dkjfalskdjфыва ç≈Ω⁄€‹›ﬁ°flakj
-          |
-          |     {-
-          |
-          |     фыва ç≈Ω⁄€‹›ﬁ°
-          |
-          |     --  -}
-          |
-          |     """.stripMargin
-      ).foreach { input =>
+        (blockComments ++ multilineComments).foreach { input =>
         check(Grammar.whsp(_), input, (), input.length)
       }
     }
@@ -150,7 +118,6 @@ object ParserTest extends TestSuite {
     }
 
     test("whsp fails when incomplete") - {
-
       // Nothing gets parsed.
       Seq( // Examples may contain trailing whitespace or leading whitespace.
         "",
@@ -324,7 +291,8 @@ object ParserTest extends TestSuite {
     }
 
     test("bytes_literal") - {
-      check(Grammar.bytes_literal(_), "0x\"64646464\"", Expression.BytesLiteral("dddd".getBytes), 12)
+      val Parsed.Success(result, 12) = parse( "0x\"64646464\"", Grammar.bytes_literal(_))
+      assert(new String(result.value) == "dddd")
     }
 
     test("primitive_expression") - {
@@ -336,15 +304,43 @@ object ParserTest extends TestSuite {
           |line
           |''""".stripMargin -> TextLiteral.ofText(Expression.TextLiteralNoInterp("line\n")),
         "x" -> Expression.Variable(VarName("x"), BigInt(0)),
+        "(x)" -> Expression.Variable(VarName("x"), BigInt(0)),
+        "( x )" -> Expression.Variable(VarName("x"), BigInt(0)),
+        "( -12345  )" -> Expression.IntegerLiteral(BigInt(-12345)),
         "a-b/c" -> Expression.Variable(VarName("a-b/c"), BigInt(0)),
         "_xyz       @   \t\t\t\n\n           123451234512345123451234512345" -> Expression.Variable(VarName("_xyz"), BigInt("123451234512345123451234512345")),
         "[1,2,3]" -> Expression.NonEmptyList(Expression.NaturalLiteral(BigInt(1)), Seq(Expression.NaturalLiteral(BigInt(2)), Expression.NaturalLiteral(BigInt(3)))),
-        "0x\"64646464\"" -> Expression.BytesLiteral("dddd".getBytes),
         "Kind" -> Expression.Builtin(SyntaxConstants.Builtin.Kind),
         "Natural/show" -> Expression.Builtin(SyntaxConstants.Builtin.NaturalShow),
         "Natural" -> Expression.Builtin(SyntaxConstants.Builtin.Natural),
       ).foreach { case (s, d) =>
         check(Grammar.primitive_expression(_), s, d, s.length)
+      }
+
+      val Parsed.Success(Expression.BytesLiteral(result), 12) = parse("0x\"64646464\"", Grammar.primitive_expression(_))
+      assert(new String(result) == "dddd")
+    }
+
+    test("import_expression") - {
+      Seq(
+        "12345" -> Expression.NaturalLiteral(BigInt(12345)),
+        "-4312.2" -> Expression.DoubleLiteral(-4312.2),
+        "\"123\"" -> TextLiteral.ofText(Expression.TextLiteralNoInterp("123")),
+        """''
+          |line
+          |''""".stripMargin -> TextLiteral.ofText(Expression.TextLiteralNoInterp("line\n")),
+        "x" -> Expression.Variable(VarName("x"), BigInt(0)),
+        "(x)" -> Expression.Variable(VarName("x"), BigInt(0)),
+        "( x )" -> Expression.Variable(VarName("x"), BigInt(0)),
+        "( -12345  )" -> Expression.IntegerLiteral(BigInt(-12345)),
+        "a-b/c" -> Expression.Variable(VarName("a-b/c"), BigInt(0)),
+        "_xyz       @   \t\t\t\n\n           123451234512345123451234512345" -> Expression.Variable(VarName("_xyz"), BigInt("123451234512345123451234512345")),
+        "[1,2,3]" -> Expression.NonEmptyList(Expression.NaturalLiteral(BigInt(1)), Seq(Expression.NaturalLiteral(BigInt(2)), Expression.NaturalLiteral(BigInt(3)))),
+        "Kind" -> Expression.Builtin(SyntaxConstants.Builtin.Kind),
+        "Natural/show" -> Expression.Builtin(SyntaxConstants.Builtin.NaturalShow),
+        "Natural" -> Expression.Builtin(SyntaxConstants.Builtin.Natural),
+      ).foreach { case (s, d) =>
+        check(Grammar.import_expression(_), s, d, s.length)
       }
     }
 

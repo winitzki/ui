@@ -1069,6 +1069,9 @@ object Grammar {
 
   def primitive_expression[$: P]: P[Expression] = P(
     temporal_literal
+      // Put bytes_literal first, or else we will just parse the initial 0 as natural_literal
+      //  '0x"01234567689abcdef"'
+      | bytes_literal
       //
       //  "2.0"
       | double_literal
@@ -1076,14 +1079,11 @@ object Grammar {
       //  "2"
       | natural_literal
       //
-      //  "+2"
+      //  "+2" or "-2"
       | integer_literal
       //
       //  '"ABC"'
       | text_literal
-      //
-      //  '0x"01234567689abcdef"'
-      | bytes_literal
       //
       //  "{ foo = 1      , bar = True }"
       //  "{ foo : Integer, bar : Bool }"
