@@ -80,6 +80,9 @@ object TestFixtures {
   )
 
   val selectorExpressions: Seq[(String, Expression)] = Seq(
-      "x . y" -> Expression.Field(Expression.Variable(VarName("x"), BigInt(0)), FieldName("y"))
+    "x.y" -> Expression.Field(Expression.Variable(VarName("x"), BigInt(0)), FieldName("y")),
+    "x . y . z" -> Expression.Field(Expression.Field(Expression.Variable(VarName("x"), BigInt(0)), FieldName("y")), FieldName("z")),
+    "x .y . (Natural)" -> Expression.ProjectByType(Expression.Field(Expression.Variable(VarName("x"), BigInt(0)), FieldName("y")), Expression.Builtin(SyntaxConstants.Builtin.Natural)),
+    "x. {y,z }" -> Expression.ProjectByLabels(Expression.Variable(VarName("x"), BigInt(0)), Seq(FieldName("y"), FieldName("z"))),
   )
 }
