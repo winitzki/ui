@@ -251,11 +251,62 @@ object ParserTest extends TestSuite {
       val names = SyntaxConstants.Builtin.namesToValuesMap
       assert(names.keySet.size == 42)
       names.foreach { case (name, c) =>
-        val v = Expression.Builtin(c)
-        println(s"Checking builtin name $name -> $v")
-        check(Grammar.builtin(_), name, v, name.length)
+        check(Grammar.builtin(_), name, Expression.Builtin(c), name.length)
       }
     }
 
+    test("numeric_double_literal") - {
+      Map(
+        "1.0" -> 1.0,
+        "-1.0" -> -1.0,
+        "1.2" -> 1.2,
+        "1.5" -> 1.5,
+        "100e2" -> 100e2,
+        "-100e12" -> -100e12,
+        "100e-2" -> 100e-2,
+        "1.0e-3" -> 1.0e-3,
+      ).foreach { case (s, d) =>
+        check(Grammar.numeric_double_literal(_), s, Expression.DoubleLiteral(d), s.length)
+      }
+    }
+
+    test("natural_literal") - {
+      Map(
+        "9" -> BigInt(9),
+        "1234512345123451234512345123451234512345" -> BigInt("1234512345123451234512345123451234512345"),
+        "0" -> BigInt(0),
+        "0x10" -> BigInt(16),
+        "0xFFFF" -> BigInt(65535),
+      ).foreach { case (s, d) =>
+        check(Grammar.natural_literal(_), s, Expression.NaturalLiteral(d), s.length)
+      }
+      // Leading zero digits are not allowed.
+      check(Grammar.natural_literal(_), "00001", Expression.NaturalLiteral(BigInt(0)), 1)
+    }
+
+    test("integer_literal") - {
+
+      Map(
+        "+9" -> BigInt(9),
+        "+1234512345123451234512345123451234512345" -> BigInt("1234512345123451234512345123451234512345"),
+        "+0" -> BigInt(0),
+        "+0x10" -> BigInt(16),
+        "+0xFFFF" -> BigInt(65535),
+        "-9" -> BigInt(-9),
+        "-1234512345123451234512345123451234512345" -> BigInt("-1234512345123451234512345123451234512345"),
+        "-0" -> BigInt(0),
+        "-0x10" -> BigInt(-16),
+        "-0xFFFF" -> BigInt(-65535),
+      ).foreach { case (s, d) =>
+        check(Grammar.integer_literal(_), s, Expression.IntegerLiteral(d), s.length)
+      }
+      // Leading zero digits are not allowed.
+      check(Grammar.integer_literal(_), "+00001", Expression.IntegerLiteral(BigInt(0)), 2)
+      check(Grammar.integer_literal(_), "-00001", Expression.IntegerLiteral(BigInt(0)), 2)
+      // Either plus or minus sign is required.
+      toFail(Grammar.integer_literal(_), "0", "", "", 0)
+      toFail(Grammar.integer_literal(_), "1", "", "", 0)
+      toFail(Grammar.integer_literal(_), " ", "", "", 0)
+    }
   }
 }
