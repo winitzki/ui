@@ -841,14 +841,14 @@ object Grammar {
       }
       //
       //  "forall (x : a) -> b"
-      | (requireKeyword("forall") ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression)
+      |  (forall ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression)
       .map { case (varName, tipe, body) => Forall(varName, tipe, body) }
       //
       //  "a -> b"
       //
       //  NOTE: Backtrack if parsing this alternative fails
       | (operator_expression ~ whsp ~ arrow ~ whsp ~ expression)
-      .map { case (head, body) => body } // TODO: figure out what this expression does!
+      .map { case (head, body) => body } // TODO: figure out what this expression does! Is this a function type? If so, why "operator_expression"?
       //
       //  "a with x = b"
       //

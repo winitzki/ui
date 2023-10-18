@@ -224,6 +224,9 @@ object ParserTest extends TestSuite {
         check(Grammar.keyword(_), input + " ", input, input.length)
         check(Grammar.keyword(_), input + "(", input, input.length)
       }
+
+      check(Grammar.forall(_), "forall", (), 6)
+      check(Grammar.forall(_), "∀", (), 1)
     }
 
     test("simple_label") - {
