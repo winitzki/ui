@@ -226,7 +226,7 @@ object ParserTest extends TestSuite {
       }
 
       check(Grammar.forall(_), "forall", (), 6)
-      check(Grammar.forall(_), "∀", (), 1)
+      check(Grammar.forall(_), "∀ ", (), 1)
     }
 
     test("simple_label") - {
@@ -238,9 +238,13 @@ object ParserTest extends TestSuite {
         "asa",
         "_in",
         "asif",
+        "forallx",
       ).foreach { input =>
         check(Grammar.simple_label(_), input, (), input.length)
       }
+      check(Grammar.simple_label(_), "x∀ ", (), 1)
+      toFail(Grammar.simple_label(_), "∀", "", "", 0)
+      toFail(Grammar.simple_label(_), "∀x", "", "", 0)
     }
 
   }
