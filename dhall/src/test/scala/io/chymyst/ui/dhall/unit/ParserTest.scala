@@ -216,7 +216,28 @@ object ParserTest extends TestSuite {
       ).foreach { input =>
         check(Grammar.whsp1(_), input, (), input.length)
       }
+    }
 
+    test("keyword") - {
+      Grammar.simpleKeywords.foreach { input =>
+        check(Grammar.keyword(_), input, input, input.length)
+        check(Grammar.keyword(_), input + " ", input, input.length)
+        check(Grammar.keyword(_), input + "(", input, input.length)
+      }
+    }
+
+    test("simple_label") - {
+      Seq(
+        "abcd",
+        "witha",
+        "awith",
+        "if_",
+        "asa",
+        "_in",
+        "asif",
+      ).foreach { input =>
+        check(Grammar.simple_label(_), input, (), input.length)
+      }
     }
 
   }

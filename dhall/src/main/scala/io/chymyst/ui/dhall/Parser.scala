@@ -1,10 +1,10 @@
 package io.chymyst.ui.dhall
 
+import fastparse.NoWhitespace._
 import fastparse._
-import NoWhitespace._
+import io.chymyst.ui.dhall.Syntax.Expression.{Some => ExpressionSome, _}
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
-import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, File, ImportType, VarName}
-import Expression.{Annotation, Application, Assert, Builtin, DateLiteral, DoubleLiteral, EmptyList, Forall, If, Import, IntegerLiteral, Lambda, Let, Merge, NaturalLiteral, Operator, RawRecordLiteral, RecordLiteral, RecordType, ShowConstructor, TextLiteral, TimeLiteral, TimeZoneLiteral, ToMap, With}
+import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, ImportType, VarName}
 
 import java.io.InputStream
 import java.time.{LocalDate, LocalTime, ZoneOffset}
@@ -105,11 +105,11 @@ object Grammar {
       | block_comment
   )
 
-  def whsp[$: P] = P(
+  def whsp[$: P]: P[Unit] = P(
     whitespace_chunk.rep
   )
 
-  def whsp1[$: P] = P(
+  def whsp1[$: P]: P[Unit] = P(
     whitespace_chunk.rep(1)
   )
 
@@ -133,7 +133,6 @@ object Grammar {
     ALPHANUM | "-" | "/" | "_"
   )
 
-  // TODO: a simple label cannot be a keyword
   /*
   ; A simple label cannot be one of the reserved keywords
   ; listed in the `keyword` rule.
@@ -144,7 +143,8 @@ object Grammar {
   ;     / !keyword (simple-label-first-char *simple-label-next-char)
    */
   def simple_label[$: P] = P(
-    simple_label_first_char ~ simple_label_next_char.rep
+    (&(keyword) ~ simple_label_next_char.rep(1))
+      | (!keyword ~ simple_label_first_char ~ simple_label_next_char.rep)
   )
 
   def quoted_label_char[$: P] = P(
@@ -296,12 +296,13 @@ object Grammar {
     "0x\"" ~ HEXDIG.rep(exactly = 2).rep.! ~ "\""
   ).map(hexStringToByteArray).map(Expression.BytesLiteral)
 
-  val simpleKeywords = Set(
+  val simpleKeywords = Seq(
     "if",
     "then",
     "else",
     "let",
     "in",
+    "assert",
     "as",
     "using",
     "merge",
@@ -310,11 +311,12 @@ object Grammar {
     "NaN",
     "Some",
     "toMap",
-    "assert",
     "with",
     "forall",
     "showConstructor",
   )
+
+  val simpleKeywordsSet = simpleKeywords.toSet
 
   def opOr[$: P] = P("||")
 
@@ -343,8 +345,24 @@ object Grammar {
   )
 
   def keyword[$: P]: P[String] = P(
-    simpleKeywords.map(P(_).!).reduce(_ | _)
-  )
+    requireKeyword("if")
+      | requireKeyword("then")
+      | requireKeyword("else")
+      | requireKeyword("let")
+      | requireKeyword("with")
+      | requireKeyword("in")
+      | requireKeyword("assert") // "assert" must come before "as" to be parsed correctly.
+      | requireKeyword("as")
+      | requireKeyword("using")
+      | requireKeyword("merge")
+      | requireKeyword("missing")
+      | requireKeyword("Infinity")
+      | requireKeyword("NaN")
+      | requireKeyword("Some")
+      | requireKeyword("toMap")
+      | requireKeyword("forall")
+      | requireKeyword("showConstructor")
+  ).!
 
   val builtinSymbols = Set(
     "Natural/fold",
@@ -391,7 +409,8 @@ object Grammar {
   )
 
   def builtin[$: P]: P[Expression.Builtin] = P(
-    builtinSymbols.map(P(_).!.map(SyntaxConstants.Builtin.withName).map(Expression.Builtin)).reduce(_ | _)
+    builtinSymbols.map(P(_).!.map(SyntaxConstants.Builtin.withName).map(Expression.Builtin))
+      .reduce { (a, b) => P(a) | P(b) }
   )
 
   def combine[$: P] = P(
@@ -961,7 +980,7 @@ object Grammar {
       //
       //  "Some e"
       | (requireKeyword("Some") ~ whsp1 ~ import_expression)
-      .map(expr => Expression.Some(expr))
+      .map(expr => ExpressionSome(expr))
       //
       //  "toMap e"
       | (requireKeyword("toMap") ~ whsp1 ~ import_expression)
@@ -1135,7 +1154,7 @@ object Grammar {
 
   // Helpers to make sure we are using valid keyword and operator names.
   def requireKeyword[$: P](name: String): P[Unit] = {
-    assert(simpleKeywords contains name, s"Keyword $name must be one of the supported Dhall keywords")
+    assert(simpleKeywordsSet contains name, s"Keyword $name must be one of the supported Dhall keywords")
     P(name)
   }
 
