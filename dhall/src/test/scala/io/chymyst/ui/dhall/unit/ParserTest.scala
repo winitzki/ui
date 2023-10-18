@@ -84,8 +84,14 @@ object ParserTest extends TestSuite {
 
     test("block_comment") - {
       Seq( // Examples should not contain trailing whitespace or leading whitespace.
-        """{- }- -}""",
+        "{- - }- } -}",
+        """{-
+          | - }-
+          |}  |
+          |-}""".stripMargin,
         "{-фыва ç≈Ω⁄€‹›ﬁ° }}-}",
+        "{--}",
+        "{-{--}-}",
       ).foreach { input =>
         check(Grammar.block_comment(_), input, (), input.length)
       }
