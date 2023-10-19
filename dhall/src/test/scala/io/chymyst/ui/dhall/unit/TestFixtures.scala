@@ -1,9 +1,10 @@
 package io.chymyst.ui.dhall.unit
 
+import io.chymyst.ui.dhall.Grammar.hexStringToByteArray
 import io.chymyst.ui.dhall.Syntax.Expression
 import io.chymyst.ui.dhall.Syntax.Expression.TextLiteral
 import io.chymyst.ui.dhall.SyntaxConstants
-import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, VarName}
+import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, File, FilePrefix, ImportMode, ImportType, VarName}
 
 object TestFixtures {
 
@@ -79,14 +80,20 @@ object TestFixtures {
     "Natural" -> Expression.Builtin(SyntaxConstants.Builtin.Natural),
   )
 
-  val selectorExpressions  = Map(
+  val selectorExpressions = Map(
     "x.y" -> Expression.Field(Expression.Variable(VarName("x"), BigInt(0)), FieldName("y")),
     "x . y . z" -> Expression.Field(Expression.Field(Expression.Variable(VarName("x"), BigInt(0)), FieldName("y")), FieldName("z")),
     "x .y . (Natural)" -> Expression.ProjectByType(Expression.Field(Expression.Variable(VarName("x"), BigInt(0)), FieldName("y")), Expression.Builtin(SyntaxConstants.Builtin.Natural)),
     "x. {y,z }" -> Expression.ProjectByLabels(Expression.Variable(VarName("x"), BigInt(0)), Seq(FieldName("y"), FieldName("z"))),
   )
 
-  val importExpressions : Seq[(String, Expression)] = Seq(
+  val sha256Example = "012356789ABCDEF012356789ABCDEF012356789ABCDEF012356789ABCDEF"
+
+  val importExpressions: Seq[(String, Expression)] = Seq(
     "x .y .( Natural) ::x .{y ,z}" -> Expression.Completion(selectorExpressions("x .y . (Natural)"), selectorExpressions("x. {y,z }")),
+    "./local/import as Location" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.Location, None),
+    "./local/import sha256:$sha256Example" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.Code, Some(hexStringToByteArray(sha256Example))),
+    s"./local/import sha256:$sha256Example as Text" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.RawText, Some(hexStringToByteArray(sha256Example))),
+    s"./local/import sha256:$sha256Example as Bytes" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.RawBytes, Some(hexStringToByteArray(sha256Example))),
   )
 }

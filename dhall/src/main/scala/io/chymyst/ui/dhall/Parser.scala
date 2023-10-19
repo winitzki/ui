@@ -314,6 +314,9 @@ object Grammar {
     "with",
     "forall",
     "showConstructor",
+    "Text",
+    "Location",
+    "Bytes",
   )
 
   val simpleKeywordsSet = simpleKeywords.toSet
