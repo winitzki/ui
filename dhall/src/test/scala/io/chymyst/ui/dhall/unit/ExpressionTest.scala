@@ -21,12 +21,5 @@ object ExpressionTest extends TestSuite {
       //              assert(result == expected)
     }
 
-    test("parse product.dhall") - {
-      val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall(getClass.getResourceAsStream("/product.dhall"))
-      // TODO: enable this test
-      //      val expected = Expression.Builtin(SyntaxConstants.Builtin.List)
-      //      assert(result == expected)
-    }
-
   }
 }
