@@ -87,13 +87,18 @@ object TestFixtures {
     "x. {y,z }" -> Expression.ProjectByLabels(Expression.Variable(VarName("x"), BigInt(0)), Seq(FieldName("y"), FieldName("z"))),
   )
 
-  val sha256Example = "012356789ABCDEF012356789ABCDEF012356789ABCDEF012356789ABCDEF"
+  val sha256example = "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"
+
+  val completionExpressions = Seq(
+    "x .y .( Natural) ::x .{y ,z}" -> Expression.Completion(selectorExpressions("x .y . (Natural)"),
+      selectorExpressions("x. {y,z }")),
+  )
 
   val importExpressions: Seq[(String, Expression)] = Seq(
-    "x .y .( Natural) ::x .{y ,z}" -> Expression.Completion(selectorExpressions("x .y . (Natural)"), selectorExpressions("x. {y,z }")),
     "./local/import as Location" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.Location, None),
-    "./local/import sha256:$sha256Example" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.Code, Some(hexStringToByteArray(sha256Example))),
-    s"./local/import sha256:$sha256Example as Text" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.RawText, Some(hexStringToByteArray(sha256Example))),
-    s"./local/import sha256:$sha256Example as Bytes" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.RawBytes, Some(hexStringToByteArray(sha256Example))),
+    s"./local/import sha256:$sha256example" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.Code, Some
+    (hexStringToByteArray(sha256example))),
+    s"./local/import sha256:$sha256example as Text" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.RawText, Some(hexStringToByteArray(sha256example))),
+    s"./local/import sha256:$sha256example as Bytes" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.RawBytes, Some(hexStringToByteArray(sha256example))),
   )
 }

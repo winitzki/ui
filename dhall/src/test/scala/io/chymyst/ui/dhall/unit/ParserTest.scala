@@ -3,8 +3,6 @@ package io.chymyst.ui.dhall.unit
 import com.eed3si9n.expecty.Expecty.assert
 import fastparse._
 import io.chymyst.ui.dhall.Syntax.Expression
-import io.chymyst.ui.dhall.Syntax.Expression.TextLiteral
-import io.chymyst.ui.dhall.SyntaxConstants.VarName
 import io.chymyst.ui.dhall.unit.TestFixtures._
 import io.chymyst.ui.dhall.{Grammar, SyntaxConstants}
 import utest.{TestSuite, Tests, intercept, test}
@@ -275,8 +273,32 @@ object ParserTest extends TestSuite {
       }
     }
 
+    test("completion_expression") - {
+      (primitiveExpressions ++ selectorExpressions ++ completionExpressions).foreach { case (s, d) =>
+        check(Grammar.completion_expression(_), s, d, s.length)
+      }
+    }
+
+    test("import_only") - {
+      importExpressions.foreach { case (s, d) =>
+        check(Grammar.import_only(_), s, d, s.length)
+      }
+    }
+
+    test("import_hashed") - {
+      import io.chymyst.ui.dhall.Grammar
+      import io.chymyst.ui.dhall.Syntax.Expression.Import
+      import io.chymyst.ui.dhall.SyntaxConstants.File
+      import io.chymyst.ui.dhall.SyntaxConstants.FilePrefix.Here
+      import io.chymyst.ui.dhall.SyntaxConstants.ImportMode.Code
+      import io.chymyst.ui.dhall.SyntaxConstants.ImportType.Path
+
+      check(Grammar.import_hashed(_), s"./local/import sha256:$sha256example",  (Path(Here, File(List
+      ("local", "import"))), Some(sha256example)), 86)
+    }
+
     test("import_expression") - {
-      (primitiveExpressions ++ selectorExpressions ++ importExpressions).foreach { case (s, d) =>
+      (primitiveExpressions ++ selectorExpressions ++ completionExpressions ++ importExpressions).foreach { case (s, d) =>
         check(Grammar.import_expression(_), s, d, s.length)
       }
     }

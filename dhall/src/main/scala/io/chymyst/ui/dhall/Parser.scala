@@ -763,11 +763,11 @@ object Grammar {
   )
 
   def hash[$: P] = P(
-    "sha256:" ~ HEXDIG.rep(exactly = 64) // "sha256:XXX...XXX"
+    "sha256:" ~/ HEXDIG.rep(exactly = 64).! // "sha256:XXX...XXX"
   )
 
   def import_hashed[$: P]: P[(ImportType, Option[String])] = P(
-    import_type ~ (whsp1 ~ hash.!).?
+    import_type ~ (whsp1 ~ hash).?
   )
 
   def import_only[$: P]: P[Import] = P(
