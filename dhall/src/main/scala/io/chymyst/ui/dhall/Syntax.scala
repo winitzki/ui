@@ -246,7 +246,8 @@ object Syntax {
 
     final case class ProjectByType(base: Expression, by: Expression) extends Expression
 
-    final case class Completion(data: Expression, tipe: Expression) extends Expression
+//    an expression of the form T::r is syntactic sugar for (T.default // r) : T.Type
+    final case class Completion(base: Expression, target: Expression) extends Expression
 
     final case class Assert(assertion: Expression) extends Expression
 

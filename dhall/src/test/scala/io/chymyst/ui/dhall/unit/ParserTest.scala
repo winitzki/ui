@@ -271,6 +271,12 @@ object ParserTest extends TestSuite {
 
     test("selector_expression") - {
       (primitiveExpressions ++ selectorExpressions).foreach { case (s, d) =>
+        check(Grammar.selector_expression(_), s, d, s.length)
+      }
+    }
+
+    test("import_expression") - {
+      (primitiveExpressions ++ selectorExpressions ++ importExpressions).foreach { case (s, d) =>
         check(Grammar.import_expression(_), s, d, s.length)
       }
     }

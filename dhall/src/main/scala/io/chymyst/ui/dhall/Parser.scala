@@ -344,7 +344,19 @@ object Grammar {
     forall_symbol | requireKeyword("forall")
   )
 
-  def keyword[$: P]: P[String] = P(
+  def keyword[$: P]: P[String] = {
+    def keywordParsers: Seq[P[_] => P[Unit]] = simpleKeywords.map {
+      k => implicit ctx: P[_] => P(k)
+    }
+
+    val keywordParsersConcatenated = keywordParsers.reduce {
+      (p1, p2) => ctx: P[_] => P(p1(ctx) | p2(ctx))
+    }
+
+    keywordParsersConcatenated(implicitly[P[$]]).!
+  }
+
+  def keyword1[$: P]: P[String] = P(
     requireKeyword("if")
       | requireKeyword("then")
       | requireKeyword("else")
