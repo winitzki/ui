@@ -344,82 +344,21 @@ object Grammar {
     forall_symbol | requireKeyword("forall")
   )
 
-  def keyword[$: P]: P[String] = {
-    def keywordParsers: Seq[P[_] => P[Unit]] = simpleKeywords.map {
-      k => implicit ctx: P[_] => P(k)
-    }
-
-    val keywordParsersConcatenated = keywordParsers.reduce {
-      (p1, p2) => ctx: P[_] => P(p1(ctx) | p2(ctx))
-    }
-
-    keywordParsersConcatenated(implicitly[P[$]]).!
+  def concatKeywords[$: P](keywords: Seq[String]): P[String] = {
+    keywords
+      .sorted(Ordering[String].reverse) // Reversing the order will disambiguate parsing of keywords that are substrings of another keyword.
+      .map {
+        k => implicit ctx: P[_] => P(k)
+      }.reduce {
+        (p1, p2) => ctx: P[_] => P(p1(ctx) | p2(ctx))
+      }(implicitly[P[$]]).!
   }
 
-  def keyword1[$: P]: P[String] = P(
-    requireKeyword("if")
-      | requireKeyword("then")
-      | requireKeyword("else")
-      | requireKeyword("let")
-      | requireKeyword("with")
-      | requireKeyword("in")
-      | requireKeyword("assert") // "assert" must come before "as" to be parsed correctly.
-      | requireKeyword("as")
-      | requireKeyword("using")
-      | requireKeyword("merge")
-      | requireKeyword("missing")
-      | requireKeyword("Infinity")
-      | requireKeyword("NaN")
-      | requireKeyword("Some")
-      | requireKeyword("toMap")
-      | requireKeyword("forall")
-      | requireKeyword("showConstructor")
-  ).!
+  def keyword[$: P]: P[String] = concatKeywords(simpleKeywords)
 
-  def builtin[$: P]: P[Expression.Builtin] = P(
-    P("Bool")
-      | P("Bytes")
-      | P("Date/show")
-      | P("Date")
-      | P("Double/show")
-      | P("Double")
-      | P("False")
-      | P("Integer/clamp")
-      | P("Integer/negate")
-      | P("Integer/show")
-      | P("Integer/toDouble")
-      | P("Integer")
-      | P("Kind")
-      | P("List/build")
-      | P("List/fold")
-      | P("List/head")
-      | P("List/indexed")
-      | P("List/last")
-      | P("List/length")
-      | P("List/reverse")
-      | P("List")
-      | P("Natural/build")
-      | P("Natural/even")
-      | P("Natural/fold")
-      | P("Natural/isZero")
-      | P("Natural/odd")
-      | P("Natural/show")
-      | P("Natural/subtract")
-      | P("Natural/toInteger")
-      | P("Natural")
-      | P("None")
-      | P("Optional")
-      | P("Sort")
-      | P("Text/replace")
-      | P("Text/show")
-      | P("Text")
-      | P("Time/show")
-      | P("TimeZone/show")
-      | P("TimeZone")
-      | P("Time")
-      | P("True")
-      | P("Type")
-  ).!.map(SyntaxConstants.Builtin.withName).map(Expression.Builtin)
+  def builtin[$: P]: P[Expression.Builtin] =
+    concatKeywords(SyntaxConstants.Builtin.namesToValuesMap.keys.toSeq)
+      .map(SyntaxConstants.Builtin.withName).map(Expression.Builtin)
 
   def combine[$: P] = P(
     "\u2227" | "/\\"
