@@ -241,8 +241,8 @@ object Grammar {
   )
 
   def double_quote_literal[$: P]: P[TextLiteral] = P(
-    "\"" ~ double_quote_chunk.rep ~ "\""
-  ).map(_.map(literalOrInterp => literalOrInterp.map(TextLiteral.ofText).merge).reduce(_ ++ _))
+    "\"" ~/ double_quote_chunk.rep ~ "\""
+  ).map(_.map(literalOrInterp => literalOrInterp.map(TextLiteral.ofText).merge).fold(TextLiteral.empty)(_ ++ _))
 
   def single_quote_continue[$: P]: P[Expression.TextLiteral] = P(
     (interpolation ~ single_quote_continue).map { case (head, tail) => Expression.TextLiteral.ofExpression(head) ++ tail }
@@ -1125,7 +1125,7 @@ object Grammar {
   )
 
   def complete_expression[$: P] = P(
-    shebang.rep ~ whsp ~ expression ~ whsp ~ line_comment_prefix.?
+    shebang.rep ~ whsp ~ expression ~ whsp ~ line_comment_prefix.? ~ End
   ).map { case (shebangContents, expr) => DhallFile(shebangContents, expr) }
 
   // Helpers to make sure we are using valid keyword and operator names.

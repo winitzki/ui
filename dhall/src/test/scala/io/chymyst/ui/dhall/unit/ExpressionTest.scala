@@ -8,6 +8,9 @@ import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, VarName}
 import io.chymyst.ui.dhall.{Grammar, Parser, SyntaxConstants}
 import munit.FunSuite
 
+import java.io.File
+import scala.util.chaining.scalaUtilChainingOps
+
 class ExpressionTest extends FunSuite {
 
   test("simple invalid expression: 1+1") {
@@ -55,6 +58,17 @@ class ExpressionTest extends FunSuite {
     val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall("let x = 1 in y")
     val expected = Expression.Let(VarName("x"), None, NaturalLiteral(1), Variable(VarName("y"), 0))
     expect(result == expected)
+  }
+
+  test("parse a string interpolation") {
+    val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall(""" "${}" """)
+    val expected = Nil
+    expect(result == expected)
+  }
+
+  test("parse a sample file") {
+    val testFile = getClass.getClassLoader.getResourceAsStream("parser-succeed/templateA.dhall")
+    val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall(testFile)
   }
 
 }
