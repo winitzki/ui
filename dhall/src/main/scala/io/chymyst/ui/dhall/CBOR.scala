@@ -65,7 +65,9 @@ object CBOR {
     case Expression.NaturalLiteral(value) => makeArrayC(Some(15))(naturalToCbor2(value))
     case Expression.IntegerLiteral(value) => ???
     case Expression.TextLiteralNoInterp(value) => makeArrayC(Some(18))(CBORObject.FromObject(value))
-    case Expression.TextLiteral(interpolations, trailing) => ???
+    case Expression.TextLiteral(interpolations, trailing) =>
+      val objects: Seq[CBORObject] = interpolations.flatMap { case (head, tail) => Seq(CBORObject.FromObject(head), toCbor2(tail)) } :+ CBORObject.FromObject(trailing)
+      makeArrayC(Some(18))(objects:_*)
     case Expression.BytesLiteral(hex) => ???
     case Expression.DateLiteral(date) => ???
     case Expression.TimeLiteral(time) => ???
