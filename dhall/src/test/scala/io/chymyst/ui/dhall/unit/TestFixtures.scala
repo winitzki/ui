@@ -34,7 +34,7 @@ object TestFixtures {
     }
   }
 
-  def check[A](successExamples: Seq[(String, Expression)], grammarRule: P[_] => P[A]): Unit = {
+  def check[A](successExamples: Seq[(String, A)], grammarRule: P[_] => P[A]): Unit = {
     val results = successExamples.map { case (s, d) =>
       Try(check(grammarRule(_), s, d, s.length))
     }
@@ -177,5 +177,17 @@ object TestFixtures {
     "{ foo, bar }" -> Expression.RecordLiteral(List((FieldName("foo"), Variable(VarName("foo"), BigInt(0))), (FieldName("bar"), Variable(VarName("bar"), BigInt
     (0))
     ))),
+  )
+
+  // Note: a `let_binding` must end with a whitespace.
+  val letBindings: Seq[(String, (VarName, Option[Expression], Expression))] = Seq(
+    "let x = 1 " -> (VarName("x"), None, Expression.NaturalLiteral(1)),
+    "let x : Integer = 1 " -> (VarName("x"), Some(Expression.Builtin(SyntaxConstants.Builtin.Integer)), Expression.NaturalLiteral(1)),
+  )
+
+  val letBindingExpressions: Seq[(String, Expression)] = Seq(
+    "let x = 1 in x" -> Expression.Variable(VarName("x"), BigInt(0)),
+    "let x = 1 let y = 2 in x" -> Expression.Variable(VarName("x"), BigInt(0)),
+    "let x = 1 y = 2 in x" -> Expression.Variable(VarName("x"), BigInt(0)),
   )
 }

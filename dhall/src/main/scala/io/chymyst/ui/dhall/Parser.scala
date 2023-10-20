@@ -526,13 +526,17 @@ object Grammar {
   "Reserved identifiers for builtins" specified in the `standard/README.md` document.
   It is a syntax error to specify a de Bruijn index in this case.
   Otherwise, this is a variable with name and index matching the label and index.
+
    */
   def identifier[$: P]: P[Expression] = P(
     variable.flatMap { case (name, index) =>
       SyntaxConstants.Builtin.namesToValuesMap.get(name.name) match {
-        case None => Pass(Expression.Variable(name, index.map(_.value).getOrElse(BigInt(0))))
-        case Some(builtinName) if index.contains(0) => Pass(Expression.Builtin(builtinName))
-        case Some(builtinName) => Fail(s"Identifier ${name.name} matches builtin but has invalid de Bruijn index $index")
+        case None =>
+          // Also, identifier may not equal a keyword!
+          if (simpleKeywordsSet contains name.name) Fail(s"Identifier ${name.name} matches a keyword name, which is not acceptable.")
+          else Pass(Expression.Variable(name, index.map(_.value).getOrElse(BigInt(0))))
+        case Some(builtinName) if index.contains(NaturalLiteral(BigInt(0))) => Pass(Expression.Builtin(builtinName))
+        case Some(builtinName) => Fail(s"Identifier ${name.name} matches a builtin name but has invalid de Bruijn index $index")
       }
     }
       | builtin
@@ -784,54 +788,55 @@ object Grammar {
 
   // The ABNF spec does not define those sub-rules but we define them to aid debugging.
 
-  def expression_lambda[$: P]: P[Lambda] = (lambda ~ whsp ~ "(" ~/ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~/ expression ~ whsp ~ ")" ~ whsp ~ arrow ~/
+  def expression_lambda[$: P]: P[Lambda] = P(lambda ~ whsp ~/ "(" ~ whsp ~/ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~/ expression ~ whsp ~ ")" ~ whsp ~ arrow ~/
     whsp ~ expression)
     .map { case (name, tipe, body) => Lambda(name, tipe, body) }
 
-  def expression_if_then_else[$: P]: P[If] = (
+  def expression_if_then_else[$: P]: P[If] = P(
     requireKeyword("if") ~ whsp1 ~/ expression ~ whsp ~ requireKeyword("then") ~ whsp1 ~/ expression ~ whsp ~ requireKeyword("else") ~ whsp1 ~/ expression
-    ).map { case (cond, ifTrue, ifFalse) =>
-      If(cond, ifTrue, ifFalse)
-    }
+  ).map { case (cond, ifTrue, ifFalse) =>
+    If(cond, ifTrue, ifFalse)
+  }
 
-  def expression_let_binding[$: P]: P[Expression] = (let_binding.rep(1) ~ requireKeyword("in") ~/ whsp1 ~ expression)
+  def expression_let_binding[$: P]: P[Expression] = P(let_binding.rep(1) ~ requireKeyword("in") ~ whsp1 ~/ expression)
     .map { case (letBindings, expr) =>
       letBindings.foldLeft(expr) { case (prev, (varName, tipe, body)) => Let(varName, tipe, body, prev) }
     }
 
-  def expression_forall[$: P]: P[Forall] = (forall ~ whsp ~/ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~/ expression ~ whsp ~ ")" ~ whsp ~ arrow ~/
+  def expression_forall[$: P]: P[Forall] = P(forall ~ whsp ~/ "(" ~ whsp ~ nonreserved_label ~ whsp ~/ ":" ~ whsp1 ~/ expression ~ whsp ~ ")" ~ whsp ~ arrow ~/
     whsp ~ expression)
     .map { case (varName, tipe, body) => Forall(varName, tipe, body) }
 
   // This may not "cut" the parse.
-  def expression_arrow[$: P]: P[Expression] = (operator_expression ~ whsp ~ arrow ~ whsp ~ expression)
+  def expression_arrow[$: P]: P[Expression] = P(operator_expression ~ whsp ~ arrow ~/ whsp ~ expression)
     .map { case (head, body) => body } // TODO: figure out what this expression does! Is this a function type? If so, why "operator_expression"?
 
-  def expression_merge[$: P]: P[Merge] = (requireKeyword("merge") ~ whsp1 ~/ import_expression ~ whsp1 ~ import_expression ~ whsp ~ ":" ~ whsp1 ~/ expression)
+  def expression_merge[$: P]: P[Merge] = P(requireKeyword("merge") ~ whsp1 ~/ import_expression ~ whsp1 ~/ import_expression ~ whsp ~/ ":" ~ whsp1 ~/
+    expression)
     .map { case (e1, e2, t) => Merge(e1, e2, Some(t)) }
 
-  def expression_toMap[$: P]: P[ToMap] = (requireKeyword("toMap") ~ whsp1 ~/ import_expression ~ whsp ~ ":" ~ whsp1 ~ expression)
+  def expression_toMap[$: P]: P[ToMap] = P(requireKeyword("toMap") ~ whsp1 ~/ import_expression ~/ whsp ~ ":" ~ whsp1 ~/ expression)
     .map { case (e1, e2) => ToMap(e1, Some(e2)) }
 
-  def expression_assert[$: P]: P[Assert] = (requireKeyword("assert") ~ whsp ~/ ":" ~ whsp1 ~ expression)
+  def expression_assert[$: P]: P[Assert] = P(requireKeyword("assert") ~ whsp ~/ ":" ~ whsp1 ~/ expression)
     .map { expr => Assert(expr) }
 
   def expression[$: P]: P[Expression] = P(
     //  "\(x : a) -> b"
-    expression_lambda
+    NoCut(expression_lambda)
       //
       //  "if a then b else c"
-      | expression_if_then_else
+      | NoCut(expression_if_then_else)
       //
       //  "let x : t = e1 in e2"
       //  "let x     = e1 in e2"
       //  We allow dropping the `in` between adjacent let_expressions; the following are equivalent:
       //  "let x = e1 let y = e2 in e3"
       //  "let x = e1 in let y = e2 in e3"
-      | expression_let_binding
+      | NoCut(expression_let_binding)
       //
       //  "forall (x : a) -> b"
-      | expression_forall
+      | NoCut(expression_forall)
       //
       //  "a -> b"
       //
@@ -863,10 +868,10 @@ object Grammar {
       | NoCut(expression_toMap)
       //
       //  "assert : Natural/even 1 === False"
-      | expression_assert
+      | NoCut(expression_assert)
       //
       //  "x : t"
-      | annotated_expression
+      | NoCut(annotated_expression)
   )
 
   def annotated_expression[$: P]: P[Expression] = P(
@@ -879,7 +884,7 @@ object Grammar {
   }
 
   def let_binding[$: P] = P(
-    requireKeyword("let") ~/ whsp1 ~ nonreserved_label ~ whsp ~ (":" ~ whsp1 ~/ expression ~ whsp).? ~ "=" ~ whsp ~/ expression ~ whsp1
+    requireKeyword("let") ~ whsp1 ~/ nonreserved_label ~ whsp ~ (":" ~ whsp1 ~/ expression ~ whsp).? ~ "=" ~ whsp ~/ expression ~ whsp1./
   )
 
   def empty_list_literal[$: P] = P(

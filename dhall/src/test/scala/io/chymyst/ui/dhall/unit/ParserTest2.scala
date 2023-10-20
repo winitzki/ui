@@ -33,8 +33,17 @@ class ParserTest2 extends FunSuite {
   }
 
   test("primitive_expression") {
-    check(recordExpressions,
+    check(recordExpressions ++ primitiveExpressions,
       Grammar.primitive_expression(_))
   }
 
+  test("let_binding") {
+    check(letBindings,
+      Grammar.let_binding(_))
+  }
+
+  test("expression_let_binding") {
+    check(letBindingExpressions,
+      Grammar.expression_let_binding(_))
+  }
 }
