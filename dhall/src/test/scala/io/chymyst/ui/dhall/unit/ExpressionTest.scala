@@ -51,7 +51,6 @@ class ExpressionTest extends FunSuite {
     expect(parse("let x = 1 in x", grammar3(_)).get.value == (VarName("x"), None, NaturalLiteral(1)))
   }
 
-
   test("simple expression: let x = 1 in y") {
     val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall("let x = 1 in y")
     val expected = Expression.Let(VarName("x"), None, NaturalLiteral(1), Variable(VarName("y"), 0))

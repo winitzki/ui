@@ -16,36 +16,36 @@ object SyntaxConstants {
 
   final case class DirName(name: String) extends AnyVal
 
-  sealed abstract class Operator(val op: String) extends EnumEntry
+  sealed abstract class Operator(val op: String, val cborCode: Int) extends EnumEntry
 
   object Operator extends Enum[Operator] {
     val values = findValues
 
-    case object Or extends Operator("||")
+    case object Or extends Operator("||", 0)
 
-    case object Plus extends Operator("+")
+    case object Plus extends Operator("+", 4)
 
-    case object TextAppend extends Operator("++")
+    case object TextAppend extends Operator("++", 6)
 
-    case object ListAppend extends Operator("#")
+    case object ListAppend extends Operator("#", 7)
 
-    case object And extends Operator("&&")
+    case object And extends Operator("&&", 1)
 
-    case object CombineRecordTerms extends Operator("∧")
+    case object CombineRecordTerms extends Operator("∧", 8)
 
-    case object Prefer extends Operator("⫽")
+    case object Prefer extends Operator("⫽", 9)
 
-    case object CombineRecordTypes extends Operator("⩓")
+    case object CombineRecordTypes extends Operator("⩓", 10)
 
-    case object Times extends Operator("*")
+    case object Times extends Operator("*", 5)
 
-    case object Equal extends Operator("==")
+    case object Equal extends Operator("==", 2)
 
-    case object NotEqual extends Operator("!=")
+    case object NotEqual extends Operator("!=", 3)
 
-    case object Equivalent extends Operator("===")
+    case object Equivalent extends Operator("===", 12)
 
-    case object Alternative extends Operator("?")
+    case object Alternative extends Operator("?", 11)
   }
 
   sealed abstract class Builtin(override val entryName: String) extends EnumEntry
@@ -138,6 +138,7 @@ object SyntaxConstants {
     override def values = findValues
   }
 
+  // TODO: implement parsing into this type when appropriate, instead of parsing into Builtin. Also True, False.
   sealed trait Constant extends EnumEntry
 
   object Constant extends Enum[Constant] {
@@ -148,6 +149,11 @@ object SyntaxConstants {
     case object Kind extends Constant
 
     case object Sort extends Constant
+
+    case object True extends Constant
+
+    case object False extends Constant
+
   }
 
   sealed trait ImportMode extends EnumEntry
