@@ -4,38 +4,12 @@ import com.eed3si9n.expecty.Expecty.expect
 import fastparse._
 import io.chymyst.ui.dhall.Syntax.Expression
 import io.chymyst.ui.dhall.Syntax.Expression.BytesLiteral
-import io.chymyst.ui.dhall.unit.ParserTest._
 import io.chymyst.ui.dhall.unit.TestFixtures._
 import io.chymyst.ui.dhall.{Grammar, SyntaxConstants}
-import munit.{FunSuite}
+import munit.FunSuite
 
 import java.nio.file.{Files, Paths}
-
-object ParserTest {
-
-  def check[A](grammarRule: P[_] => P[A], input: String, expectedResult: A, lastIndex: Int) = {
-    val parsed = parse(input, grammarRule)
-    parsed match {
-      case Parsed.Success(value, index) =>
-        println(s"Parsing input '$input', got Success($value, $index), expecting Success($expectedResult, $lastIndex)")
-      case Parsed.Failure(message, index, extra) =>
-        println(s"Error: Parsing input '$input', expected Success($expectedResult, $index) but got Failure('$message', $index, ${extra.stack})")
-    }
-    expect(parsed == Parsed.Success(expectedResult, lastIndex))
-  }
-
-  def toFail[A](grammarRule: P[_] => P[A], input: String, parsedInput: String, expectedMessage: String, lastIndex: Int) = {
-    val parsed = parse(input, grammarRule)
-    parsed match {
-      case Parsed.Success(value, index) =>
-        println(s"Error: Parsing input '$input', expected Failure but got Success($value, $index)")
-        expect(parsed == Parsed.Failure(parsedInput, lastIndex, null))
-      case f@Parsed.Failure(message, index, extra) =>
-        println(s"Parsing input '$input', expected index $lastIndex, got Failure('$message', $index, ${extra.stack}), message '${f.msg}' as expected")
-        expect(f.msg contains expectedMessage, f.index == lastIndex)
-    }
-  }
-}
+import scala.util.Try
 
 class ParserTest extends FunSuite {
 
@@ -88,7 +62,7 @@ class ParserTest extends FunSuite {
     import fastparse._
     import NoWhitespace._
 
-    val input: String = Files.readString(Paths.get(ParserTest.getClass.getResource("/valid_non_ascii.txt").toURI))
+    val input: String = Files.readString(Paths.get(this.getClass.getResource("/valid_non_ascii.txt").toURI))
 
     def rule[$: P] = P(Grammar.valid_non_ascii.rep)
 
@@ -247,10 +221,10 @@ class ParserTest extends FunSuite {
   // TODO: tests for date and time literals
 
   test("identifier") {
-    identifiers.foreach { case (s, d) =>
-      check(Grammar.identifier(_), s, d, s.length)
-    }
+    check(identifiers, Grammar.identifier(_))
+  }
 
+  test("identifier special cases") {
     check(Grammar.identifier(_), "Natural+blahblah", Expression.Builtin(SyntaxConstants.Builtin.Natural), 7)
     toFail(Grammar.identifier(_), "-abc", "", "", 0)
     toFail(Grammar.identifier(_), "/abc", "", "", 0)
@@ -262,24 +236,19 @@ class ParserTest extends FunSuite {
   }
 
   test("primitive_expression") {
-    primitiveExpressions.foreach { case (s, d) =>
-      check(Grammar.primitive_expression(_), s, d, s.length)
-    }
+    check(primitiveExpressions, Grammar.primitive_expression(_))
 
     val Parsed.Success(result: BytesLiteral, 12) = parse("0x\"64646464\"", Grammar.primitive_expression(_))
     expect(new String(result.bytes) == "dddd")
   }
 
   test("selector_expression") {
-    (primitiveExpressions ++ selectorExpressions).foreach { case (s, d) =>
-      check(Grammar.selector_expression(_), s, d, s.length)
-    }
+    check(primitiveExpressions ++ selectorExpressions,
+      Grammar.selector_expression(_))
   }
 
   test("completion_expression") {
-    (primitiveExpressions ++ selectorExpressions ++ completionExpressions).foreach { case (s, d) =>
-      check(Grammar.completion_expression(_), s, d, s.length)
-    }
+    check(primitiveExpressions ++ selectorExpressions ++ completionExpressions, Grammar.completion_expression(_))
   }
 
 }

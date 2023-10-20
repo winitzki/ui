@@ -2,7 +2,7 @@ package io.chymyst.ui.dhall
 
 import fastparse.NoWhitespace._
 import fastparse._
-import io.chymyst.ui.dhall.Syntax.Expression.{Some => ExpressionSome, _}
+import io.chymyst.ui.dhall.Syntax.Expression.{KeywordSome => ExpressionSome, _}
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
 import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, ImportType, VarName}
 
@@ -426,14 +426,14 @@ object Grammar {
       | (CharIn("1-9") ~ DIGIT.rep).!.map(digits => BigInt(digits, 10))
       // ... except for 0 itself
       | P("0").map(_ => BigInt(0))
-  ).map(NaturalLiteral)
+  ).map(NaturalLiteral.apply)
 
   def integer_literal[$: P]: P[IntegerLiteral] = P(
     ("+" | "-").! ~ natural_literal
   ).map {
     case ("+", nat) => nat.value
     case ("-", nat) => -nat.value
-  }.map(IntegerLiteral)
+  }.map(IntegerLiteral.apply)
 
   def temporal_literal[$: P]: P[Expression] = P(
     // "YYYY_MM_DDThh:mm:ss[+-]HH:MM", parsed as a `{ date : Date, time : Time, timeZone : TimeZone }`
@@ -870,7 +870,7 @@ object Grammar {
   )
 
   def annotated_expression[$: P]: P[Expression] = P(
-    operator_expression ~ (whsp ~ ":" ~ whsp1 ~ expression).?
+    operator_expression ~ (whsp ~ ":" ~ whsp1 ~/ expression).?
   ).map { case (expr, tipe) =>
     tipe match {
       case Some(t) => Annotation(expr, t)
@@ -879,52 +879,53 @@ object Grammar {
   }
 
   def let_binding[$: P] = P(
-    requireKeyword("let") ~/ whsp1 ~ nonreserved_label ~ whsp ~ (":" ~ whsp1 ~ expression ~ whsp).? ~ "=" ~ whsp ~ expression ~ whsp1
+    requireKeyword("let") ~/ whsp1 ~ nonreserved_label ~ whsp ~ (":" ~ whsp1 ~/ expression ~ whsp).? ~ "=" ~ whsp ~/ expression ~ whsp1
   )
 
   def empty_list_literal[$: P] = P(
-    "[" ~ whsp ~ ("," ~ whsp).? ~ "]" ~ whsp ~ ":" ~ whsp1 ~ expression
+    "[" ~ whsp ~ ("," ~ whsp).? ~ "]" ~ whsp ~/ ":" ~ whsp1 ~/ expression
   ).map(expr => EmptyList(expr))
 
   // with_expression may not "cut" the parse.
   def with_expression[$: P] = P(
-    import_expression ~ (whsp1 ~ "with" ~ whsp1 ~ with_clause).rep(1)
+    import_expression ~ (whsp1 ~ "with" ~ whsp1 ~/ with_clause).rep(1)
   ).map { case (expr, substs) => With(expr, Seq(), expr) } // TODO: figure out what this expression does!
 
   def with_clause[$: P] = P(
-    with_component.map(VarName) ~ (whsp ~ "." ~ whsp ~ with_component.map(FieldName)).rep ~ whsp ~ "=" ~ whsp ~ operator_expression
+    with_component.map(VarName) ~ (whsp ~ "." ~ whsp ~/ with_component.map(FieldName)).rep ~ whsp ~ "=" ~ whsp ~/ operator_expression
   )
 
   def operator_expression[$: P]: P[Expression] = P(
     equivalent_expression
   )
 
-  private implicit class FoldOpExpression(parser: P[(Expression, Seq[Expression])]) {
-    def withOperator(op: SyntaxConstants.Operator): P[Expression] = parser.map { case (head, tail) => tail.foldLeft(head)((prev, arg) => Operator(prev, op, arg)) }
+  private implicit class FoldOpExpression(resultWithExpressionSequence: P[(Expression, Seq[Expression])]) {
+    def withOperator(op: SyntaxConstants.Operator): P[Expression] =
+      resultWithExpressionSequence.map { case (head, tail) => tail.foldLeft(head)((prev, arg) => Operator(prev, op, arg)) }
   }
 
   def equivalent_expression[$: P]: P[Expression] = P(
-    import_alt_expression ~ (whsp ~ equivalent ~ whsp ~ import_alt_expression).rep
+    import_alt_expression ~ (whsp ~ equivalent ~ whsp ~/ import_alt_expression).rep
   ).withOperator(SyntaxConstants.Operator.Equivalent)
 
   def import_alt_expression[$: P]: P[Expression] = P(
-    or_expression ~ (whsp ~ opAlternative ~ whsp1 ~ or_expression).rep
+    or_expression ~ (whsp ~ opAlternative ~ whsp1 ~/ or_expression).rep
   ).withOperator(SyntaxConstants.Operator.Alternative)
 
   def or_expression[$: P]: P[Expression] = P(
-    plus_expression ~ (whsp ~ opOr ~ whsp ~ plus_expression).rep
+    plus_expression ~ (whsp ~ opOr ~ whsp ~/ plus_expression).rep
   ).withOperator(SyntaxConstants.Operator.Or)
 
   def plus_expression[$: P]: P[Expression] = P(
-    text_append_expression ~ (whsp ~ opPlus ~ whsp1 ~ text_append_expression).rep
+    text_append_expression ~ (whsp ~ opPlus ~ whsp1 ~/ text_append_expression).rep
   ).withOperator(SyntaxConstants.Operator.Plus)
 
   def text_append_expression[$: P]: P[Expression] = P(
-    list_append_expression ~ (whsp ~ opTextAppend ~ whsp ~ list_append_expression).rep
+    list_append_expression ~ (whsp ~ opTextAppend ~ whsp ~/ list_append_expression).rep
   ).withOperator(SyntaxConstants.Operator.TextAppend)
 
   def list_append_expression[$: P]: P[Expression] = P(
-    and_expression ~ (whsp ~ opListAppend ~ whsp ~ and_expression).rep
+    and_expression ~ (whsp ~ opListAppend ~ whsp ~/ and_expression).rep
   ).withOperator(SyntaxConstants.Operator.ListAppend)
 
   def and_expression[$: P]: P[Expression] = P(
@@ -932,27 +933,27 @@ object Grammar {
   ).withOperator(SyntaxConstants.Operator.And)
 
   def combine_expression[$: P]: P[Expression] = P(
-    prefer_expression ~ (whsp ~ combine ~ whsp ~ prefer_expression).rep
+    prefer_expression ~ (whsp ~ combine ~ whsp ~/ prefer_expression).rep
   ).withOperator(SyntaxConstants.Operator.CombineRecordTerms)
 
   def prefer_expression[$: P]: P[Expression] = P(
-    combine_types_expression ~ (whsp ~ prefer ~ whsp ~ combine_types_expression).rep
+    combine_types_expression ~ (whsp ~ prefer ~ whsp ~/ combine_types_expression).rep
   ).withOperator(SyntaxConstants.Operator.Prefer)
 
   def combine_types_expression[$: P]: P[Expression] = P(
-    times_expression ~ (whsp ~ combine_types ~ whsp ~ times_expression).rep
+    times_expression ~ (whsp ~ combine_types ~ whsp ~/ times_expression).rep
   ).withOperator(SyntaxConstants.Operator.CombineRecordTypes)
 
   def times_expression[$: P]: P[Expression] = P(
-    equal_expression ~ (whsp ~ opTimes ~ whsp ~ equal_expression).rep
+    equal_expression ~ (whsp ~ opTimes ~ whsp ~/ equal_expression).rep
   ).withOperator(SyntaxConstants.Operator.Times)
 
   def equal_expression[$: P]: P[Expression] = P(
-    not_equal_expression ~ (whsp ~ opEqual ~ whsp ~ not_equal_expression).rep
+    not_equal_expression ~ (whsp ~ opEqual ~ whsp ~/ not_equal_expression).rep
   ).withOperator(SyntaxConstants.Operator.Equal)
 
   def not_equal_expression[$: P]: P[Expression] = P(
-    application_expression ~ (whsp ~ opNotEqual ~ whsp ~ application_expression).rep
+    application_expression ~ (whsp ~ opNotEqual ~ whsp ~/ application_expression).rep
   ).withOperator(SyntaxConstants.Operator.NotEqual)
 
   def application_expression[$: P]: P[Expression] = P(
@@ -1044,12 +1045,12 @@ object Grammar {
       //
       //  "{ foo = 1      , bar = True }"
       //  "{ foo : Integer, bar : Bool }"
-      | ("{" ~ whsp ~ ("," ~ whsp).? ~ record_type_or_literal ~ whsp ~ "}")
+      | ("{" ~ whsp ~/ ("," ~/ whsp./).? ~ record_type_or_literal ~ whsp ~ "}")
       .map(_.getOrElse(Expression.RecordLiteral(Seq())))
       //
       //  "< Foo : Integer | Bar : Bool >"
       //  "< Foo | Bar : Bool >"
-      | ("<" ~ whsp ~ ("|" ~ whsp).? ~ union_type ~ whsp ~ ">")
+      | ("<" ~ whsp ~/ ("|" / whsp./).? ~ union_type ~ whsp ~ ">")
       //
       //  "[1, 2, 3]"
       | non_empty_list_literal
@@ -1068,7 +1069,7 @@ object Grammar {
   )
 
   def empty_record_literal[$: P]: P[Expression.RecordLiteral] = P(
-    "=" ~ (whsp ~ ",").?
+    "=" ~/ (whsp ~ ",").?
   ).map(_ => Expression.RecordLiteral(Seq()))
 
   def non_empty_record_type_or_literal[$: P]: P[Expression] = P(
@@ -1087,56 +1088,36 @@ object Grammar {
     record_literal_entry ~ (whsp ~ "," ~ whsp ~ record_literal_entry).rep ~ (whsp ~ ",").?
   ).map { case (head, tail) => Expression.RecordLiteral.of(head +: tail) }
 
-  /* See https://github.com/dhall-lang/dhall-lang/blob/master/standard/README.md#record-syntactic-sugar
-
-  ... a record literal of the form:
-
-  { x.y = 1, x.z = 1 }
-
-  ... first desugars dotted fields to nested records:
-
-  { x = { y = 1 }, x = { z = 1 } }
-
-  ... and then desugars duplicate fields by merging them using ∧:
-
-  { x = { y = 1 } ∧ { z = 1} }
-
-  ... this conversion occurs at parse-time ...
-
-  See https://github.com/dhall-lang/dhall-lang/blob/master/standard/record.md
-
-   */
   def record_literal_entry[$: P]: P[RawRecordLiteral] = P(
     any_label_or_some.map(FieldName) ~ record_literal_normal_entry.?
-  ).map { case (fields, body) => RawRecordLiteral(Seq((fields, body.map(_._1).toSeq.flatten, body.map(_._2)))) }
+  ).map(RawRecordLiteral.tupled)
 
   def record_literal_normal_entry[$: P]: P[(Seq[FieldName], Expression)] = P(
-    (whsp ~ "." ~ whsp ~ any_label_or_some.map(FieldName)).rep ~ whsp ~ "=" ~ whsp ~ expression
+    (whsp ~ "." ~ whsp ~/ any_label_or_some.map(FieldName)).rep ~ whsp ~ "=" ~ whsp ~/ expression
   )
 
   def union_type[$: P]: P[Expression.UnionType] = P(
-    (union_type_entry ~ (whsp ~ "|" ~ whsp ~ union_type_entry).rep ~ (whsp ~ "|").?).?
+    (union_type_entry ~ (whsp ~ "|" ~ whsp ~/ union_type_entry).rep ~ (whsp ~ "|").?).?
   ).map {
     case Some((headName, headType, tail)) => Expression.UnionType((headName, headType) +: tail)
     case None => Expression.UnionType(Seq())
   }
 
   def union_type_entry[$: P] = P(
-    any_label_or_some.map(ConstructorName) ~ (whsp ~ ":" ~ whsp1 ~ expression).?
+    any_label_or_some.map(ConstructorName) ~ (whsp ~ ":" ~ whsp1 ~/ expression).?
   )
 
   def non_empty_list_literal[$: P]: P[Expression.NonEmptyList] = P(
-    "[" ~ whsp ~ ("," ~ whsp).? ~ expression ~ whsp ~ ("," ~ whsp ~ expression ~ whsp).rep ~ ("," ~ whsp).? ~ "]"
+    "[" ~ whsp ~ ("," ~ whsp).? ~ expression ~ whsp ~ ("," ~ whsp ~/ expression ~ whsp).rep ~ ("," ~ whsp).? ~ "]"
   ).map { case (head, tail) => Expression.NonEmptyList(head, tail) }
 
   def shebang[$: P] = P(
-    "#!" ~ not_end_of_line.rep.! ~ end_of_line
+    "#!" ~/ not_end_of_line.rep.! ~ end_of_line
   )
 
   def complete_expression[$: P] = P(
     shebang.rep ~ whsp ~ expression ~ whsp ~ line_comment_prefix.?
   ).map { case (shebangContents, expr) => DhallFile(shebangContents, expr) }
-  // .log // TODO: remove .log
 
   // Helpers to make sure we are using valid keyword and operator names.
   def requireKeyword[$: P](name: String): P[Unit] = {

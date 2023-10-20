@@ -247,7 +247,7 @@ object Syntax {
 
     final case class ProjectByType(base: Expression, by: Expression) extends Expression
 
-//    an expression of the form T::r is syntactic sugar for (T.default // r) : T.Type
+    //    an expression of the form T::r is syntactic sugar for (T.default // r) : T.Type
     final case class Completion(base: Expression, target: Expression) extends Expression
 
     final case class Assert(assertion: Expression) extends Expression
@@ -258,7 +258,20 @@ object Syntax {
 
     final case class NaturalLiteral(value: Natural) extends Expression
 
+    object NaturalLiteral {
+      def apply(value: Int): NaturalLiteral = {
+        require(value >= 0)
+        NaturalLiteral(BigInt(value))
+      }
+    }
+
     final case class IntegerLiteral(value: Integer) extends Expression
+
+    object IntegerLiteral {
+      def apply(value: Int): IntegerLiteral = {
+        IntegerLiteral(BigInt(value))
+      }
+    }
 
     final case class TextLiteralNoInterp(value: String) extends Expression
 
@@ -287,7 +300,7 @@ object Syntax {
     }
 
     final case class BytesLiteral(hex: String) extends Expression {
-      val bytes: Array[Byte]= hexStringToByteArray(hex)
+      val bytes: Array[Byte] = hexStringToByteArray(hex)
     }
 
     final case class DateLiteral(date: LocalDate) extends Expression
@@ -301,11 +314,52 @@ object Syntax {
     final case class RecordLiteral(defs: Seq[(FieldName, Expression)]) extends Expression
 
     object RecordLiteral {
-      def of(value: Seq[RawRecordLiteral]): RecordLiteral = ??? // Parse a non-empty sequence of RawRecordLiteral's into a RecordLiteral.
+      // Parse a non-empty sequence of RawRecordLiteral's into a RecordLiteral.
+      def of(values: Seq[RawRecordLiteral]): RecordLiteral = {
+        /* See https://github.com/dhall-lang/dhall-lang/blob/master/standard/README.md#record-syntactic-sugar
+
+          ... a record literal of the form:
+
+          { x.y = 1, x.z = 1 }
+
+          ... first desugars dotted fields to nested records:
+
+          { x = { y = 1 }, x = { z = 1 } }
+
+          ... and then desugars duplicate fields by merging them using ∧:
+
+          { x = { y = 1 } ∧ { z = 1} }
+
+          ... this conversion occurs at parse-time ...
+
+          See https://github.com/dhall-lang/dhall-lang/blob/master/standard/record.md
+
+           */
+        val desugared: Seq[(FieldName, Expression)] = values.map {
+          // Desugar { x } into { x = x }.
+          case RawRecordLiteral(base, None) => (base, Expression.Variable(VarName(base.name), BigInt(0)))
+
+          // Desugar { w.x.y.z = expr } into {w = {x = { y = {z = expr }}}}.
+          case RawRecordLiteral(base, Some((fields, target))) => (base, fields.foldRight(target) { (field, expr) => RecordLiteral(Seq((field, expr))) })
+        }
+
+        // Desugar repeated field names { x = { y = 1 }, x = { z = 1 } } into { x = { y = 1 } ∧ { z = 1} }. This is needed at the top nested level only.
+        def desugarRepetition(defs: Seq[(FieldName, Expression)]): Seq[(FieldName, Expression)] = {
+          val recordMap: Map[FieldName, Expression] =
+            defs.groupBy(_._1)
+              .map { case (field, subDefs) =>
+                (field, subDefs.map(_._2).reduce((a, b) => Expression.Operator(a, SyntaxConstants.Operator.CombineRecordTerms, b)))
+              }
+          // Preserve the original order of definitions.
+          defs.map(_._1).distinct.map { fieldName => (fieldName, recordMap(fieldName)) }
+        }
+
+        RecordLiteral(desugarRepetition(desugared))
+      }
     }
 
     // Raw record syntax: { x.y.z = 1 } that needs to be processed further.
-    final case class RawRecordLiteral(defs: Seq[(FieldName, Seq[FieldName], Option[Expression])]) extends Expression
+    final case class RawRecordLiteral(base: FieldName, defs: Option[(Seq[FieldName], Expression)]) extends Expression
 
     final case class UnionType(defs: Seq[(ConstructorName, Option[Expression])]) extends Expression
 
@@ -313,7 +367,7 @@ object Syntax {
 
     final case class Import(importType: SyntaxConstants.ImportType, importMode: SyntaxConstants.ImportMode, digest: Option[BytesLiteral]) extends Expression
 
-    final case class Some(data: Expression) extends Expression
+    final case class KeywordSome(data: Expression) extends Expression
 
     final case class Builtin(builtin: SyntaxConstants.Builtin) extends Expression
 

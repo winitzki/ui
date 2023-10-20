@@ -1,12 +1,56 @@
 package io.chymyst.ui.dhall.unit
 
-import io.chymyst.ui.dhall.Grammar.hexStringToByteArray
+import com.eed3si9n.expecty.Expecty.expect
+import fastparse._
 import io.chymyst.ui.dhall.Syntax.Expression
-import io.chymyst.ui.dhall.Syntax.Expression.{BytesLiteral, TextLiteral}
+import io.chymyst.ui.dhall.Syntax.Expression.{Builtin, BytesLiteral, TextLiteral, Variable}
 import io.chymyst.ui.dhall.SyntaxConstants
-import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, File, FilePrefix, ImportMode, ImportType, Scheme, URL, VarName}
+import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, File, FilePrefix, ImportMode, ImportType, Scheme, URL, VarName}
+
+import java.io.{PrintWriter, StringWriter}
+import scala.util.Try
 
 object TestFixtures {
+  def check[A](grammarRule: P[_] => P[A], input: String, expectedResult: A, lastIndex: Int): Unit = {
+    val parsed = parse(input, grammarRule)
+    parsed match {
+      case Parsed.Success(value, index) =>
+        println(s"Parsing input '$input', got Success($value, $index), expecting Success($expectedResult, $lastIndex)")
+      case Parsed.Failure(message, index, extra) =>
+        println(s"Error: Parsing input '$input', expected Success($expectedResult, $index) but got Failure('$message', $index, ${extra.stack})")
+    }
+    expect((input != null) && (parsed == Parsed.Success(expectedResult, lastIndex)))
+  }
+
+  def toFail[A](grammarRule: P[_] => P[A], input: String, parsedInput: String, expectedMessage: String, lastIndex: Int): Unit = {
+    val parsed = parse(input, grammarRule)
+    parsed match {
+      case Parsed.Success(value, index) =>
+        println(s"Error: Parsing input '$input', expected Failure but got Success($value, $index)")
+        expect(parsed == Parsed.Failure(parsedInput, lastIndex, null))
+      case f@Parsed.Failure(message, index, extra) =>
+        println(s"Parsing input '$input', expected index $lastIndex, got Failure('$message', $index, ${extra.stack}), message '${f.msg}' as expected")
+        expect(input != null && (f.msg contains expectedMessage), input != null && f.index == lastIndex)
+    }
+  }
+
+  def check[A](successExamples: Seq[(String, Expression)], grammarRule: P[_] => P[A]): Unit = {
+    val results = successExamples.map { case (s, d) =>
+      Try(check(grammarRule(_), s, d, s.length))
+    }
+    if (results.forall(_.isSuccess))
+      println(s"All ${successExamples.size} examples passed.")
+    else {
+      println(s"Error: ${results.count(_.isFailure)} examples failed:")
+      val message = results.filter(_.isFailure).map(_.failed.get).map { t =>
+        val stackTrace = new StringWriter
+        t.printStackTrace(new PrintWriter(stackTrace))
+        stackTrace.flush()
+        t.getMessage + "\n\n" + stackTrace.toString
+      }.mkString("\n")
+      throw new Exception(message)
+    }
+  }
 
   val blockComments = Seq( // Examples should not contain trailing whitespace or leading whitespace.
     "{- - }- } -}",
@@ -78,6 +122,19 @@ object TestFixtures {
     "Kind" -> Expression.Builtin(SyntaxConstants.Builtin.Kind),
     "Natural/show" -> Expression.Builtin(SyntaxConstants.Builtin.NaturalShow),
     "Natural" -> Expression.Builtin(SyntaxConstants.Builtin.Natural),
+    "{foo: Natural, bar: Type}" -> Expression.RecordType(Seq(
+      (FieldName("foo"), Expression.Builtin(SyntaxConstants.Builtin.Natural)),
+      (FieldName("bar"), Expression.Builtin(SyntaxConstants.Builtin.Type)),
+    )),
+    "{ foo = 1, bar = 2 }" -> Expression.RecordLiteral(Seq(
+      (FieldName("foo"), Expression.NaturalLiteral(1)),
+      (FieldName("bar"), Expression.NaturalLiteral(2)),
+    )),
+    "< Foo : Integer | Bar : Bool >" -> Expression.UnionType(Seq(
+      (ConstructorName("Foo"), Some(Expression.Builtin(SyntaxConstants.Builtin.Integer))),
+      (ConstructorName("Bar"), Some(Builtin(SyntaxConstants.Builtin.Bool)))),
+    ),
+    "< Foo | Bar : Bool >" -> Expression.UnionType(List((ConstructorName("Foo"), None), (ConstructorName("Bar"), Some(Builtin(SyntaxConstants.Builtin.Bool))))),
   )
 
   val selectorExpressions = Map(
@@ -102,6 +159,19 @@ object TestFixtures {
     s"./local/import sha256:$sha256example as Bytes" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.RawBytes, Some(BytesLiteral(sha256example))),
     "env:HOME as Text" -> Expression.Import(ImportType.Env("HOME"), ImportMode.RawText, None),
     s"https://example.com/a/b?c=d using headers123 sha256:$sha256example as Bytes" -> Expression.Import(ImportType.Remote(URL(Scheme.HTTPS, "example.com", File
-    (Seq("a","b")), Some("c=d")), Expression.Variable(VarName("headers123"), BigInt(0))), ImportMode.RawBytes, Some(BytesLiteral(sha256example))),
+    (Seq("a", "b")), Some("c=d")), Expression.Variable(VarName("headers123"), BigInt(0))), ImportMode.RawBytes, Some(BytesLiteral(sha256example))),
+  )
+
+  val plusExpressions: Seq[(String, Expression)] = Seq(
+    "1 + 1" -> Expression.Operator(Expression.NaturalLiteral(1), SyntaxConstants.Operator.Plus, Expression.NaturalLiteral(1)),
+    "10 + 10" -> Expression.Operator(Expression.NaturalLiteral(10), SyntaxConstants.Operator.Plus, Expression.NaturalLiteral(10)),
+    "1.0 +2.0" -> Expression.Operator(Expression.DoubleLiteral(1.0), SyntaxConstants.Operator.Plus, Expression.DoubleLiteral(2.0)),
+    "1 +[] : Natural ++ [1,2,3]" -> Expression.Operator(Expression.NaturalLiteral(1), SyntaxConstants.Operator.Plus, Expression.NaturalLiteral(1)),
+  )
+
+  val recordExpressions: Seq[(String, Expression)]  = Seq(
+    "{ foo, bar }" -> Expression.RecordLiteral(List((FieldName("foo"), Variable(VarName("foo"), BigInt(0))), (FieldName("bar"), Variable(VarName("bar"), BigInt
+    (0))
+    ))),
   )
 }

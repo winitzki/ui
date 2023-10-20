@@ -1,7 +1,6 @@
 package io.chymyst.ui.dhall.unit
 
 import io.chymyst.ui.dhall.Grammar
-import io.chymyst.ui.dhall.unit.ParserTest.{check, toFail}
 import io.chymyst.ui.dhall.unit.TestFixtures._
 import munit.FunSuite
 
@@ -24,10 +23,18 @@ class ParserTest2 extends FunSuite {
   }
 
   test("import_expression") {
-    (primitiveExpressions ++ selectorExpressions ++ completionExpressions ++ importExpressions).foreach { case (s, d) =>
-      check(Grammar.import_expression(_), s, d, s.length)
-    }
+    check(primitiveExpressions ++ selectorExpressions ++ completionExpressions ++ importExpressions,
+      Grammar.import_expression(_))
   }
 
+  test("plus_expression") {
+    check(primitiveExpressions ++ selectorExpressions ++ completionExpressions ++ importExpressions ++ plusExpressions,
+      Grammar.plus_expression(_))
+  }
+
+  test("primitive_expression") {
+    check(recordExpressions,
+      Grammar.primitive_expression(_))
+  }
 
 }
