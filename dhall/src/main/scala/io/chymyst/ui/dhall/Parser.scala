@@ -807,7 +807,6 @@ object Grammar {
     whsp ~ expression)
     .map { case (varName, tipe, body) => Forall(varName, tipe, body) }
 
-  // This may not "cut" the parse.
   def expression_arrow[$: P]: P[Expression] = P(operator_expression ~ whsp ~ arrow ~/ whsp ~ expression)
     .map { case (head, body) => body } // TODO: figure out what this expression does! Is this a function type? If so, why "operator_expression"?
 
@@ -891,7 +890,6 @@ object Grammar {
     "[" ~ whsp ~ ("," ~ whsp).? ~ "]" ~ whsp ~/ ":" ~ whsp1 ~/ expression
   ).map(expr => EmptyList(expr))
 
-  // with_expression may not "cut" the parse.
   def with_expression[$: P] = P(
     import_expression ~ (whsp1 ~ "with" ~ whsp1 ~/ with_clause).rep(1)
   ).map { case (expr, substs) => With(expr, Seq(), expr) } // TODO: figure out what this expression does!
