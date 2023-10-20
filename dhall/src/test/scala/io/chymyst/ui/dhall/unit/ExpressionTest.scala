@@ -61,7 +61,7 @@ class ExpressionTest extends FunSuite {
   }
 
   test("parse a string interpolation") {
-    val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall(""" "${}" """)
+    val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall(""" "${1}" """)
     val expected = Nil
     expect(result == expected)
   }

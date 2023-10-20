@@ -268,11 +268,11 @@ object Grammar {
   ).!
 
   def single_quote_literal[$: P] = P(
-    "''" ~ end_of_line ~ single_quote_continue
+    "''" ~ end_of_line ~/ single_quote_continue
   )
 
   def interpolation[$: P]: P[Expression] = P(
-    "${" ~ complete_expression.map(_.omitShebangs) ~ "}"
+    "${" ~ complete_expression.map(_.omitShebangs) ~/ "}"
   )
 
   def text_literal[$: P]: P[TextLiteral] = P(
