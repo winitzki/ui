@@ -4,7 +4,7 @@ import io.chymyst.ui.dhall.Grammar.hexStringToByteArray
 import io.chymyst.ui.dhall.Syntax.Expression
 import io.chymyst.ui.dhall.Syntax.Expression.{BytesLiteral, TextLiteral}
 import io.chymyst.ui.dhall.SyntaxConstants
-import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, File, FilePrefix, ImportMode, ImportType, VarName}
+import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, File, FilePrefix, ImportMode, ImportType, Scheme, URL, VarName}
 
 object TestFixtures {
 
@@ -100,8 +100,8 @@ object TestFixtures {
     (BytesLiteral(sha256example))),
     s"./local/import sha256:$sha256example as Text" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.RawText, Some(BytesLiteral(sha256example))),
     s"./local/import sha256:$sha256example as Bytes" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.RawBytes, Some(BytesLiteral(sha256example))),
-    "env:HOME as Text" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.Location, None),
-    "https://example.com/a/b?q=d using headers as Bytes" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode
-      .Location, None),
+    "env:HOME as Text" -> Expression.Import(ImportType.Env("HOME"), ImportMode.RawText, None),
+    s"https://example.com/a/b?c=d using headers123 sha256:$sha256example as Bytes" -> Expression.Import(ImportType.Remote(URL(Scheme.HTTPS, "example.com", File
+    (Seq("a","b")), Some("c=d")), Expression.Variable(VarName("headers123"), BigInt(0))), ImportMode.RawBytes, Some(BytesLiteral(sha256example))),
   )
 }
