@@ -1,7 +1,7 @@
 package io.chymyst.ui.dhall
 
 
-import com.upokecenter.cbor.CBORObject
+import com.upokecenter.cbor.{CBORObject, CBORType}
 import com.upokecenter.numbers.EInteger
 import io.chymyst.ui.dhall.Syntax.{Expression, Natural}
 import io.chymyst.ui.dhall.SyntaxConstants.VarName
@@ -12,6 +12,20 @@ import scala.collection.immutable.Seq
 object CBOR {
 
   def exprToBytes(e: Expression): Array[Byte] = toCbor2(e).EncodeToBytes()
+
+  def bytesToExpr(bytes: Array[Byte]): Expression = fromCbor2(CBORObject.DecodeFromBytes(bytes))
+
+  def fromCbor2(obj: CBORObject): Expression = obj.getType match {
+    case CBORType.Boolean => ???
+    case CBORType.SimpleValue => ???
+    case CBORType.ByteString => ???
+    case CBORType.TextString => ???
+    case CBORType.Array => ???
+    case CBORType.Map => ???
+    case CBORType.Integer => // Either a 64-bit int or a bigint.
+      ???
+    case CBORType.FloatingPoint => ???
+  }
 
   def naturalToCbor2(index: Natural): CBORObject =
     if (index < BigInt(1).<<(64))
@@ -30,7 +44,7 @@ object CBOR {
     CBORObject.FromObject((cborCodes ++ cborExprs).toArray)
   }
 
-  def toCbor2: Expression => CBORObject = {
+  def toCbor2(e: Expression): CBORObject = e match {
     case Expression.Variable(VarName("_"), index) => naturalToCbor2(index)
     case Expression.Variable(VarName(name), index) => CBORObject.NewArray().Add(name).Add(naturalToCbor2(index))
     case Expression.Lambda(VarName(name), tipe, body) => makeArray(Some(1))(tipe, body)
@@ -67,7 +81,7 @@ object CBOR {
     case Expression.TextLiteralNoInterp(value) => makeArrayC(Some(18))(CBORObject.FromObject(value))
     case Expression.TextLiteral(interpolations, trailing) =>
       val objects: Seq[CBORObject] = interpolations.flatMap { case (head, tail) => Seq(CBORObject.FromObject(head), toCbor2(tail)) } :+ CBORObject.FromObject(trailing)
-      makeArrayC(Some(18))(objects:_*)
+      makeArrayC(Some(18))(objects: _*)
     case Expression.BytesLiteral(hex) => ???
     case Expression.DateLiteral(date) => ???
     case Expression.TimeLiteral(time) => ???
