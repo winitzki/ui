@@ -714,11 +714,11 @@ object Grammar {
   )))
 
   def http[$: P]: P[ImportType.Remote] = P(
-    http_raw ~ (whsp ~ requireKeyword("using") ~ whsp1 ~ import_expression).?
+    http_raw ~ (whsp ~ requireKeyword("using") ~ whsp1 ~/ import_expression).?
   ).map { case (url, headers) => ImportType.Remote(url, headers.getOrElse(emptyHeaders)) }
 
   def env[$: P]: P[ImportType.Env] = P(
-    "env:" ~
+    "env:" ~/
       (bash_environment_variable.!
         | ("\u0022" ~ posix_environment_variable.! ~ "\u0022")
         )
@@ -771,7 +771,7 @@ object Grammar {
   )
 
   def import_only[$: P]: P[Import] = P(
-    import_hashed ~ (whsp ~ requireKeyword("as") ~ whsp1 ~ (requireKeyword("Text") | requireKeyword("Location") | requireKeyword("Bytes")).!).?
+    import_hashed ~ (whsp ~ requireKeyword("as") ~ whsp1 ~/ (requireKeyword("Text") | requireKeyword("Location") | requireKeyword("Bytes")).!).?
   ).map { case (importType, digest, mode) =>
     val importMode = mode match {
       case Some("Bytes") => SyntaxConstants.ImportMode.RawBytes
@@ -784,33 +784,36 @@ object Grammar {
 
   // The ABNF spec does not define those sub-rules but we define them to aid debugging.
 
-  def expression_lambda[$: P]: P[Lambda] = (lambda ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression)
+  def expression_lambda[$: P]: P[Lambda] = (lambda ~ whsp ~ "(" ~/ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~/ expression ~ whsp ~ ")" ~ whsp ~ arrow ~/
+    whsp ~ expression)
     .map { case (name, tipe, body) => Lambda(name, tipe, body) }
 
-  def expression_if_then_else[$: P]: P[If] = (requireKeyword("if") ~ whsp1 ~ expression ~ whsp ~ requireKeyword("then") ~ whsp1 ~ expression ~ whsp ~ requireKeyword("else") ~ whsp1 ~ expression)
-    .map { case (cond, ifTrue, ifFalse) =>
+  def expression_if_then_else[$: P]: P[If] = (
+    requireKeyword("if") ~ whsp1 ~/ expression ~ whsp ~ requireKeyword("then") ~ whsp1 ~/ expression ~ whsp ~ requireKeyword("else") ~ whsp1 ~/ expression
+    ).map { case (cond, ifTrue, ifFalse) =>
       If(cond, ifTrue, ifFalse)
     }
 
-  def expression_let_binding[$: P]: P[Expression] = (let_binding.rep(1) ~ requireKeyword("in") ~ whsp1 ~ expression)
+  def expression_let_binding[$: P]: P[Expression] = (let_binding.rep(1) ~ requireKeyword("in") ~/ whsp1 ~ expression)
     .map { case (letBindings, expr) =>
       letBindings.foldLeft(expr) { case (prev, (varName, tipe, body)) => Let(varName, tipe, body, prev) }
     }
 
-  def expression_forall[$: P]: P[Forall] = (forall ~ whsp ~ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~ expression ~ whsp ~ ")" ~ whsp ~ arrow ~ whsp ~ expression)
+  def expression_forall[$: P]: P[Forall] = (forall ~ whsp ~/ "(" ~ whsp ~ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~/ expression ~ whsp ~ ")" ~ whsp ~ arrow ~/
+    whsp ~ expression)
     .map { case (varName, tipe, body) => Forall(varName, tipe, body) }
 
   // This may not "cut" the parse.
   def expression_arrow[$: P]: P[Expression] = (operator_expression ~ whsp ~ arrow ~ whsp ~ expression)
     .map { case (head, body) => body } // TODO: figure out what this expression does! Is this a function type? If so, why "operator_expression"?
 
-  def expression_merge[$: P]: P[Merge] = (requireKeyword("merge") ~ whsp1 ~ import_expression ~ whsp1 ~ import_expression ~ whsp ~ ":" ~ whsp1 ~ expression)
+  def expression_merge[$: P]: P[Merge] = (requireKeyword("merge") ~ whsp1 ~/ import_expression ~ whsp1 ~ import_expression ~ whsp ~ ":" ~ whsp1 ~/ expression)
     .map { case (e1, e2, t) => Merge(e1, e2, Some(t)) }
 
-  def expression_toMap[$: P]: P[ToMap] = (requireKeyword("toMap") ~ whsp1 ~ import_expression ~ whsp ~ ":" ~ whsp1 ~ expression)
+  def expression_toMap[$: P]: P[ToMap] = (requireKeyword("toMap") ~ whsp1 ~/ import_expression ~ whsp ~ ":" ~ whsp1 ~ expression)
     .map { case (e1, e2) => ToMap(e1, Some(e2)) }
 
-  def expression_assert[$: P]: P[Assert] = (requireKeyword("assert") ~ whsp ~ ":" ~ whsp1 ~ expression)
+  def expression_assert[$: P]: P[Assert] = (requireKeyword("assert") ~ whsp ~/ ":" ~ whsp1 ~ expression)
     .map { expr => Assert(expr) }
 
   def expression[$: P]: P[Expression] = P(
@@ -833,31 +836,31 @@ object Grammar {
       //  "a -> b"
       //
       //  NOTE: Backtrack if parsing this alternative fails
-      | expression_arrow
+      | NoCut(expression_arrow)
       //
       //  "a with x = b"
       //
       //  NOTE: Backtrack if parsing this alternative fails
-      | with_expression.map { case (expr, substs) => With(expr, Seq(), expr) } // TODO: figure out what this expression does!
+      | NoCut(with_expression)
       //
       //  "merge e1 e2 : t"
       //
       //  NOTE: Backtrack if parsing this alternative fails since we can't tell
       //  from the keyword whether there will be a type annotation or not
-      | expression_merge
+      | NoCut(expression_merge)
       //
       //  "[] : t"
       //
       //  NOTE: Backtrack if parsing this alternative fails since we can't tell
       //  from the opening bracket whether or not this will be an empty list or
       //  a non_empty list
-      | empty_list_literal
+      | NoCut(empty_list_literal)
       //
       //  "toMap e : t"
       //
       //  NOTE: Backtrack if parsing this alternative fails since we can't tell
       //  from the keyword whether there will be a type annotation or not
-      | expression_toMap
+      | NoCut(expression_toMap)
       //
       //  "assert : Natural/even 1 === False"
       | expression_assert
@@ -876,7 +879,7 @@ object Grammar {
   }
 
   def let_binding[$: P] = P(
-    requireKeyword("let") ~ whsp1 ~ nonreserved_label ~ whsp ~ (":" ~ whsp1 ~ expression ~ whsp).? ~ "=" ~ whsp ~ expression ~ whsp1
+    requireKeyword("let") ~/ whsp1 ~ nonreserved_label ~ whsp ~ (":" ~ whsp1 ~ expression ~ whsp).? ~ "=" ~ whsp ~ expression ~ whsp1
   )
 
   def empty_list_literal[$: P] = P(
@@ -886,7 +889,7 @@ object Grammar {
   // with_expression may not "cut" the parse.
   def with_expression[$: P] = P(
     import_expression ~ (whsp1 ~ "with" ~ whsp1 ~ with_clause).rep(1)
-  )
+  ).map { case (expr, substs) => With(expr, Seq(), expr) } // TODO: figure out what this expression does!
 
   def with_clause[$: P] = P(
     with_component.map(VarName) ~ (whsp ~ "." ~ whsp ~ with_component.map(FieldName)).rep ~ whsp ~ "=" ~ whsp ~ operator_expression
@@ -958,19 +961,19 @@ object Grammar {
 
   def first_application_expression[$: P]: P[Expression] = P(
     //  "merge e1 e2"
-    (requireKeyword("merge") ~ whsp1 ~ import_expression ~ whsp1 ~ import_expression)
+    (requireKeyword("merge") ~ whsp1 ~/ import_expression ~ whsp1 ~ import_expression)
       .map { case (e1, e2) => Merge(e1, e2, None) }
       //
       //  "Some e"
-      | (requireKeyword("Some") ~ whsp1 ~ import_expression)
+      | (requireKeyword("Some") ~ whsp1 ~/ import_expression)
       .map(expr => ExpressionSome(expr))
       //
       //  "toMap e"
-      | (requireKeyword("toMap") ~ whsp1 ~ import_expression)
+      | (requireKeyword("toMap") ~ whsp1 ~/ import_expression)
       .map(expr => ToMap(expr, None))
       //
       //  "showConstructor e"
-      | (requireKeyword("showConstructor") ~ whsp1 ~ import_expression)
+      | (requireKeyword("showConstructor") ~ whsp1 ~/ import_expression)
       .map(expr => ShowConstructor(expr))
       //
       | import_expression

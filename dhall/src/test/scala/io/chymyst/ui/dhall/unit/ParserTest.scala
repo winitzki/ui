@@ -1,13 +1,13 @@
 package io.chymyst.ui.dhall.unit
 
-import com.eed3si9n.expecty.Expecty.assert
+import com.eed3si9n.expecty.Expecty.expect
 import fastparse._
 import io.chymyst.ui.dhall.Syntax.Expression
 import io.chymyst.ui.dhall.Syntax.Expression.BytesLiteral
 import io.chymyst.ui.dhall.unit.ParserTest._
 import io.chymyst.ui.dhall.unit.TestFixtures._
 import io.chymyst.ui.dhall.{Grammar, SyntaxConstants}
-import munit.FunSuite
+import munit.{FunSuite}
 
 import java.nio.file.{Files, Paths}
 
@@ -21,7 +21,7 @@ object ParserTest {
       case Parsed.Failure(message, index, extra) =>
         println(s"Error: Parsing input '$input', expected Success($expectedResult, $index) but got Failure('$message', $index, ${extra.stack})")
     }
-    assert(parsed == Parsed.Success(expectedResult, lastIndex))
+    expect(parsed == Parsed.Success(expectedResult, lastIndex))
   }
 
   def toFail[A](grammarRule: P[_] => P[A], input: String, parsedInput: String, expectedMessage: String, lastIndex: Int) = {
@@ -29,10 +29,10 @@ object ParserTest {
     parsed match {
       case Parsed.Success(value, index) =>
         println(s"Error: Parsing input '$input', expected Failure but got Success($value, $index)")
-        assert(parsed == Parsed.Failure(parsedInput, lastIndex, null))
+        expect(parsed == Parsed.Failure(parsedInput, lastIndex, null))
       case f@Parsed.Failure(message, index, extra) =>
         println(s"Parsing input '$input', expected index $lastIndex, got Failure('$message', $index, ${extra.stack}), message '${f.msg}' as expected")
-        assert((f.msg contains expectedMessage) && (f.index == lastIndex))
+        expect(f.msg contains expectedMessage, f.index == lastIndex)
     }
   }
 }
@@ -42,9 +42,9 @@ class ParserTest extends FunSuite {
   test("quoted_label_char") {
     val Parsed.Success((), 1) = parse("asdf", Grammar.quoted_label_char(_))
     val f@Parsed.Failure(failure, index, _) = parse("`asdf", Grammar.quoted_label_char(_))
-    assert(failure == "")
-    assert(index == 0)
-    assert(f.msg == """Position 1:1, found "`asdf"""")
+    expect(failure == "")
+    expect(index == 0)
+    expect(f.msg == """Position 1:1, found "`asdf"""")
   }
 
   test("requireKeyword") {
@@ -184,7 +184,7 @@ class ParserTest extends FunSuite {
 
   test("builtin names") {
     val names = SyntaxConstants.Builtin.namesToValuesMap
-    assert(names.keySet.size == 42)
+    expect(names.keySet.size == 42)
     names.foreach { case (name, c) =>
       check(Grammar.builtin(_), name, Expression.Builtin(c), name.length)
     }
@@ -258,7 +258,7 @@ class ParserTest extends FunSuite {
 
   test("bytes_literal") {
     val Parsed.Success(result, 12) = parse("0x\"64646464\"", Grammar.bytes_literal(_))
-    assert(new String(result.bytes) == "dddd")
+    expect(new String(result.bytes) == "dddd")
   }
 
   test("primitive_expression") {
@@ -267,7 +267,7 @@ class ParserTest extends FunSuite {
     }
 
     val Parsed.Success(result: BytesLiteral, 12) = parse("0x\"64646464\"", Grammar.primitive_expression(_))
-    assert(new String(result.bytes) == "dddd")
+    expect(new String(result.bytes) == "dddd")
   }
 
   test("selector_expression") {
