@@ -164,12 +164,16 @@ object TestFixtures {
 
   val plusExpressions: Seq[(String, Expression)] = Seq(
     "1 + 1" -> Expression.Operator(Expression.NaturalLiteral(1), SyntaxConstants.Operator.Plus, Expression.NaturalLiteral(1)),
-    "10 + 10" -> Expression.Operator(Expression.NaturalLiteral(10), SyntaxConstants.Operator.Plus, Expression.NaturalLiteral(10)),
-    "1.0 +2.0" -> Expression.Operator(Expression.DoubleLiteral(1.0), SyntaxConstants.Operator.Plus, Expression.DoubleLiteral(2.0)),
-    "1 +[] : Natural ++ [1,2,3]" -> Expression.Operator(Expression.NaturalLiteral(1), SyntaxConstants.Operator.Plus, Expression.NaturalLiteral(1)),
+    "10 + +10" -> Expression.Operator(Expression.NaturalLiteral(10), SyntaxConstants.Operator.Plus, Expression.IntegerLiteral(10)),
+    "10 + -10" -> Expression.Operator(Expression.NaturalLiteral(10), SyntaxConstants.Operator.Plus, Expression.IntegerLiteral(-10)),
+    "10 +10" -> Expression.Application(Expression.NaturalLiteral(10), Expression.IntegerLiteral(10)),
+    "10 ++10" -> Expression.Operator(Expression.NaturalLiteral(10), SyntaxConstants.Operator.TextAppend, Expression.NaturalLiteral(10)),
+    "1.0 + 2.0" -> Expression.Operator(Expression.DoubleLiteral(1.0), SyntaxConstants.Operator.Plus, Expression.DoubleLiteral(2.0)),
+    "1.0 -2.0" -> Expression.Application(Expression.DoubleLiteral(1.0), Expression.DoubleLiteral(-2.0)),
+    "1 ++ [1,2,3]" -> Expression.Operator(Expression.NaturalLiteral(1), SyntaxConstants.Operator.TextAppend, primitiveExpressions.toMap.apply("[1,2,3]")),
   )
 
-  val recordExpressions: Seq[(String, Expression)]  = Seq(
+  val recordExpressions: Seq[(String, Expression)] = Seq(
     "{ foo, bar }" -> Expression.RecordLiteral(List((FieldName("foo"), Variable(VarName("foo"), BigInt(0))), (FieldName("bar"), Variable(VarName("bar"), BigInt
     (0))
     ))),
