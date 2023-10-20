@@ -10,10 +10,10 @@ import munit.FunSuite
 
 class ExpressionTest extends FunSuite {
 
-  test("simple expression: 1+1") {
+  test("simple invalid expression: 1+1") {
     val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall("1+1")
-    val expected = Expression.Builtin(SyntaxConstants.Builtin.List)
-    expect(result == expected, "1+1 must be parsed".nonEmpty)
+    val expected = Expression.NaturalLiteral(1)
+    expect(result == expected, "1+1 must be parsed as 1".nonEmpty)
   }
 
   test("simple expression: { foo, bar }") {
@@ -53,9 +53,9 @@ class ExpressionTest extends FunSuite {
   }
 
 
-  test("simple expression: let x = 1 in x") {
-    val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall("let x = 1 in x")
-    val expected = Expression.Builtin(SyntaxConstants.Builtin.List)
+  test("simple expression: let x = 1 in y") {
+    val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall("let x = 1 in y")
+    val expected = Expression.Let(VarName("x"), None, NaturalLiteral(1), Variable(VarName("y"), 0))
     expect(result == expected)
   }
 

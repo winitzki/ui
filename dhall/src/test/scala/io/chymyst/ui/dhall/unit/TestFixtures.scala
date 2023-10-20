@@ -3,7 +3,7 @@ package io.chymyst.ui.dhall.unit
 import com.eed3si9n.expecty.Expecty.expect
 import fastparse._
 import io.chymyst.ui.dhall.Syntax.Expression
-import io.chymyst.ui.dhall.Syntax.Expression.{Builtin, BytesLiteral, TextLiteral, Variable}
+import io.chymyst.ui.dhall.Syntax.Expression.{Builtin, BytesLiteral, NaturalLiteral, TextLiteral, Variable}
 import io.chymyst.ui.dhall.SyntaxConstants
 import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, File, FilePrefix, ImportMode, ImportType, Scheme, URL, VarName}
 
@@ -186,8 +186,8 @@ object TestFixtures {
   )
 
   val letBindingExpressions: Seq[(String, Expression)] = Seq(
-    "let x = 1 in x" -> Expression.Variable(VarName("x"), BigInt(0)),
-    "let x = 1 let y = 2 in x" -> Expression.Variable(VarName("x"), BigInt(0)),
-    "let x = 1 y = 2 in x" -> Expression.Variable(VarName("x"), BigInt(0)),
+    "let x = 1 in y" -> Expression.Let(VarName("x"), None, NaturalLiteral(1), Variable(VarName("y"), 0)),
+    "let x = 1 let y = 2 in z" -> Expression.Let(VarName("x"), None, NaturalLiteral(1), Expression.Let(VarName("y"), None, NaturalLiteral(2), Variable(VarName("z"), 0))),
+    "let x = 1 in let y = 2 in z" -> Expression.Let(VarName("x"), None, NaturalLiteral(1), Expression.Let(VarName("y"), None, NaturalLiteral(2), Variable(VarName("z"), 0))),
   )
 }
