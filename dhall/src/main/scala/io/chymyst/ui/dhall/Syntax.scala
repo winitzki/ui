@@ -1,6 +1,7 @@
 package io.chymyst.ui.dhall
 
 import enumeratum._
+import io.chymyst.ui.dhall.Grammar.hexStringToByteArray
 import io.chymyst.ui.dhall.Syntax.Expression
 import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, DirName, FieldName, VarName}
 
@@ -285,15 +286,8 @@ object Syntax {
       }
     }
 
-    final case class BytesLiteral(value: Array[Byte]) extends Expression {
-      override def equals(obj: Any): Boolean = obj match {
-        case byteArray: Array[Byte] =>
-          println(s"DEBUG: comparing byte arrays ${new String(value)} and ${new String(byteArray)}")
-          byteArray sameElements value
-        case _ => false
-      }
-
-      override def toString: String = s"BytesLiteral(${new String(value)})"
+    final case class BytesLiteral(hex: String) extends Expression {
+      val bytes: Array[Byte]= hexStringToByteArray(hex)
     }
 
     final case class DateLiteral(date: LocalDate) extends Expression
@@ -317,7 +311,7 @@ object Syntax {
 
     final case class ShowConstructor(data: Expression) extends Expression
 
-    final case class Import(importType: SyntaxConstants.ImportType, importMode: SyntaxConstants.ImportMode, digest: Option[Array[Byte]]) extends Expression
+    final case class Import(importType: SyntaxConstants.ImportType, importMode: SyntaxConstants.ImportMode, digest: Option[BytesLiteral]) extends Expression
 
     final case class Some(data: Expression) extends Expression
 

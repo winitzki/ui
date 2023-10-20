@@ -2,7 +2,7 @@ package io.chymyst.ui.dhall.unit
 
 import io.chymyst.ui.dhall.Grammar.hexStringToByteArray
 import io.chymyst.ui.dhall.Syntax.Expression
-import io.chymyst.ui.dhall.Syntax.Expression.TextLiteral
+import io.chymyst.ui.dhall.Syntax.Expression.{BytesLiteral, TextLiteral}
 import io.chymyst.ui.dhall.SyntaxConstants
 import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, File, FilePrefix, ImportMode, ImportType, VarName}
 
@@ -97,8 +97,11 @@ object TestFixtures {
   val importExpressions: Seq[(String, Expression)] = Seq(
     "./local/import as Location" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.Location, None),
     s"./local/import sha256:$sha256example" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.Code, Some
-    (hexStringToByteArray(sha256example))),
-    s"./local/import sha256:$sha256example as Text" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.RawText, Some(hexStringToByteArray(sha256example))),
-    s"./local/import sha256:$sha256example as Bytes" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.RawBytes, Some(hexStringToByteArray(sha256example))),
+    (BytesLiteral(sha256example))),
+    s"./local/import sha256:$sha256example as Text" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.RawText, Some(BytesLiteral(sha256example))),
+    s"./local/import sha256:$sha256example as Bytes" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.RawBytes, Some(BytesLiteral(sha256example))),
+    "env:HOME as Text" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.Location, None),
+    "https://example.com/a/b?q=d using headers as Bytes" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode
+      .Location, None),
   )
 }
