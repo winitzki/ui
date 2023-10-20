@@ -41,13 +41,12 @@ class ExpressionTest extends FunSuite {
     expect(parse("let x = 1 ", grammar1(_)).get.value == (VarName("x"), None, NaturalLiteral(1)))
 
     def grammar2[$: P] = P(
-      Grammar.let_binding.log.logBefore("letb-").logAfter("letb+")
-        ~ Grammar.requireKeyword("in").log
+      Grammar.let_binding ~ Grammar.requireKeyword("in")
     )
 
     expect(parse("let x=1 in ", grammar2(_)).get.value == (VarName("x"), None, NaturalLiteral(1)))
 
-    def grammar3[$: P] = (Grammar.let_binding ~ Grammar.requireKeyword("in").log.logBefore("in-").logAfter("in+"))
+    def grammar3[$: P] = (Grammar.let_binding ~ Grammar.requireKeyword("in"))
 
     expect(parse("let x = 1 in x", grammar3(_)).get.value == (VarName("x"), None, NaturalLiteral(1)))
   }

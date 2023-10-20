@@ -378,7 +378,7 @@ object Syntax {
   sealed trait PathComponent
 
   object PathComponent {
-    final case class Label(dirName: DirName) extends PathComponent
+    final case class Label(fieldName: FieldName) extends PathComponent
 
     final case object DescendOptional extends PathComponent
   }

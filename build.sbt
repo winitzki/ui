@@ -13,6 +13,9 @@ val assertVerbose = "com.eed3si9n.expecty" %% "expecty" % "0.16.0" % Test
 val enumeratum = "com.beachape" %% "enumeratum" % "1.7.3"
 val flatlaf = "com.formdev" % "flatlaf" % "3.2.2"
 
+val cbor1 = "co.nstant.in" % "cbor" % "0.9"
+val cbor2  ="com.upokecenter" % "cbor" % "4.5.2"
+
 lazy val root = (project in file(".")).settings(
   scalaVersion := scalaV,
   crossScalaVersions := Seq(scalaV),
@@ -85,5 +88,7 @@ lazy val dhall = (project in file("dhall")).settings(
     munit,
     assertVerbose,
     enumeratum,
+    cbor1,
+    cbor2,
   ),
 )

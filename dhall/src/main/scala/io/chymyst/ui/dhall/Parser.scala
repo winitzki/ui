@@ -3,7 +3,7 @@ package io.chymyst.ui.dhall
 import fastparse.NoWhitespace._
 import fastparse._
 import io.chymyst.ui.dhall.Syntax.Expression.{KeywordSome => ExpressionSome, _}
-import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
+import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression, PathComponent}
 import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, ImportType, VarName}
 
 import java.io.InputStream
@@ -807,8 +807,9 @@ object Grammar {
     whsp ~ expression)
     .map { case (varName, tipe, body) => Forall(varName, tipe, body) }
 
+  // (`A → B` is short-hand for `∀(_ : A) → B`)
   def expression_arrow[$: P]: P[Expression] = P(operator_expression ~ whsp ~ arrow ~/ whsp ~ expression)
-    .map { case (head, body) => body } // TODO: figure out what this expression does! Is this a function type? If so, why "operator_expression"?
+    .map { case (head, body) => Expression.Forall(VarName("_"), head, body) }
 
   def expression_merge[$: P]: P[Merge] = P(requireKeyword("merge") ~ whsp1 ~/ import_expression ~ whsp1 ~/ import_expression ~ whsp ~/ ":" ~ whsp1 ~/
     expression)
@@ -888,11 +889,16 @@ object Grammar {
 
   def empty_list_literal[$: P] = P(
     "[" ~ whsp ~ ("," ~ whsp).? ~ "]" ~ whsp ~/ ":" ~ whsp1 ~/ expression
-  ).map(expr => EmptyList(expr))
+  ).map(EmptyList)
 
   def with_expression[$: P] = P(
     import_expression ~ (whsp1 ~ "with" ~ whsp1 ~/ with_clause).rep(1)
-  ).map { case (expr, substs) => With(expr, Seq(), expr) } // TODO: figure out what this expression does!
+    // record with x1.y1.z1 = expr1 with x2.y2.z2 = expr2   should be represented by With(  With(record, Seq(x1, y1, z1), expr1), Seq(x2, y2, z2), expr2)
+  ).map { case (expr, substs) =>
+    substs.foldLeft(expr) { case (prev, (varName, fields, target)) => With(prev, PathComponent.Label(FieldName(varName.name)) +: fields.map(PathComponent
+      .Label), target)
+    }
+  }
 
   def with_clause[$: P] = P(
     with_component.map(VarName) ~ (whsp ~ "." ~ whsp ~/ with_component.map(FieldName)).rep ~ whsp ~ "=" ~ whsp ~/ operator_expression
