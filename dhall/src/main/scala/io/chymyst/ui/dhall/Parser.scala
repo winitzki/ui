@@ -800,7 +800,7 @@ object Grammar {
 
   def expression_let_binding[$: P]: P[Expression] = P(let_binding.rep(1) ~ requireKeyword("in") ~ whsp1 ~/ expression)
     .map { case (letBindings, expr) =>
-      letBindings.foldLeft(expr) { case (prev, (varName, tipe, body)) => Let(varName, tipe, body, prev) }
+      letBindings.foldRight(expr) { case ((varName, tipe, body), prev) => Let(varName, tipe, body, prev) }
     }
 
   def expression_forall[$: P]: P[Forall] = P(forall ~ whsp ~/ "(" ~ whsp ~ nonreserved_label ~ whsp ~/ ":" ~ whsp1 ~/ expression ~ whsp ~ ")" ~ whsp ~ arrow ~/
