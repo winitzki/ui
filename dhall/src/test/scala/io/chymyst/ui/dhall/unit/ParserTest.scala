@@ -85,14 +85,17 @@ class ParserTest extends FunSuite {
     }
   }
 
-  test("whsp fails when not closed") {
-    toFail(Grammar.whsp(_), "{-", "", "", 2)
-    toFail(Grammar.whsp(_), "{- {- -} -0", "", "", 8)
-// This will not fail unless `{-` cuts. But if it cuts we cannot parse identifiers with trailing comments.
-    // TODO: fix this.
+  test("comment fails when not closed") {
+    import fastparse._, NoWhitespace._
+
+    // Incomplete comments will not fail to parse without ~End unless `{-` cuts. But if it cuts we cannot parse identifiers with trailing comments.
+    def whspClosed[$: P] = Grammar.whsp ~ End
+
+    toFail(whspClosed(_), "{-", "", "", 0)
+    toFail(whspClosed(_), "{- {- -} -0", "", "", 9)
   }
 
-  test("whsp fails when incomplete") {
+  test("comment fails when incomplete") {
     // Nothing gets parsed.
     Seq( // Examples may contain trailing whitespace or leading whitespace.
       "",
@@ -101,6 +104,11 @@ class ParserTest extends FunSuite {
       check(Grammar.whsp(_), input, (), 0)
     }
 
+    import fastparse._, NoWhitespace._
+
+    // Incomplete comments will not fail to parse without ~End unless `{-` cuts. But if it cuts we cannot parse identifiers with trailing comments.
+    def whspClosed[$: P] = Grammar.whsp ~ End
+
     Seq( // Examples may contain trailing whitespace or leading whitespace.
       "   {- 1 - }- }  ",
       """   {-2
@@ -108,7 +116,7 @@ class ParserTest extends FunSuite {
         |}  |
         |- }""".stripMargin,
     ).foreach { input =>
-      toFail(Grammar.whsp(_), input, "", "", 5)
+      toFail(whspClosed(_), input, "", "", 3)
     }
 
   }
