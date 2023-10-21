@@ -156,58 +156,59 @@ object SyntaxConstants {
 
   }
 
-  sealed trait ImportMode extends EnumEntry
+  sealed abstract class ImportMode(val cborCode: Int) extends EnumEntry
 
   object ImportMode extends Enum[ImportMode] {
     val values = findValues
 
-    case object Code extends ImportMode
+    case object Code extends ImportMode(0)
 
-    case object RawBytes extends ImportMode
+    case object RawBytes extends ImportMode(1)
 
-    case object RawText extends ImportMode
+    case object RawText extends ImportMode(2)
 
-    case object Location extends ImportMode
+    case object Location extends ImportMode(3)
   }
 
-  sealed trait Scheme extends EnumEntry
+  sealed abstract class Scheme(val cborCode: Int) extends EnumEntry
 
   object Scheme extends Enum[Scheme] {
     val values = findValues
 
-    case object HTTP extends Scheme
+    case object HTTP extends Scheme(0)
 
-    case object HTTPS extends Scheme
+    case object HTTPS extends Scheme(1)
   }
 
-  sealed trait FilePrefix
+  sealed abstract class FilePrefix(val cborCode: Int)
 
   object FilePrefix {
-    case object Absolute extends FilePrefix
+    case object Absolute extends FilePrefix(2)
 
-    case object Here extends FilePrefix // ./something relative to the current working directory
+    case object Here extends FilePrefix(3) // ./something relative to the current working directory
 
-    case object Parent extends FilePrefix // ./something relative to the parent working directory
+    case object Parent extends FilePrefix(4) // ./something relative to the parent working directory
 
-    case object Home extends FilePrefix // ~/something relative to the user's home directory
+    case object Home extends FilePrefix(5) // ~/something relative to the user's home directory
   }
 
-  sealed trait ImportType
+  sealed abstract class ImportType
 
   object ImportType {
     final case object Missing extends ImportType
 
-    final case class Remote(url: URL, headers: Expression) extends ImportType
+    final case class Remote(url: URL, headers: Option[Expression]) extends ImportType
 
     final case class Path(filePrefix: FilePrefix, file: File) extends ImportType
 
     final case class Env(envVarName: String) extends ImportType
   }
 
+  // The authority of http://user@host:port/foo is stored as "user@host:port".
+  // The query of ?foo=1&bar=true is stored as "foo=1&bar=true".
   final case class URL(scheme: Scheme, authority: String, path: File, query: Option[String])
 
   final case class File(segments: Seq[String])
-
 }
 
 object Syntax {

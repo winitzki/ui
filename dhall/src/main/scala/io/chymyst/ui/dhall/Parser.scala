@@ -723,14 +723,14 @@ object Grammar {
     "!" | "$" | "&" | "'" | "*" | "+" | ";" | "="
   )
 
-  val emptyHeaders: Expression = Expression.EmptyList(Expression.RecordType(Seq(
-    (FieldName("mapKey"), Expression.Builtin(SyntaxConstants.Builtin.Text)),
-    (FieldName("mapValue"), Expression.Builtin(SyntaxConstants.Builtin.Text)),
-  )))
+//  val emptyHeaders: Expression = Expression.EmptyList(Expression.RecordType(Seq(
+//    (FieldName("mapKey"), Expression.Builtin(SyntaxConstants.Builtin.Text)),
+//    (FieldName("mapValue"), Expression.Builtin(SyntaxConstants.Builtin.Text)),
+//  )))
 
   def http[$: P]: P[ImportType.Remote] = P(
     http_raw ~ (whsp ~ requireKeyword("using") ~ whsp1 ~/ import_expression).?
-  ).map { case (url, headers) => ImportType.Remote(url, headers.getOrElse(emptyHeaders)) }
+  ).map { case (url, headers) => ImportType.Remote(url, headers) }
 
   def env[$: P]: P[ImportType.Env] = P(
     "env:" ~/

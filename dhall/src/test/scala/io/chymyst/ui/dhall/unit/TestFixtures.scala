@@ -116,7 +116,7 @@ object TestFixtures {
       .RawBytes, Some(Expression.BytesLiteral(sha256example))),
     "env:HOME as Text" -> Expression.Import(ImportType.Env("HOME"), ImportMode.RawText, None),
     s"https://example.com/a/b?c=d using headers123 sha256:$sha256example as Bytes" -> Expression.Import(ImportType.Remote(URL(Scheme.HTTPS, "example.com", File
-    (Seq("a", "b")), Some("c=d")), v("headers123")), ImportMode.RawBytes, Some(Expression.BytesLiteral(sha256example))),
+    (Seq("a", "b")), Some("c=d")), Some(v("headers123"))), ImportMode.RawBytes, Some(Expression.BytesLiteral(sha256example))),
   )
 
   val plusExpressions: Seq[(String, Expression)] = Seq(

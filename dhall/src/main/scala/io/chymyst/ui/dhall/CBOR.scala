@@ -4,7 +4,7 @@ package io.chymyst.ui.dhall
 import com.upokecenter.cbor.{CBORObject, CBORType}
 import com.upokecenter.numbers.EInteger
 import io.chymyst.ui.dhall.Syntax.{Expression, Natural, PathComponent}
-import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, VarName}
+import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, FilePrefix, ImportType, VarName}
 
 import scala.annotation.tailrec
 import scala.collection.immutable.Seq
@@ -49,8 +49,11 @@ object CBOR {
 
   def toCbor2(e: Expression): CBORObject = e match {
     case Expression.Variable(VarName("_"), index) => naturalToCbor2(index)
+
     case Expression.Variable(VarName(name), index) => CBORObject.NewArray().Add(name).Add(naturalToCbor2(index))
+
     case Expression.Lambda(VarName(name), tipe, body) => makeArray(Some(1))(tipe, body)
+
     case Expression.Forall(VarName(name), tipe, body) => makeArray(Some(2))(tipe, body)
 
     case e@Expression.Let(_, _, _, _) =>
@@ -72,9 +75,13 @@ object CBOR {
       makeArray(Some(27))(args: _*)
 
     case Expression.EmptyList(Expression.Application(Expression.Builtin(SyntaxConstants.Builtin.List), tipe)) => makeArray(Some(4))(tipe)
+
     case Expression.EmptyList(tipe) => makeArray(Some(28))(tipe)
+
     case Expression.NonEmptyList(head, tail) => makeArray(Some(4), None)((head +: tail): _*)
+
     case Expression.Annotation(data, tipe) => makeArray(Some(26))(data, tipe)
+
     case Expression.Operator(lop, op, rop) => makeArray(Some(3), Some(op.cborCode))(lop, rop)
 
     case f@Expression.Application(_, _) =>
@@ -86,9 +93,13 @@ object CBOR {
       makeArray(Some(0))(loop(Seq(), f): _*)
 
     case Expression.Field(base, FieldName(name)) => makeArrayC(Some(9))(toCbor2(base), CBORObject.FromObject(name))
+
     case Expression.ProjectByLabels(base, labels) => makeArrayC(Some(10))(toCbor2(base) +: labels.map(label => CBORObject.FromObject(label.name)): _*)
+
     case Expression.ProjectByType(base, by) => makeArrayC(Some(10))(toCbor2(base), makeArrayC()(toCbor2(by)))
+
     case Expression.Completion(base, target) => makeArray(Some(3), Some(13))(base, target)
+
     case Expression.Assert(data) => makeArray(Some(19))(data)
 
     case Expression.With(data, pathComponents, body) =>
@@ -99,8 +110,11 @@ object CBOR {
       makeArrayC(Some(29))(toCbor2(data), makeArrayC()(path: _*), toCbor2(body))
 
     case Expression.DoubleLiteral(value) => CBORObject.FromObject(value) // TODO: verify that this works correctly.
+
     case Expression.NaturalLiteral(value) => makeArrayC(Some(15))(naturalToCbor2(value))
+
     case Expression.IntegerLiteral(value) => makeArrayC(Some(16))(CBORObject.FromObject(value)) // TODO: verify that this works correctly.
+
     case Expression.TextLiteralNoInterp(value) => makeArrayC(Some(18))(CBORObject.FromObject(value))
 
     case Expression.TextLiteral(interpolations, trailing) =>
@@ -110,7 +124,9 @@ object CBOR {
       makeArrayC(Some(18))(objects: _*)
 
     case b@Expression.BytesLiteral(_) => makeArrayC(Some(33))(CBORObject.FromObject(b.bytes))
+
     case Expression.DateLiteral(y, m, d) => makeArrayC(Some(30))(Seq(y, m, d).map(x => CBORObject.FromObject(x)): _*)
+
     case Expression.TimeLiteral(time) =>
       // Always use nanosecond precision. TODO: validate that this is OK
       val totalSeconds: Long = time.getSecond * 1000000000 + time.getNano
@@ -155,11 +171,33 @@ object CBOR {
       makeArrayC(Some(11))(CBORObject.FromObject(dict))
 
     case Expression.ShowConstructor(data) => makeArray(Some(34))(data)
-    case Expression.Import(importType, importMode, digest) => ???
+
+    case Expression.Import(importType, importMode, digest) =>
+      val integrity = digest.map(d => CBORObject.FromObject("\u0012\u0020".getBytes ++ d.bytes)).getOrElse(CBORObject.Null)
+      val part1: Seq[CBORObject] = Seq(integrity, CBORObject.FromObject(importMode.cborCode))
+      val part2: Seq[CBORObject] = importType match {
+        case ImportType.Missing => Seq(CBORObject.FromObject(7))
+
+        case ImportType.Remote(SyntaxConstants.URL(scheme, authority, SyntaxConstants.File(segments), query), headers) =>
+          val cborHeaders = headers.map(toCbor2).getOrElse(CBORObject.Null)
+          val cborQuery = query.map(s => CBORObject.FromObject(s)).getOrElse(CBORObject.Null)
+          CBORObject.FromObject(scheme.cborCode) +: cborHeaders +: CBORObject.FromObject(authority) +: segments.map(s => CBORObject.FromObject(s)) :+ cborQuery
+
+        case ImportType.Path(filePrefix, SyntaxConstants.File(segments)) =>
+          CBORObject.FromObject(filePrefix.cborCode) +: segments.map(s => CBORObject.FromObject(s))
+
+        case ImportType.Env(envVarName) => Seq(CBORObject.FromObject(6), CBORObject.FromObject(envVarName))
+      }
+      makeArrayC(Some(24))(part1 ++ part2: _*)
+
     case Expression.KeywordSome(data) => makeArray(Some(5), None)(data)
+
     case Expression.Builtin(SyntaxConstants.Builtin.True) | Expression.Constant(SyntaxConstants.Constant.True) => CBORObject.True
+
     case Expression.Builtin(SyntaxConstants.Builtin.False) | Expression.Constant(SyntaxConstants.Constant.False) => CBORObject.False
+
     case Expression.Builtin(builtin) => CBORObject.FromObject(builtin.entryName)
+
     case Expression.Constant(constant) => CBORObject.FromObject(constant.entryName)
 
   }
