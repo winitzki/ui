@@ -117,7 +117,9 @@ object CBOR {
       makeArrayC(Some(31))(
         CBORObject.FromObject(time.getHour),
         CBORObject.FromObject(time.getMinute),
-        CBORObject.FromObjectAndTag(makeArrayC()(CBORObject.FromObject(-9), CBORObject.FromObject(totalSeconds)), 4)
+        CBORObject.FromObjectAndTag(makeArrayC()(
+          CBORObject.FromObject(-9),
+          CBORObject.FromObject(totalSeconds)), 4),
       )
 
     case Expression.TimeZoneLiteral(totalMinutes) =>
@@ -127,17 +129,29 @@ object CBOR {
       val cborSign = if (isPositive) CBORObject.True else CBORObject.False
       makeArrayC(Some(32))(cborSign, CBORObject.FromObject(hours), CBORObject.FromObject(minutes))
 
-    case Expression.RecordType(defs) => ???
-    case Expression.RecordLiteral(defs) => ???
+    case Expression.RecordType(defs) =>
+      val dict: java.util.Map[String, CBORObject] = defs
+        .sortBy(_._1.name)
+        .map { case (FieldName(name), expr) => (name, toCbor2(expr)) }
+        .toMap.asJava
+      makeArrayC(Some(7))(CBORObject.FromObject(dict))
+
+    case Expression.RecordLiteral(defs) =>
+      val dict: java.util.Map[String, CBORObject] = defs
+        .sortBy(_._1.name)
+        .map { case (FieldName(name), expr) => (name, toCbor2(expr)) }
+        .toMap.asJava
+      makeArrayC(Some(8))(CBORObject.FromObject(dict))
 
     case e@Expression.RawRecordLiteral(_, _) => toCbor2(Expression.RecordLiteral.of(Seq(e))) // This is a type defined at parse time and should not occur here.
 
     case Expression.UnionType(defs) =>
-      val dict: java.util.Map[String, CBORObject] = defs.map {
-        case (ConstructorName(name), Some(expr)) => (name, toCbor2(expr))
-        case (ConstructorName(name), None) => (name, CBORObject.Null)
-      }.toMap.asJava
-
+      val dict: java.util.Map[String, CBORObject] = defs
+        .sortBy(_._1.name)
+        .map {
+          case (ConstructorName(name), Some(expr)) => (name, toCbor2(expr))
+          case (ConstructorName(name), None) => (name, CBORObject.Null)
+        }.toMap.asJava
       makeArrayC(Some(11))(CBORObject.FromObject(dict))
 
     case Expression.ShowConstructor(data) => makeArray(Some(34))(data)
