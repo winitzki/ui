@@ -56,4 +56,8 @@ class ParserTest2 extends FunSuite {
   test("single-quoted multiline text with interpolations") {
     check(singleQuotedExpressions, Grammar.single_quote_literal(_))
   }
+
+  test("text_literal") {
+    check(singleQuotedExpressions ++ doubleQuotedExpressions, Grammar.text_literal(_))
+  }
 }
