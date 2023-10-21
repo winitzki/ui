@@ -142,9 +142,10 @@ object Grammar {
   ;       keyword 1*simple-label-next-char
   ;     / !keyword (simple-label-first-char *simple-label-next-char)
    */
+  // TODO: figure out whether we need to use `keyword` or `keywordOrBuiltin` here.
   def simple_label[$: P]: P[Unit] = P(
-    (keyword.map(_ => ()) ~ simple_label_next_char.rep(1)) // Do not insert a cut after keyword.
-      | (!keyword ~ simple_label_first_char ~ simple_label_next_char.rep)
+    (keywordOrBuiltin.map(_ => ()) ~ simple_label_next_char.rep(1)) // Do not insert a cut after keyword.
+      | (!keywordOrBuiltin ~ simple_label_first_char ~ simple_label_next_char.rep)
   )
 
   def quoted_label_char[$: P] = P(
@@ -156,6 +157,8 @@ object Grammar {
     quoted_label_char.rep
   )
 
+  // Note: identifiers in backquotes may contain arbitrary text, including the name of a Dhall keyword.
+  // Example: "let `in` = 1 in `in`" evaluates to "1".
   def label[$: P]: P[String] = P(
     ("`" ~ quoted_label.! ~ "`") | simple_label.!
   )
@@ -358,10 +361,14 @@ object Grammar {
       }(implicitly[P[$]]).!
   }
 
+  def keywordOrBuiltin[$: P]: P[String] = concatKeywords(simpleKeywords ++ builtinSymbolNames)
+
   def keyword[$: P]: P[String] = concatKeywords(simpleKeywords)
 
+  val builtinSymbolNames = SyntaxConstants.Builtin.namesToValuesMap.keys.toSeq
+
   def builtin[$: P]: P[Expression.Builtin] =
-    concatKeywords(SyntaxConstants.Builtin.namesToValuesMap.keys.toSeq)
+    concatKeywords(builtinSymbolNames)
       .map(SyntaxConstants.Builtin.withName).map(Expression.Builtin)
 
   def combine[$: P] = P(

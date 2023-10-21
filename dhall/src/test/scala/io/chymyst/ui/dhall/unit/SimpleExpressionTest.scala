@@ -143,13 +143,8 @@ class SimpleExpressionTest extends FunSuite {
   }
 
   test("simple_label") {
-    import fastparse._, NoWhitespace._
     val input = "witha"
-    val expected = Expression.Operator(v("x"), SyntaxConstants.Operator.Equivalent, v("y"))
-
-    def grammar[_: P] = Grammar.simple_label
-
-    expect(parse(input, grammar(_)).get.value == (()))
+    check(Grammar.simple_label(_), input, ())
   }
 
 }
