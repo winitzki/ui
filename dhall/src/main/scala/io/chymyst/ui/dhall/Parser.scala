@@ -824,7 +824,7 @@ object Grammar {
   def expression_assert[$: P]: P[Assert] = P(requireKeyword("assert") ~ whsp ~/ ":" ~ whsp1 ~/ expression)
     .map { expr => Assert(expr) }
 
-  def expression[$: P]: P[Expression] = P(
+  def expression[$: P]: P[Expression] = P( // TODO: remove some of these NoCut() because they are probably not needed.
     //  "\(x : a) -> b"
     NoCut(expression_lambda)
       //
@@ -941,7 +941,7 @@ object Grammar {
   ).withOperator(SyntaxConstants.Operator.ListAppend)
 
   def and_expression[$: P]: P[Expression] = P(
-    combine_expression ~ (whsp ~ opAnd ~ whsp ~ combine_expression).rep
+    combine_expression ~ (whsp ~ opAnd ~ whsp ~/ combine_expression).rep
   ).withOperator(SyntaxConstants.Operator.And)
 
   def combine_expression[$: P]: P[Expression] = P(
@@ -961,7 +961,7 @@ object Grammar {
   ).withOperator(SyntaxConstants.Operator.Times)
 
   def equal_expression[$: P]: P[Expression] = P(
-    not_equal_expression ~ (whsp ~ opEqual ~ whsp ~/ not_equal_expression).rep
+    not_equal_expression ~ (whsp ~ opEqual ~ whsp ~ not_equal_expression).rep // Should not cut because == can be confused with ===
   ).withOperator(SyntaxConstants.Operator.Equal)
 
   def not_equal_expression[$: P]: P[Expression] = P(
@@ -974,7 +974,7 @@ object Grammar {
 
   def first_application_expression[$: P]: P[Expression] = P(
     //  "merge e1 e2"
-    (requireKeyword("merge") ~ whsp1 ~/ import_expression ~ whsp1 ~ import_expression)
+    (requireKeyword("merge") ~ whsp1 ~/ import_expression ~ whsp1 ~/ import_expression)
       .map { case (e1, e2) => Merge(e1, e2, None) }
       //
       //  "Some e"

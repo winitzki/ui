@@ -3,6 +3,7 @@ package io.chymyst.ui.dhall.unit
 import io.chymyst.ui.dhall.Syntax.Expression
 import io.chymyst.ui.dhall.SyntaxConstants._
 import io.chymyst.ui.dhall.SyntaxConstants
+import io.chymyst.ui.dhall.unit.TestUtils.v
 
 object TestFixtures {
 
@@ -48,11 +49,11 @@ object TestFixtures {
   )
 
   val identifiers = Seq(
-    "Natural-blahblah" -> Expression.Variable(VarName("Natural-blahblah"), BigInt(0)),
-    "Natural/blahblah" -> Expression.Variable(VarName("Natural/blahblah"), BigInt(0)),
-    "Natural/show123" -> Expression.Variable(VarName("Natural/show123"), BigInt(0)),
-    "abc" -> Expression.Variable(VarName("abc"), BigInt(0)),
-    "a-b/c" -> Expression.Variable(VarName("a-b/c"), BigInt(0)),
+    "Natural-blahblah" -> v("Natural-blahblah"),
+    "Natural/blahblah" -> v("Natural/blahblah"),
+    "Natural/show123" -> v("Natural/show123"),
+    "abc" -> v("abc"),
+    "a-b/c" -> v("a-b/c"),
     "_xyz       @   \t\t\t\n\n           123451234512345123451234512345" -> Expression.Variable(VarName("_xyz"), BigInt("123451234512345123451234512345")),
     "Kind" -> Expression.Builtin(SyntaxConstants.Builtin.Kind),
     "Natural/show" -> Expression.Builtin(SyntaxConstants.Builtin.NaturalShow),
@@ -66,11 +67,11 @@ object TestFixtures {
     """''
       |line
       |''""".stripMargin -> Expression.TextLiteral.ofText(Expression.TextLiteralNoInterp("line\n")),
-    "x" -> Expression.Variable(VarName("x"), BigInt(0)),
-    "(x)" -> Expression.Variable(VarName("x"), BigInt(0)),
-    "( x )" -> Expression.Variable(VarName("x"), BigInt(0)),
+    "x" -> v("x"),
+    "(x)" -> v("x"),
+    "( x )" -> v("x"),
     "( -12345  )" -> Expression.IntegerLiteral(BigInt(-12345)),
-    "a-b/c" -> Expression.Variable(VarName("a-b/c"), BigInt(0)),
+    "a-b/c" -> v("a-b/c"),
     "_xyz       @   \t\t\t\n\n           123451234512345123451234512345" -> Expression.Variable(VarName("_xyz"), BigInt("123451234512345123451234512345")),
     "[1,2,3]" -> Expression.NonEmptyList(Expression.NaturalLiteral(BigInt(1)), Seq(Expression.NaturalLiteral(BigInt(2)), Expression.NaturalLiteral(BigInt(3)))),
     "Kind" -> Expression.Builtin(SyntaxConstants.Builtin.Kind),
@@ -92,10 +93,10 @@ object TestFixtures {
   )
 
   val selectorExpressions = Map(
-    "x.y" -> Expression.Field(Expression.Variable(VarName("x"), BigInt(0)), FieldName("y")),
-    "x . y . z" -> Expression.Field(Expression.Field(Expression.Variable(VarName("x"), BigInt(0)), FieldName("y")), FieldName("z")),
-    "x .y . (Natural)" -> Expression.ProjectByType(Expression.Field(Expression.Variable(VarName("x"), BigInt(0)), FieldName("y")), Expression.Builtin(SyntaxConstants.Builtin.Natural)),
-    "x. {y,z }" -> Expression.ProjectByLabels(Expression.Variable(VarName("x"), BigInt(0)), Seq(FieldName("y"), FieldName("z"))),
+    "x.y" -> Expression.Field(v("x"), FieldName("y")),
+    "x . y . z" -> Expression.Field(Expression.Field(v("x"), FieldName("y")), FieldName("z")),
+    "x .y . (Natural)" -> Expression.ProjectByType(Expression.Field(v("x"), FieldName("y")), Expression.Builtin(SyntaxConstants.Builtin.Natural)),
+    "x. {y,z }" -> Expression.ProjectByLabels(v("x"), Seq(FieldName("y"), FieldName("z"))),
   )
 
   val sha256example = "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"
@@ -115,7 +116,7 @@ object TestFixtures {
       .RawBytes, Some(Expression.BytesLiteral(sha256example))),
     "env:HOME as Text" -> Expression.Import(ImportType.Env("HOME"), ImportMode.RawText, None),
     s"https://example.com/a/b?c=d using headers123 sha256:$sha256example as Bytes" -> Expression.Import(ImportType.Remote(URL(Scheme.HTTPS, "example.com", File
-    (Seq("a", "b")), Some("c=d")), Expression.Variable(VarName("headers123"), BigInt(0))), ImportMode.RawBytes, Some(Expression.BytesLiteral(sha256example))),
+    (Seq("a", "b")), Some("c=d")), v("headers123")), ImportMode.RawBytes, Some(Expression.BytesLiteral(sha256example))),
   )
 
   val plusExpressions: Seq[(String, Expression)] = Seq(
@@ -130,10 +131,10 @@ object TestFixtures {
   )
 
   val recordExpressions: Seq[(String, Expression)] = Seq(
-    "{ foo, bar }" -> Expression.RecordLiteral(List((FieldName("foo"), Expression.Variable(VarName("foo"), BigInt(0))), (FieldName("bar"), Expression.Variable(VarName
-    ("bar"), BigInt
-    (0))
-    ))),
+    "{ foo, bar }" -> Expression.RecordLiteral(List(
+      (FieldName("foo"), v("foo")),
+      (FieldName("bar"), v("bar")),
+    )),
   )
 
   // Note: a `let_binding` must end with a whitespace.
@@ -143,14 +144,14 @@ object TestFixtures {
   )
 
   val letBindingExpressions: Seq[(String, Expression)] = Seq(
-    "let x = 1 in y" -> Expression.Let(VarName("x"), None, Expression.NaturalLiteral(1), Expression.Variable(VarName("y"), 0)),
-    "let x = 1 let y = 2 in z" -> Expression.Let(VarName("x"), None, Expression.NaturalLiteral(1), Expression.Let(VarName("y"), None, Expression.NaturalLiteral(2), Expression.Variable(VarName("z"), 0))),
-    "let x = 1 in let y = 2 in z" -> Expression.Let(VarName("x"), None, Expression.NaturalLiteral(1), Expression.Let(VarName("y"), None, Expression.NaturalLiteral(2), Expression.Variable(VarName("z"), 0))),
+    "let x = 1 in y" -> Expression.Let(VarName("x"), None, Expression.NaturalLiteral(1), v("y")),
+    "let x = 1 let y = 2 in z" -> Expression.Let(VarName("x"), None, Expression.NaturalLiteral(1), Expression.Let(VarName("y"), None, Expression.NaturalLiteral(2), v("z"))),
+    "let x = 1 in let y = 2 in z" -> Expression.Let(VarName("x"), None, Expression.NaturalLiteral(1), Expression.Let(VarName("y"), None, Expression.NaturalLiteral(2), v("z"))),
   )
 
   val interpolationExpressions: Seq[(String, Expression)] =
     Seq(
-      "${x}" -> Expression.Variable(VarName("x"), BigInt(0)),
+      "${x}" -> v("x"),
       "${1}" -> Expression.NaturalLiteral(1),
       "${\"x\"}" -> Expression.TextLiteral(List(), "x"),
     )
@@ -162,20 +163,20 @@ object TestFixtures {
       "\"x\"" -> Expression.TextLiteral(List(
       ), "x"),
       "\"${x}\"" -> Expression.TextLiteral(List(
-        ("", Expression.Variable(VarName("x"), BigInt(0))),
+        ("", v("x")),
       ), ""),
       "\"a${x}\"" -> Expression.TextLiteral(List(
-        ("a", Expression.Variable(VarName("x"), BigInt(0))),
+        ("a", v("x")),
       ), ""),
       "\"${x}b\"" -> Expression.TextLiteral(List(
-        ("", Expression.Variable(VarName("x"), BigInt(0))),
+        ("", v("x")),
       ), "b"),
       "\"a${x}b\"" -> Expression.TextLiteral(List(
-        ("a", Expression.Variable(VarName("x"), BigInt(0))),
+        ("a", v("x")),
       ), "b"),
       "\"${x}a${y}b\"" -> Expression.TextLiteral(List(
-        ("", Expression.Variable(VarName("x"), BigInt(0))),
-        ("a", Expression.Variable(VarName("y"), BigInt(0))),
+        ("", v("x")),
+        ("a", v("y")),
       ), "b"),
     )
 

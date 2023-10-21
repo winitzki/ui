@@ -2,11 +2,15 @@ package io.chymyst.ui.dhall.unit
 
 import com.eed3si9n.expecty.Expecty.expect
 import fastparse._
+import io.chymyst.ui.dhall.Syntax.Expression
+import io.chymyst.ui.dhall.SyntaxConstants
 
 import java.io.{PrintWriter, StringWriter}
 import scala.util.Try
 
 object TestUtils {
+
+  def v(name: String) = Expression.Variable(SyntaxConstants.VarName(name), BigInt(0))
 
   def printFailure(t: Throwable): String = {
     val stackTrace = new StringWriter
@@ -14,6 +18,18 @@ object TestUtils {
     stackTrace.flush()
     //        t.getMessage + "\n\n" + // No need to print the message because the stack trace already contains all that.
     stackTrace.toString
+  }
+
+  // Do not verify the last parsed position.
+  def check[A](grammarRule: P[_] => P[A], input: String, expectedResult: A): Unit = {
+    val parsed = parse(input, grammarRule)
+    parsed match {
+      case Parsed.Success(value, index) =>
+        println(s"Parsing input '$input', got Success($value, $index), expecting Success($expectedResult, _)")
+      case Parsed.Failure(message, index, extra) =>
+        println(s"Error: Parsing input '$input', expected Success($expectedResult, $index) but got Failure('$message', $index, ${extra.stack})")
+    }
+    expect((input != null) && (parsed.get.value == expectedResult))
   }
 
   def check[A](grammarRule: P[_] => P[A], input: String, expectedResult: A, lastIndex: Int): Unit = {
