@@ -200,11 +200,11 @@ object Grammar {
       | "n".!.map(_ => "\n") // 'n'    line feed       U+000A
       | "r".!.map(_ => "\r") // 'r'    carriage return U+000D
       | "t".!.map(_ => "\t") // 't'    tab             U+0009
-      | ("u" ~ unicode_escape.!.map(hex => Integer.parseInt(hex, 16).toChar.toString)) // 'uXXXX' | 'u{XXXX}'    U+XXXX
+      | ("u" ~ unicode_escape.map(hex => Integer.parseInt(hex, 16).toChar.toString)) // 'uXXXX' | 'u{XXXX}'    U+XXXX
   )
 
-  def unicode_escape[$: P] = P(
-    unbraced_escape | ("{" ~ braced_escape ~ "}")
+  def unicode_escape[$: P]: P[String] = P(
+    unbraced_escape.! | ("{" ~/ braced_escape.! ~ "}")
   )
 
   def unicode_suffix[$: P] = P(
