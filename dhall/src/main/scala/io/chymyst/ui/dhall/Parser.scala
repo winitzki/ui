@@ -1128,8 +1128,8 @@ object Grammar {
     "#!" ~/ not_end_of_line.rep.! ~ end_of_line
   )
 
-  def complete_dhall_file[$: P] = P(
-    shebang.rep ~ complete_expression ~ line_comment_prefix.?
+  def complete_dhall_file[$: P] = P( // TODO: figure out whether we need ~ End here.
+    shebang.rep ~ complete_expression ~ line_comment_prefix.? ~ End
   ).map { case (shebangContents, expr) => DhallFile(shebangContents, expr) }
 
   def complete_expression[$: P] = P(

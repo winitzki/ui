@@ -6,7 +6,7 @@ import io.chymyst.ui.dhall.Grammar.{equivalent_expression, import_alt_expression
 import io.chymyst.ui.dhall.Syntax.Expression.{NaturalLiteral, Variable}
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
 import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, VarName}
-import io.chymyst.ui.dhall.unit.TestUtils.{check, printFailure, v}
+import io.chymyst.ui.dhall.unit.TestUtils.{check, printFailure, toFail, v}
 import io.chymyst.ui.dhall.{Grammar, Parser, SyntaxConstants}
 import munit.FunSuite
 
@@ -15,9 +15,10 @@ import scala.util.Try
 class SimpleExpressionTest extends FunSuite {
 
   test("simple invalid expression: 1+1") {
-    val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall("1+1")
-    val expected = Expression.NaturalLiteral(1)
-    expect(result == expected, "1+1 must be parsed as 1".nonEmpty)
+    toFail(Grammar.complete_dhall_file(_), "1+1", "", "", 1)
+    //    val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall("1+1")
+    //    val expected = Expression.NaturalLiteral(1)
+    //    expect(result == expected, "1+1 must be parsed as 1".nonEmpty)
   }
 
   test("simple expression: { foo, bar }") {
