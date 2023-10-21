@@ -63,7 +63,7 @@ object TestFixtures {
   val identifiersWithBackquote = Seq(
     "`abc`" -> v("abc"),
     "` `" -> v(" "),
-    "`0%!#${}%^`" -> v("0%!#${}%"),
+    "`0%!#${}%^`" -> v("0%!#${}%^"),
   ) ++ (Grammar.simpleKeywords ++ Grammar.builtinSymbolNames).sorted.map { name => s"`$name`" -> v(name) }
 
   val primitiveExpressions: Seq[(String, Expression)] = Seq(

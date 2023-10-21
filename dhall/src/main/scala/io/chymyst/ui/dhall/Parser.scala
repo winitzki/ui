@@ -532,31 +532,32 @@ object Grammar {
     }
   }
 
-  /*
-  If the identifier matches one of the names in the `builtin` rule, then it is a
-  builtin, and should be treated as the corresponding item in the list of
-  "Reserved identifiers for builtins" specified in the `standard/README.md` document.
-  It is a syntax error to specify a de Bruijn index in this case.
-  Otherwise, this is a variable with name and index matching the label and index.
-   */
+
   def identifier[$: P]: P[Expression] = P(
-    variable.flatMap { case (name, index) =>
-      SyntaxConstants.Builtin.namesToValuesMap.get(name.name) match {
-        case None =>
-          // This is not a builtin symbol.
-          Pass(Expression.Variable(name, index.map(_.value).getOrElse(BigInt(0))))
-        case Some(builtinName) =>
-          if (index contains NaturalLiteral(BigInt(0)))
-            Pass(Expression.Builtin(builtinName))
-          else Fail(s"Identifier ${name.name} matches a builtin name but has invalid (nonzero) de Bruijn index $index")
-      }
-    }
-      | builtin
+    variable | builtin
   )
 
-  def variable[$: P] = P(
-    nonreserved_label ~ (whsp ~ "@" ~ whsp ~ natural_literal).?
-  )
+  /*
+    If the identifier matches one of the names in the `builtin` rule, then it is a
+    builtin, and should be treated as the corresponding item in the list of
+    "Reserved identifiers for builtins" specified in the `standard/README.md` document.
+    It is a syntax error to specify a de Bruijn index in this case.
+    Otherwise, this is a variable with name and index matching the label and index.
+     */
+  def variable[$: P]: P[Expression] = P(
+    nonreserved_label ~ (whsp ~ "@" ~ whsp ~ natural_literal).? // TODO: do we need a cut after "@"?
+  ).map { case (name, index) => Expression.Variable(name, index.map(_.value).getOrElse(BigInt(0))) }
+  //    .flatMap { case (name, index) =>
+  //    SyntaxConstants.Builtin.namesToValuesMap.get(name.name) match {
+  //      case None =>
+  //        // This is not a builtin symbol.
+  //        Pass(Expression.Variable(name, index.map(_.value).getOrElse(BigInt(0))))
+  //      case Some(builtinName) =>
+  //        if (index.exists(i => i.value.isValidInt && i.value.intValue == 0))
+  //          Pass(Expression.Builtin(builtinName))
+  //        else Fail(s"Identifier ${name.name} matches a builtin name but has invalid (nonzero) de Bruijn index $index")
+  //    }
+  // }
 
   def path_character[$: P] = P( // Note: character 002D is the hyphen and needs to be escaped when used under CharIn().
     CharIn("\u0021\u0024-\u0027\u002A-\u002B\\-\u002E\u0030\u003B\u0040-\u005A\u005E-\u007A\u007C\u007E")

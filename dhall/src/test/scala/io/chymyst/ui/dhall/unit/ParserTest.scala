@@ -223,8 +223,20 @@ class ParserTest extends FunSuite {
     check(identifiers, Grammar.identifier(_))
   }
 
-  test("identifiers with backquotes") {
+  test("identifier with backquotes") {
     check(identifiersWithBackquote, Grammar.identifier(_))
+  }
+
+  test("variable with backquotes") {
+    check(identifiersWithBackquote, Grammar.variable(_))
+  }
+
+  test("nonreserved_label with backquotes") {
+    check(identifiersWithBackquote.map { case (k, v) => (k, v.name) }, Grammar.nonreserved_label(_))
+  }
+
+  test("label with backquotes") {
+    check(identifiersWithBackquote.map { case (k, v) => (k, v.name.name) }, Grammar.label(_))
   }
 
   test("identifier special cases") {
