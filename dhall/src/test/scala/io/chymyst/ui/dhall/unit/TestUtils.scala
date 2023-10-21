@@ -27,7 +27,7 @@ object TestUtils {
       case Parsed.Success(value, index) =>
         println(s"Parsing input '$input', got Success($value, $index), expecting Success($expectedResult, _)")
       case Parsed.Failure(message, index, extra) =>
-        println(s"Error: Parsing input '$input', expected Success($expectedResult, $index) but got Failure('$message', $index, ${extra.stack})")
+        println(s"Error: Parsing input '$input', expected Success($expectedResult, $index) but got Failure('$message', $index, ${Try(extra.stack).toOption})")
     }
     expect((input != null) && (parsed.get.value == expectedResult))
   }
@@ -38,7 +38,7 @@ object TestUtils {
       case Parsed.Success(value, index) =>
         println(s"Parsing input '$input', got Success($value, $index), expecting Success($expectedResult, $lastIndex)")
       case Parsed.Failure(message, index, extra) =>
-        println(s"Error: Parsing input '$input', expected Success($expectedResult, $index) but got Failure('$message', $index, ${extra.stack})")
+        println(s"Error: Parsing input '$input', expected Success($expectedResult, $index) but got Failure('$message', $index, ${Try(extra.stack).toOption})")
     }
     expect((input != null) && (parsed == Parsed.Success(expectedResult, lastIndex)))
   }
@@ -50,7 +50,7 @@ object TestUtils {
         println(s"Error: Parsing input '$input', expected Failure but got Success($value, $index)")
         expect(parsed == Parsed.Failure(parsedInput, lastIndex, null))
       case f@Parsed.Failure(message, index, extra) =>
-        println(s"Parsing input '$input', expected index $lastIndex, got Failure('$message', $index, ${extra.stack}), message '${f.msg}' as expected")
+        println(s"Parsing input '$input', expected index $lastIndex, got Failure('$message', $index, ${Try(extra.stack).toOption}), message '${f.msg}' as expected")
         expect(input != null && (f.msg contains expectedMessage), input != null && f.index == lastIndex)
     }
   }

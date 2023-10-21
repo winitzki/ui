@@ -69,7 +69,7 @@ object Grammar {
   def tab[$: P] = P("\t")
 
   def block_comment[$: P] = P(
-    "{-" ~/ block_comment_continue
+    "{-" ~ block_comment_continue // Do not use cut here, because then block comment will fail the entire identifier when parsing "x {- -}" without a following @.
   )
 
   def block_comment_char[$: P] = P(
@@ -90,7 +90,7 @@ object Grammar {
   )
 
   def line_comment_prefix[$: P] = P(
-    "--" ~/ (not_end_of_line.rep)
+    "--" ~ (not_end_of_line.rep)
   )
 
   def line_comment[$: P] = P(
@@ -166,8 +166,8 @@ object Grammar {
 
   // A successfully parsed `nonreserved_label` is guaranteed to be either quoted or not a builtin.
   def nonreserved_label[$: P] = P(
-    (builtin ~ simple_label_next_char.rep(1)) | (!builtin ~ label)
-  ).!.map(VarName)
+    (builtin ~ simple_label_next_char.rep(1)).! | (!builtin ~ label)
+  ).map(VarName)
 
   def any_label[$: P]: P[String] = P(
     label
@@ -546,7 +546,7 @@ object Grammar {
     This is guaranteed because `nonreserved_label` does not match any keyword or builtin, and we match builtins separately without a de Bruijn index.
      */
   def variable[$: P]: P[Expression] = P(
-    nonreserved_label ~ (whsp ~ "@" ~ whsp ~ natural_literal).? // TODO: do we need a cut after "@"?
+    nonreserved_label ~ (whsp ~ "@" ~/ whsp ~ natural_literal).? // TODO: do we need a cut after "@"?
   ).map { case (name, index) => Expression.Variable(name, index.map(_.value).getOrElse(BigInt(0))) }
 
   def path_character[$: P] = P( // Note: character 002D is the hyphen and needs to be escaped when used under CharIn().
@@ -871,10 +871,10 @@ object Grammar {
       | NoCut(expression_toMap)
       //
       //  "assert : Natural/even 1 === False"
-      | NoCut(expression_assert)
+      | expression_assert
       //
       //  "x : t"
-      | NoCut(annotated_expression)
+      | annotated_expression
   )
 
   def annotated_expression[$: P]: P[Expression] = P(
@@ -1129,7 +1129,7 @@ object Grammar {
   )
 
   def complete_dhall_file[$: P] = P(
-    shebang.rep ~ whsp ~ expression ~ whsp ~ line_comment_prefix.?
+    shebang.rep ~ complete_expression ~ line_comment_prefix.?
   ).map { case (shebangContents, expr) => DhallFile(shebangContents, expr) }
 
   def complete_expression[$: P] = P(

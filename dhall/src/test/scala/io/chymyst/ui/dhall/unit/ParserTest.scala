@@ -88,7 +88,8 @@ class ParserTest extends FunSuite {
   test("whsp fails when not closed") {
     toFail(Grammar.whsp(_), "{-", "", "", 2)
     toFail(Grammar.whsp(_), "{- {- -} -0", "", "", 8)
-
+// This will not fail unless `{-` cuts. But if it cuts we cannot parse identifiers with trailing comments.
+    // TODO: fix this.
   }
 
   test("whsp fails when incomplete") {

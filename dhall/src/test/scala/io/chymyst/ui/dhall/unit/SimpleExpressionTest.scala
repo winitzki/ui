@@ -94,6 +94,24 @@ class SimpleExpressionTest extends FunSuite {
     expect(result == expected)
   }
 
+  test("expression followed by comment") {
+    import fastparse._, NoWhitespace._
+    val input = "x {- -}"
+    val expected = v("x")
+
+    def grammar1[$: P] = Grammar.whsp ~ Grammar.expression ~ Grammar.whsp
+
+    val failures = Seq(
+      Try(check(Grammar.whsp(_), " {- -}", ())),
+      Try(check(Grammar.whsp(_), "", ())),
+      Try(check(Grammar.expression(_), "x", expected)),
+      Try(check(Grammar.primitive_expression(_), "x", expected)),
+      Try(check(grammar1(_), "x {- -}", expected)),
+    ).filter(_.isFailure).map(_.failed.get.getMessage)
+    if (failures.nonEmpty) println(s"Found ${failures.size} failures:\n${failures.mkString("\n")}")
+    expect(failures.isEmpty)
+  }
+
   test("parse assert : x") {
     val input = "assert : x"
     val expected = Expression.Assert(v("x"))
@@ -117,28 +135,27 @@ class SimpleExpressionTest extends FunSuite {
 
     // Expression "x === y" must be parsed as "x", leaving " === y" unconsumed!
     val failures = Seq(
-      Try(check(Grammar.completion_expression(_), "x === y", v("x"))),
-      Try(check(Grammar.import_expression(_), "x === y", v("x"))),
-      Try(check(Grammar.first_application_expression(_), "x === y", v("x"))),
-      Try(check(Grammar.application_expression(_), "x === y", v("x"))),
-      Try(check(Grammar.not_equal_expression(_), "x === y", v("x"))),
-      Try(check(Grammar.equal_expression(_), "x === y", v("x"))),
-      Try(check(Grammar.times_expression(_), "x === y", v("x"))),
-      Try(check(Grammar.combine_types_expression(_), "x === y", v("x"))),
-      Try(check(Grammar.prefer_expression(_), "x === y", v("x"))),
-      Try(check(Grammar.combine_expression(_), "x === y", v("x"))),
-      Try(check(Grammar.and_expression(_), "x === y", v("x"))),
-      Try(check(Grammar.list_append_expression(_), "x === y", v("x"))),
-      Try(check(Grammar.text_append_expression(_), "x === y", v("x"))),
-      Try(check(Grammar.plus_expression(_), "x === y", v("x"))),
-      Try(check(Grammar.or_expression(_), "x === y", v("x"))),
-      Try(check(Grammar.import_alt_expression(_), "x === y", v("x"))),
+      Try(check(Grammar.completion_expression(_), input, v("x"))),
+      Try(check(Grammar.import_expression(_), input, v("x"))),
+      Try(check(Grammar.first_application_expression(_), input, v("x"))),
+      Try(check(Grammar.application_expression(_), input, v("x"))),
+      Try(check(Grammar.not_equal_expression(_), input, v("x"))),
+      Try(check(Grammar.equal_expression(_), input, v("x"))),
+      Try(check(Grammar.times_expression(_), input, v("x"))),
+      Try(check(Grammar.combine_types_expression(_), input, v("x"))),
+      Try(check(Grammar.prefer_expression(_), input, v("x"))),
+      Try(check(Grammar.combine_expression(_), input, v("x"))),
+      Try(check(Grammar.and_expression(_), input, v("x"))),
+      Try(check(Grammar.list_append_expression(_), input, v("x"))),
+      Try(check(Grammar.text_append_expression(_), input, v("x"))),
+      Try(check(Grammar.plus_expression(_), input, v("x"))),
+      Try(check(Grammar.or_expression(_), input, v("x"))),
+      Try(check(Grammar.import_alt_expression(_), input, v("x"))),
     ).filter(_.isFailure).map(_.failed.get).map(printFailure).mkString("\n\n")
     if (failures.nonEmpty) println(s"ERROR failures = $failures")
 
-    def grammar[_: P] = (import_alt_expression.log ~ (whsp.log ~ Grammar.equivalent.log ~ whsp ~/ import_alt_expression).rep)
-
-    val Parsed.Success(result1, _) = parse(input, grammar(_))
+    val Parsed.Success(result1, _) = parse(input, Grammar.equivalent_expression(_))
+    expect(result1 == expected)
   }
 
   test("parse assert : x === y") {
