@@ -143,7 +143,7 @@ object Grammar {
   ;     / !keyword (simple-label-first-char *simple-label-next-char)
    */
   def simple_label[$: P] = P(
-    (&(keyword) ~ simple_label_next_char.rep(1))
+    (keyword ~ simple_label_next_char.rep(1)) // Do not insert a cut after keyword.
       | (!keyword ~ simple_label_first_char ~ simple_label_next_char.rep)
   )
 
@@ -348,13 +348,13 @@ object Grammar {
     forall_symbol | requireKeyword("forall")
   )
 
-  def concatKeywords[$: P](keywords: Seq[String]): P[String] = {
+  private def concatKeywords[$: P](keywords: Seq[String]): P[String] = {
     keywords
       .sorted(Ordering[String].reverse) // Reversing the order will disambiguate parsing of keywords that are substrings of another keyword.
       .map {
         k => implicit ctx: P[_] => P(k)
       }.reduce {
-        (p1, p2) => ctx: P[_] => P(p1(ctx) | p2(ctx))
+        (p1, p2) => implicit ctx: P[_] => P(p1(ctx) | p2(ctx))
       }(implicitly[P[$]]).!
   }
 
@@ -789,7 +789,7 @@ object Grammar {
     Import(importType, importMode, digest.map(BytesLiteral))
   }
 
-  // The ABNF spec does not define those sub-rules but we define them to aid debugging.
+  // The ABNF spec does not define those sub-rules. They are created only to help with debugging.
 
   def expression_lambda[$: P]: P[Lambda] = P(lambda ~ whsp ~/ "(" ~ whsp ~/ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~/ expression ~ whsp ~ ")" ~ whsp ~ arrow ~/
     whsp ~ expression)
