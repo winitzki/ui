@@ -78,8 +78,20 @@ class SimpleExpressionTest extends FunSuite {
   }
 
   test("parse a sample file") {
-    val testFile = getClass.getClassLoader.getResourceAsStream("parser-succeed/AssertEquivalenceA.dhall")
+    val testFile = getClass.getClassLoader.getResourceAsStream("parser-succeed/whitespaceBuffetA.dhall")
     val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall(testFile)
+  }
+
+  test("expression and a block comment") {
+    val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall("""1 {- -}""")
+    val expected = Expression.NaturalLiteral(1)
+    expect(result == expected)
+  }
+
+  test("expression and a line comment") {
+    val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall("""1 -- aaa \n""")
+    val expected = Expression.NaturalLiteral(1)
+    expect(result == expected)
   }
 
   test("parse assert : x") {
