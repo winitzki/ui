@@ -142,8 +142,8 @@ object Grammar {
   ;       keyword 1*simple-label-next-char
   ;     / !keyword (simple-label-first-char *simple-label-next-char)
    */
-  def simple_label[$: P] = P(
-    (keyword ~ simple_label_next_char.rep(1)) // Do not insert a cut after keyword.
+  def simple_label[$: P]: P[Unit] = P(
+    (keyword.map(_ => ()) ~ simple_label_next_char.rep(1)) // Do not insert a cut after keyword.
       | (!keyword ~ simple_label_first_char ~ simple_label_next_char.rep)
   )
 
