@@ -5,13 +5,10 @@ import fastparse.{Parsed, parse}
 import io.chymyst.ui.dhall.Syntax.Expression.{NaturalLiteral, Variable}
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
 import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, VarName}
-import io.chymyst.ui.dhall.{Grammar, Parser, SyntaxConstants}
+import io.chymyst.ui.dhall.{Grammar, Parser}
 import munit.FunSuite
 
-import java.io.File
-import scala.util.chaining.scalaUtilChainingOps
-
-class ExpressionTest extends FunSuite {
+class SimpleExpressionTest extends FunSuite {
 
   test("simple invalid expression: 1+1") {
     val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall("1+1")
@@ -34,11 +31,12 @@ class ExpressionTest extends FunSuite {
     expect(parse("x", Grammar.expression(_)).get.value == Expression.Variable(VarName("x"), BigInt(0)))
     expect(parse("let x = 1 ", Grammar.let_binding(_)).get.value == (VarName("x"), None, NaturalLiteral(1)))
 
-    //    expect(parse("in", Grammar.identifier(_)).get.value == NaturalLiteral(1)) // this parse must fail.
+    TestUtils.toFail(Grammar.identifier(_), "in", "", "", 0)
 
     expect(parse("1 in", Grammar.application_expression(_)).get.value == NaturalLiteral(1))
 
-    import fastparse._, NoWhitespace._
+    import fastparse._
+    import NoWhitespace._
     def grammar1[$: P] = P(Grammar.let_binding)
 
     expect(parse("let x = 1 ", grammar1(_)).get.value == (VarName("x"), None, NaturalLiteral(1)))

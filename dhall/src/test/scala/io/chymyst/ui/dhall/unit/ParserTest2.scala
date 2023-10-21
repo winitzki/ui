@@ -60,4 +60,5 @@ class ParserTest2 extends FunSuite {
   test("text_literal") {
     check(singleQuotedExpressions ++ doubleQuotedExpressions, Grammar.text_literal(_))
   }
+
 }
