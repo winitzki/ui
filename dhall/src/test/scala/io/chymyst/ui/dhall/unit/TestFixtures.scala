@@ -106,6 +106,7 @@ object TestFixtures {
   )
 
   val sha256example = "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"
+  val sha256lc = "16173e984d35ee3ffd8b6b79167df89480e67d1cd03ea5d0fc93689e4d928e61"
 
   val completionExpressions = Seq(
     "x .y .( Natural) ::x .{y ,z}" -> Expression.Completion(selectorExpressions("x .y . (Natural)"),
@@ -113,10 +114,12 @@ object TestFixtures {
   )
 
   val importExpressions: Seq[(String, Expression)] = Seq(
+    s"./a.dhall sha256:$sha256example" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("a.dhall"))), ImportMode.Code, Some(Expression.BytesLiteral(sha256example))),
+    s"./a.dhall sha256:$sha256lc" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("a.dhall"))), ImportMode.Code, Some(Expression.BytesLiteral(sha256lc))),
     "./local/import as Location" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.Location, None),
     s"./local/import sha256:$sha256example" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.Code, Some
     (Expression.BytesLiteral(sha256example))),
-    s"./local/import sha256:$sha256example as Text" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.RawText,
+    s"./local/import.dhall sha256:$sha256example as Text" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import.dhall"))), ImportMode.RawText,
       Some(Expression.BytesLiteral(sha256example))),
     s"./local/import sha256:$sha256example as Bytes" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode
       .RawBytes, Some(Expression.BytesLiteral(sha256example))),

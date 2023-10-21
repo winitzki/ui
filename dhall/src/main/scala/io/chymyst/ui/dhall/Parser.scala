@@ -122,7 +122,7 @@ object Grammar {
   )
 
   def HEXDIG[$: P] = P(
-    CharIn("0-9A-F")
+    CharIn("0-9A-Fa-f")
   )
 
   def simple_label_first_char[$: P] = P(
@@ -142,7 +142,6 @@ object Grammar {
   ;       keyword 1*simple-label-next-char
   ;     / !keyword (simple-label-first-char *simple-label-next-char)
    */
-  // TODO: figure out whether we need to use `keyword` or `keywordOrBuiltin` here.
   def simple_label[$: P]: P[Unit] = P(
     (keyword.map(_ => ()) ~ simple_label_next_char.rep(1)) // Do not insert a cut after keyword.
       | (!keyword ~ simple_label_first_char ~ simple_label_next_char.rep)
@@ -587,15 +586,15 @@ object Grammar {
   )
 
   def parent_path[$: P] = P(
-    ".." ~ path // Relative path
+    ".." ~/ path // Relative path
   ).map(segments => ImportType.Path(SyntaxConstants.FilePrefix.Parent, SyntaxConstants.File(segments)))
 
   def here_path[$: P] = P(
-    "." ~ path // Relative path
+    "." ~/ path // Relative path
   ).map(segments => ImportType.Path(SyntaxConstants.FilePrefix.Here, SyntaxConstants.File(segments)))
 
   def home_path[$: P] = P(
-    "~" ~ path // Home_anchored path
+    "~" ~/ path // Home_anchored path
   ).map(segments => ImportType.Path(SyntaxConstants.FilePrefix.Home, SyntaxConstants.File(segments)))
 
   def absolute_path[$: P] = P(

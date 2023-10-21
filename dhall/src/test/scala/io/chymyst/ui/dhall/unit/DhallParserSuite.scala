@@ -26,11 +26,18 @@ class DhallParserSuite extends FunSuite {
 
   test("parse standard examples for successful parsing") {
     val results = testFilesForSuccess.map { file =>
-      val result = Try {
-        val Parsed.Success(dhallValue, _) = Parser.parseDhall(new FileInputStream(file))
-        dhallValue
+      val result = for {
+        result1 <- Try(Parser.parseDhall(new FileInputStream(file)))
+          .recoverWith { case exception => Failure(new Exception(s"Parsing file ${file.getName} expecting success. Result: parser crashed with $exception")) }
+        result2 <- result1 match {
+          case Parsed.Success(value, index) => Success(value)
+          case Parsed.Failure(a, b, c) => Failure(new Exception(s"Parsing file ${file.getName} expecting success. Result: $result1, diagnostics: ${c.stack}"))
+        }
+      } yield result2
+      result match {
+        case Failure(exception) => println(exception.getMessage)
+        case Success(value) => ()
       }
-      if (result.isFailure) println(s"Parsing file ${file.getName} expecting success. Result: ${result.failed.get.getMessage}")
       result
     }
     println(s"Success count: ${results.count(_.isSuccess)}\nFailure count: ${results.count(_.isFailure)}")
@@ -71,8 +78,8 @@ class DhallParserSuite extends FunSuite {
         bytes <- Try(CBOR.exprToBytes(dhallValue.value))
       } yield bytes
       val result = result1.toOption.map { bytes =>
-          if(bytes sameElements cborValidationBytes) Success(bytes)
-          else Failure(new Exception(s"CBOR encoding differs"))
+        if (bytes sameElements cborValidationBytes) Success(bytes)
+        else Failure(new Exception(s"CBOR encoding differs"))
       }
       if (result.exists(_.isFailure)) println(s"CBOR validation failed for file ${file.getName}: ${result.get.failed.get.getMessage}")
       result
