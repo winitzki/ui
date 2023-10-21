@@ -3,7 +3,7 @@ package io.chymyst.ui.dhall
 
 import com.upokecenter.cbor.{CBORObject, CBORType}
 import com.upokecenter.numbers.EInteger
-import io.chymyst.ui.dhall.Syntax.{Expression, Natural}
+import io.chymyst.ui.dhall.Syntax.{Expression, Natural, PathComponent}
 import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, VarName}
 
 import scala.annotation.tailrec
@@ -90,7 +90,12 @@ object CBOR {
     case Expression.Completion(base, target) => makeArray(Some(3), Some(13))(base, target)
     case Expression.Assert(data) => makeArray(Some(19))(data)
 
-    case Expression.With(data, pathComponents, body) => ???
+    case Expression.With(data, pathComponents, body) =>
+      val path: Seq[CBORObject] = pathComponents.map {
+        case PathComponent.Label(FieldName(name)) => CBORObject.FromObject(name)
+        case PathComponent.DescendOptional => CBORObject.FromObject(0)
+      }
+      makeArrayC(Some(29))(toCbor2(data), makeArrayC()(path: _*), toCbor2(body))
 
     case Expression.DoubleLiteral(value) => CBORObject.FromObject(value) // TODO: verify that this works correctly.
     case Expression.NaturalLiteral(value) => makeArrayC(Some(15))(naturalToCbor2(value))
