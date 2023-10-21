@@ -497,15 +497,16 @@ object Grammar {
       )
   )
 
-  def time_numoffset[$: P] = P(
+  // Return the total count of minutes (signed integer).
+  def time_numoffset[$: P]: P[Int] = P(
     ("+" | "-").! ~ time_hour ~ ":" ~ time_minute
   ).map {
-    case ("+", h, m) => ZoneOffset.ofHoursMinutes(h, m)
-    case ("-", h, m) => ZoneOffset.ofHoursMinutes(-h, -m)
+    case ("+", h, m) => h *60 + m
+    case ("-", h, m) => -(h*60+m)
   }
 
-  def time_offset[$: P]: P[ZoneOffset] = P(
-    P("Z").map(_ => ZoneOffset.ofHours(0)) // "Z" desugars to "+00:00"
+  def time_offset[$: P]: P[Int] = P(
+    P("Z").map(_ => 0) // "Z" desugars to "+00:00"
       | time_numoffset
   )
 
@@ -522,9 +523,9 @@ object Grammar {
   def full_date[$: P]: P[DateLiteral] = P(
     date_fullyear ~ "-" ~ date_month ~ "-" ~ date_mday
   ).flatMap { case (y, m, d) =>
-    Try(DateLiteral(LocalDate.of(y, m, d))) match {
+    Try(LocalDate.of(y, m, d)) match{
       case Failure(exception) => Fail(s"Invalid date literal $y-$m-$d - $exception")
-      case Success(value) => Pass(value)
+      case Success(_) => Pass(DateLiteral(y, m, d))
     }
   }
 
@@ -1164,7 +1165,7 @@ object Parser {
 
   def parseDhall(source: InputStream): Parsed[DhallFile] = parse(source, Grammar.complete_dhall_file(_))
 
-  private def localDateTimeZone(dateOption: Option[DateLiteral], timeOption: Option[TimeLiteral], zoneOption: Option[ZoneOffset]): Expression = {
+  private def localDateTimeZone(dateOption: Option[DateLiteral], timeOption: Option[TimeLiteral], zoneOption: Option[Int]): Expression = {
     val dateR = dateOption.map { date => (FieldName("date"), date) }
     val dateT = dateOption.map { date => (FieldName("date"), Builtin(SyntaxConstants.Builtin.Date)) }
     val timeR = timeOption.map { time => (FieldName("time"), time) }
@@ -1178,9 +1179,9 @@ object Parser {
     Annotation(record, recordType) // Return { date : Date, time : Time, timeZone : TimeZone } or some subset of that record.
   }
 
-  def localDateTimeWithZone(date: DateLiteral, time: TimeLiteral, zone: ZoneOffset): Expression = localDateTimeZone(Some(date), Some(time), Some(zone))
+  def localDateTimeWithZone(date: DateLiteral, time: TimeLiteral, zone: Int): Expression = localDateTimeZone(Some(date), Some(time), Some(zone))
 
-  def localTimeWithZone(time: TimeLiteral, zone: ZoneOffset): Expression = localDateTimeZone(None, Some(time), Some(zone))
+  def localTimeWithZone(time: TimeLiteral, zone: Int): Expression = localDateTimeZone(None, Some(time), Some(zone))
 
   def localDateTime(date: DateLiteral, time: TimeLiteral): Expression = localDateTimeZone(Some(date), Some(time), None)
 }

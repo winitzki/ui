@@ -307,11 +307,11 @@ object Syntax {
       val bytes: Array[Byte] = hexStringToByteArray(hex)
     }
 
-    final case class DateLiteral(date: LocalDate) extends Expression
+    final case class DateLiteral(year: Int, month: Int, day: Int) extends Expression
 
     final case class TimeLiteral(time: LocalTime) extends Expression
 
-    final case class TimeZoneLiteral(tz: ZoneOffset) extends Expression
+    final case class TimeZoneLiteral(totalMinutes: Int) extends Expression
 
     final case class RecordType(defs: Seq[(FieldName, Expression)]) extends Expression
 

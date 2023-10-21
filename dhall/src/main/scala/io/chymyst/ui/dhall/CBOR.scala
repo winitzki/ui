@@ -18,6 +18,7 @@ object CBOR {
   def bytesToExpr(bytes: Array[Byte]): Expression = fromCbor2(CBORObject.DecodeFromBytes(bytes))
 
   def fromCbor2(obj: CBORObject): Expression = obj.getType match {
+    case CBORType.Number => ???
     case CBORType.Boolean => ???
     case CBORType.SimpleValue => ???
     case CBORType.ByteString => ???
@@ -108,10 +109,24 @@ object CBOR {
           .flatMap { case (head, tail) => Seq(CBORObject.FromObject(head), toCbor2(tail)) } :+ CBORObject.FromObject(trailing)
       makeArrayC(Some(18))(objects: _*)
 
-    case b@Expression.BytesLiteral(hex) => makeArrayC(Some(33))(CBORObject.FromObject(b.bytes))
-    case Expression.DateLiteral(date) => ???
-    case Expression.TimeLiteral(time) => ???
-    case Expression.TimeZoneLiteral(tz) => ???
+    case b@Expression.BytesLiteral(_) => makeArrayC(Some(33))(CBORObject.FromObject(b.bytes))
+    case Expression.DateLiteral(y, m, d) => makeArrayC(Some(30))(Seq(y, m, d).map(x => CBORObject.FromObject(x)): _*)
+    case Expression.TimeLiteral(time) =>
+      // Always use nanosecond precision. TODO: validate that this is OK
+      val totalSeconds: Long = time.getSecond * 1000000000 + time.getNano
+      makeArrayC(Some(31))(
+        CBORObject.FromObject(time.getHour),
+        CBORObject.FromObject(time.getMinute),
+        CBORObject.FromObjectAndTag(makeArrayC()(CBORObject.FromObject(-9), CBORObject.FromObject(totalSeconds)), 4)
+      )
+
+    case Expression.TimeZoneLiteral(totalMinutes) =>
+      val hours: Int = math.abs(totalMinutes) / 60
+      val minutes: Int = math.abs(totalMinutes) % 60
+      val isPositive: Boolean = totalMinutes >= 0
+      val cborSign = if (isPositive) CBORObject.True else CBORObject.False
+      makeArrayC(Some(32))(cborSign, CBORObject.FromObject(hours), CBORObject.FromObject(minutes))
+
     case Expression.RecordType(defs) => ???
     case Expression.RecordLiteral(defs) => ???
 
