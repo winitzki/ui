@@ -447,10 +447,10 @@ object Grammar {
 
   def temporal_literal[$: P]: P[Expression] = P(
     // "YYYY_MM_DDThh:mm:ss[+-]HH:MM", parsed as a `{ date : Date, time : Time, timeZone : TimeZone }`
-    (full_date ~ "T" ~ partial_time ~ time_offset)
+    (full_date ~ CharIn("tT") ~ partial_time ~ time_offset)
       .map { case (date, time, zone) => Parser.localDateTimeWithZone(date, time, zone) }
       // "YYYY_MM_DDThh:mm:ss", parsed as a `{ date : Date, time : Time }`
-      | (full_date ~ "T" ~ partial_time)
+      | (full_date ~ CharIn("tT") ~ partial_time)
       .map { case (date, time) => Parser.localDateTime(date, time) }
       // "hh:mm:ss[+-]HH:MM", parsed as a `{ time : Time, timeZone, TimeZone }`
       | (partial_time ~ time_offset)
