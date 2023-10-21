@@ -151,7 +151,7 @@ object TestFixtures {
   val interpolationExpressions: Seq[(String, Expression)] =
     Seq(
       "${x}" -> Expression.Variable(VarName("x"), BigInt(0)),
-      "${1}" ->  Expression.NaturalLiteral(1) ,
+      "${1}" -> Expression.NaturalLiteral(1),
       "${\"x\"}" -> Expression.TextLiteral(List(), "x"),
     )
 
@@ -179,4 +179,7 @@ object TestFixtures {
       ), "b"),
     )
 
+  val singleQuotedExpressions: Seq[(String, Expression)] = doubleQuotedExpressions.map { case (s, expr) => (s.replaceFirst("\"",
+    "''\n").replace("\"", "''"), expr)
+  }
 }
