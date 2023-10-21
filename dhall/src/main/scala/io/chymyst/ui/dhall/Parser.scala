@@ -148,6 +148,7 @@ object Grammar {
       | (!keywordOrBuiltin ~ simple_label_first_char ~ simple_label_next_char.rep)
   )
 
+  // Any printable character other than the backquote.
   def quoted_label_char[$: P] = P(
     CharIn("\u0020-\u005F", "\u0061-\u007E")
     // %x60 = '`'
@@ -159,10 +160,12 @@ object Grammar {
 
   // Note: identifiers in backquotes may contain arbitrary text, including the name of a Dhall keyword.
   // Example: "let `in` = 1 in `in`" evaluates to "1".
+  // A successfully parsed `label` is guaranteed to be either quoted or not a keyword.
   def label[$: P]: P[String] = P(
     ("`" ~ quoted_label.! ~ "`") | simple_label.!
   )
 
+  // A successfully parsed `nonreserved_label` is guaranteed to be either quoted or not a keyword.
   def nonreserved_label[$: P] = P(
     label.map(VarName)
   )
@@ -501,8 +504,8 @@ object Grammar {
   def time_numoffset[$: P]: P[Int] = P(
     ("+" | "-").! ~ time_hour ~ ":" ~ time_minute
   ).map {
-    case ("+", h, m) => h *60 + m
-    case ("-", h, m) => -(h*60+m)
+    case ("+", h, m) => h * 60 + m
+    case ("-", h, m) => -(h * 60 + m)
   }
 
   def time_offset[$: P]: P[Int] = P(
@@ -523,7 +526,7 @@ object Grammar {
   def full_date[$: P]: P[DateLiteral] = P(
     date_fullyear ~ "-" ~ date_month ~ "-" ~ date_mday
   ).flatMap { case (y, m, d) =>
-    Try(LocalDate.of(y, m, d)) match{
+    Try(LocalDate.of(y, m, d)) match {
       case Failure(exception) => Fail(s"Invalid date literal $y-$m-$d - $exception")
       case Success(_) => Pass(DateLiteral(y, m, d))
     }
@@ -535,19 +538,17 @@ object Grammar {
   "Reserved identifiers for builtins" specified in the `standard/README.md` document.
   It is a syntax error to specify a de Bruijn index in this case.
   Otherwise, this is a variable with name and index matching the label and index.
-
    */
   def identifier[$: P]: P[Expression] = P(
     variable.flatMap { case (name, index) =>
       SyntaxConstants.Builtin.namesToValuesMap.get(name.name) match {
         case None =>
-          // Also, identifier may not equal a keyword!
-          if (simpleKeywordsSet contains name.name) Fail(s"Identifier ${name.name} matches a keyword name, which is not acceptable.")
-          else Pass(Expression.Variable(name, index.map(_.value).getOrElse(BigInt(0))))
+          // This is not a builtin symbol.
+          Pass(Expression.Variable(name, index.map(_.value).getOrElse(BigInt(0))))
         case Some(builtinName) =>
           if (index contains NaturalLiteral(BigInt(0)))
             Pass(Expression.Builtin(builtinName))
-          else Fail(s"Identifier ${name.name} matches a builtin name but has invalid de Bruijn index $index")
+          else Fail(s"Identifier ${name.name} matches a builtin name but has invalid (nonzero) de Bruijn index $index")
       }
     }
       | builtin
@@ -723,10 +724,10 @@ object Grammar {
     "!" | "$" | "&" | "'" | "*" | "+" | ";" | "="
   )
 
-//  val emptyHeaders: Expression = Expression.EmptyList(Expression.RecordType(Seq(
-//    (FieldName("mapKey"), Expression.Builtin(SyntaxConstants.Builtin.Text)),
-//    (FieldName("mapValue"), Expression.Builtin(SyntaxConstants.Builtin.Text)),
-//  )))
+  //  val emptyHeaders: Expression = Expression.EmptyList(Expression.RecordType(Seq(
+  //    (FieldName("mapKey"), Expression.Builtin(SyntaxConstants.Builtin.Text)),
+  //    (FieldName("mapValue"), Expression.Builtin(SyntaxConstants.Builtin.Text)),
+  //  )))
 
   def http[$: P]: P[ImportType.Remote] = P(
     http_raw ~ (whsp ~ requireKeyword("using") ~ whsp1 ~/ import_expression).?

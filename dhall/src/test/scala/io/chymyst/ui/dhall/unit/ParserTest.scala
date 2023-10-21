@@ -223,6 +223,10 @@ class ParserTest extends FunSuite {
     check(identifiers, Grammar.identifier(_))
   }
 
+  test("identifiers with backquotes") {
+    check(identifiersWithBackquote, Grammar.identifier(_))
+  }
+
   test("identifier special cases") {
     check(Grammar.identifier(_), "Natural+blahblah", Expression.Builtin(SyntaxConstants.Builtin.Natural), 7)
     toFail(Grammar.identifier(_), "-abc", "", "", 0)

@@ -2,7 +2,7 @@ package io.chymyst.ui.dhall.unit
 
 import io.chymyst.ui.dhall.Syntax.Expression
 import io.chymyst.ui.dhall.SyntaxConstants._
-import io.chymyst.ui.dhall.SyntaxConstants
+import io.chymyst.ui.dhall.{Grammar, SyntaxConstants}
 import io.chymyst.ui.dhall.unit.TestUtils.v
 
 object TestFixtures {
@@ -59,6 +59,12 @@ object TestFixtures {
     "Natural/show" -> Expression.Builtin(SyntaxConstants.Builtin.NaturalShow),
     "Natural" -> Expression.Builtin(SyntaxConstants.Builtin.Natural),
   )
+
+  val identifiersWithBackquote = Seq(
+    "`abc`" -> v("abc"),
+    "` `" -> v(" "),
+    "`0%!#${}%^`" -> v("0%!#${}%"),
+  ) ++ (Grammar.simpleKeywords ++ Grammar.builtinSymbolNames).sorted.map { name => s"`$name`" -> v(name) }
 
   val primitiveExpressions: Seq[(String, Expression)] = Seq(
     "12345" -> Expression.NaturalLiteral(BigInt(12345)),
@@ -147,6 +153,7 @@ object TestFixtures {
     "let x = 1 in y" -> Expression.Let(VarName("x"), None, Expression.NaturalLiteral(1), v("y")),
     "let x = 1 let y = 2 in z" -> Expression.Let(VarName("x"), None, Expression.NaturalLiteral(1), Expression.Let(VarName("y"), None, Expression.NaturalLiteral(2), v("z"))),
     "let x = 1 in let y = 2 in z" -> Expression.Let(VarName("x"), None, Expression.NaturalLiteral(1), Expression.Let(VarName("y"), None, Expression.NaturalLiteral(2), v("z"))),
+    "let `in` = 1 in `let`" -> Expression.Let(VarName("in"), None, Expression.NaturalLiteral(1), v("let")),
   )
 
   val interpolationExpressions: Seq[(String, Expression)] =
