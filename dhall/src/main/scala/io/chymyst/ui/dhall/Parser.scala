@@ -144,8 +144,8 @@ object Grammar {
    */
   // TODO: figure out whether we need to use `keyword` or `keywordOrBuiltin` here.
   def simple_label[$: P]: P[Unit] = P(
-    (keywordOrBuiltin.map(_ => ()) ~ simple_label_next_char.rep(1)) // Do not insert a cut after keyword.
-      | (!keywordOrBuiltin ~ simple_label_first_char ~ simple_label_next_char.rep)
+    (keyword.map(_ => ()) ~ simple_label_next_char.rep(1)) // Do not insert a cut after keyword.
+      | (!keyword ~ simple_label_first_char ~ simple_label_next_char.rep)
   )
 
   // Any printable character other than the backquote.
@@ -165,10 +165,10 @@ object Grammar {
     ("`" ~ quoted_label.! ~ "`") | simple_label.!
   )
 
-  // A successfully parsed `nonreserved_label` is guaranteed to be either quoted or not a keyword.
+  // A successfully parsed `nonreserved_label` is guaranteed to be either quoted or not a builtin.
   def nonreserved_label[$: P] = P(
-    label.map(VarName)
-  )
+    (builtin ~ simple_label_next_char.rep(1)) | (!builtin ~ label)
+  ).!.map(VarName)
 
   def any_label[$: P]: P[String] = P(
     label
