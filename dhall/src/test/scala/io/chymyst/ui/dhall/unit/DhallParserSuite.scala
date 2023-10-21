@@ -3,7 +3,7 @@ package io.chymyst.ui.dhall.unit
 import fastparse.Parsed
 import io.chymyst.ui.dhall.Parser
 import munit.FunSuite
-
+import TestUtils._
 import java.io.{File, FileInputStream}
 import scala.util.Try
 import scala.util.chaining.scalaUtilChainingOps
@@ -18,7 +18,7 @@ class DhallParserSuite extends FunSuite {
         val Parsed.Success(dhallValue, _) = Parser.parseDhall(new FileInputStream(file))
         dhallValue
       }
-      if (result.isSuccess) println("success.") else println("failure.")
+      if (result.isSuccess) println("success, as expected.") else println(s"unexpected failure:\n${printFailure(result.failed.get)}")
       result
     }
     println(s"Success count: ${results.count(_.isSuccess)}\nFailure count: ${results.count(_.isFailure)}")
@@ -32,7 +32,7 @@ class DhallParserSuite extends FunSuite {
         val Parsed.Success(result, _) = Parser.parseDhall(new FileInputStream(file))
         result
       }
-      if (result.isSuccess) println(" success.") else println(" failure.")
+      if (result.isSuccess) println(s"unexpected success:\n\t\t\t${result.get}\n") else println(" failure, as expected.")
       result
     }
     println(s"Success count: ${results.count(_.isSuccess)}\nFailure count: ${results.count(_.isFailure)}")

@@ -212,9 +212,7 @@ object SyntaxConstants {
 
 object Syntax {
 
-  final case class DhallFile(shebangs: Seq[String], value: Expression) {
-    val omitShebangs: Expression = value
-  }
+  final case class DhallFile(shebangs: Seq[String], value: Expression)
 
   type Natural = BigInt
 

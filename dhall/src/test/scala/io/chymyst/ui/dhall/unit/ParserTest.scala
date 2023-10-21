@@ -3,13 +3,12 @@ package io.chymyst.ui.dhall.unit
 import com.eed3si9n.expecty.Expecty.expect
 import fastparse._
 import io.chymyst.ui.dhall.Syntax.Expression
-import io.chymyst.ui.dhall.Syntax.Expression.BytesLiteral
 import io.chymyst.ui.dhall.unit.TestFixtures._
+import io.chymyst.ui.dhall.unit.TestUtils._
 import io.chymyst.ui.dhall.{Grammar, SyntaxConstants}
 import munit.FunSuite
 
 import java.nio.file.{Files, Paths}
-import scala.util.Try
 
 class ParserTest extends FunSuite {
 
@@ -238,7 +237,7 @@ class ParserTest extends FunSuite {
   test("primitive_expression") {
     check(primitiveExpressions, Grammar.primitive_expression(_))
 
-    val Parsed.Success(result: BytesLiteral, 12) = parse("0x\"64646464\"", Grammar.primitive_expression(_))
+    val Parsed.Success(result: Expression.BytesLiteral, 12) = parse("0x\"64646464\"", Grammar.primitive_expression(_))
     expect(new String(result.bytes) == "dddd")
   }
 

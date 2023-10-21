@@ -2,6 +2,7 @@ package io.chymyst.ui.dhall.unit
 
 import io.chymyst.ui.dhall.Grammar
 import io.chymyst.ui.dhall.unit.TestFixtures._
+import io.chymyst.ui.dhall.unit.TestUtils._
 import munit.FunSuite
 
 class ParserTest2 extends FunSuite {
@@ -33,17 +34,22 @@ class ParserTest2 extends FunSuite {
   }
 
   test("primitive_expression") {
-    check(recordExpressions ++ primitiveExpressions,
-      Grammar.primitive_expression(_))
+    check(recordExpressions ++ primitiveExpressions, Grammar.primitive_expression(_))
   }
 
   test("let_binding") {
-    check(letBindings,
-      Grammar.let_binding(_))
+    check(letBindings, Grammar.let_binding(_))
   }
 
   test("expression_let_binding") {
-    check(letBindingExpressions,
-      Grammar.expression_let_binding(_))
+    check(letBindingExpressions, Grammar.expression_let_binding(_))
+  }
+
+  test("interpolation") {
+    check(interpolationExpressions, Grammar.interpolation(_))
+  }
+
+  test("double-quoted text with interpolations") {
+    check(doubleQuotedExpressions, Grammar.double_quote_literal(_))
   }
 }

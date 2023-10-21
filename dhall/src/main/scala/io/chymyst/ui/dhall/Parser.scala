@@ -176,6 +176,7 @@ object Grammar {
     any_label_or_some | "?".!
   ).!
 
+  // Either a complete interpolated expression ${...} or a single character.
   def double_quote_chunk[$: P]: P[Either[Expression.TextLiteral, Expression.TextLiteralNoInterp]] = P( // text literal with or without interpolations
     interpolation.map(Expression.TextLiteral.ofExpression).map(Left.apply)
       // '\'    Beginning of escape sequence
@@ -272,7 +273,7 @@ object Grammar {
   )
 
   def interpolation[$: P]: P[Expression] = P(
-    "${" ~ complete_expression.map(_.omitShebangs) ~/ "}"
+    "${" ~ complete_expression ~/ "}"
   )
 
   def text_literal[$: P]: P[TextLiteral] = P(
@@ -535,8 +536,10 @@ object Grammar {
           // Also, identifier may not equal a keyword!
           if (simpleKeywordsSet contains name.name) Fail(s"Identifier ${name.name} matches a keyword name, which is not acceptable.")
           else Pass(Expression.Variable(name, index.map(_.value).getOrElse(BigInt(0))))
-        case Some(builtinName) if index.contains(NaturalLiteral(BigInt(0))) => Pass(Expression.Builtin(builtinName))
-        case Some(builtinName) => Fail(s"Identifier ${name.name} matches a builtin name but has invalid de Bruijn index $index")
+        case Some(builtinName) =>
+          if (index contains NaturalLiteral(BigInt(0)))
+            Pass(Expression.Builtin(builtinName))
+          else Fail(s"Identifier ${name.name} matches a builtin name but has invalid de Bruijn index $index")
       }
     }
       | builtin
@@ -1001,7 +1004,7 @@ object Grammar {
   }
 
   def selector_expression[$: P]: P[Expression] = P(
-    primitive_expression ~ (whsp ~ "." ~ whsp ~ selector).rep
+    primitive_expression ~ (whsp ~ "." ~ whsp ~/ selector).rep
   ).map { case (base, selectors) => selectors.foldLeft(base)((prev, selector) => selector.chooseExpression(prev)) }
 
   sealed trait ExpressionSelector {
@@ -1069,7 +1072,7 @@ object Grammar {
       | identifier
       //
       //  "( e )"
-      | ("(" ~ complete_expression ~ ")").map(_.omitShebangs)
+      | ("(" ~/ complete_expression ~/ ")")
   )
 
   def record_type_or_literal[$: P]: P[Option[Expression]] = P(
@@ -1124,9 +1127,13 @@ object Grammar {
     "#!" ~/ not_end_of_line.rep.! ~ end_of_line
   )
 
-  def complete_expression[$: P] = P(
-    shebang.rep ~ whsp ~ expression ~ whsp ~ line_comment_prefix.? ~ End
+  def complete_dhall_file[$: P] = P(
+    shebang.rep ~ whsp ~ expression ~ whsp ~ line_comment_prefix.?
   ).map { case (shebangContents, expr) => DhallFile(shebangContents, expr) }
+
+  def complete_expression[$: P] = P(
+    whsp ~ expression ~ whsp
+  )
 
   // Helpers to make sure we are using valid keyword and operator names.
   def requireKeyword[$: P](name: String): P[Unit] = {
@@ -1145,9 +1152,9 @@ object Parser {
   //    res
   //  }
 
-  def parseDhall(source: String): Parsed[DhallFile] = parse(source, Grammar.complete_expression(_))
+  def parseDhall(source: String): Parsed[DhallFile] = parse(source, Grammar.complete_dhall_file(_))
 
-  def parseDhall(source: InputStream): Parsed[DhallFile] = parse(source, Grammar.complete_expression(_))
+  def parseDhall(source: InputStream): Parsed[DhallFile] = parse(source, Grammar.complete_dhall_file(_))
 
   private def localDateTimeZone(dateOption: Option[DateLiteral], timeOption: Option[TimeLiteral], zoneOption: Option[ZoneOffset]): Expression = {
     val dateR = dateOption.map { date => (FieldName("date"), date) }

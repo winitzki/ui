@@ -60,9 +60,15 @@ class ExpressionTest extends FunSuite {
     expect(result == expected)
   }
 
+  test("simple expression: (x)") {
+    val Parsed.Success(result, _) = parse("(x)", Grammar.primitive_expression(_))
+    val expected = Expression.Variable(VarName("x"), BigInt(0))
+    expect(result == expected)
+  }
+
   test("parse a string interpolation") {
     val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall(""" "${1}" """)
-    val expected = Nil
+    val expected = Expression.TextLiteral(List(("", Expression.NaturalLiteral(1))), "")
     expect(result == expected)
   }
 
