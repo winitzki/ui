@@ -127,25 +127,14 @@ object CBOR {
     else
       CBORObject.FromObject(EInteger.FromBytes(index.toByteArray, false)) // TODO: Does this work correctly? Do we need to set littleEndian = true?
 
-  //private def makeArray(codes: Option[Int]*)(exprs: Expression*): CBORObject = makeArrayC(codes: _*)(exprs.map(e => toCbor2(e)): _*)
-
-//  private def makeArrayC(codes: Option[Int]*)(exprs: CBORObject*): CBORObject = {
-//    val cborCodes = codes.toSeq.map {
-//      case Some(i: Int) => CBORObject.FromObject(i)
-//      case None => CBORObject.Null
-//    }
-//    val cborExprs = exprs.toSeq
-//    CBORObject.FromObject((cborCodes ++ cborExprs).toArray)
-//  }
-
   def toCborModel(e: Expression): CBORmodel = e match {
-    case Expression.Variable(VarName("_"), index) => toCBORmodel(index) // naturalToCbor2(index)
+    case Expression.Variable(VarName("_"), index) => CInt(index) // naturalToCbor2(index)
 
     case Expression.Variable(VarName(name), index) => array(name, index) //CBORObject.NewArray().Add(name).Add(naturalToCbor2(index))
 
-    case Expression.Lambda(VarName(name), tipe, body) => array(1, name, tipe, body) //makeArray(Some(1))(tipe, body)
+    case Expression.Lambda(VarName(name), tipe, body) => if (name == "_") array(1, tipe, body) else array(1, name, tipe, body) //makeArray(Some(1))(tipe, body)
 
-    case Expression.Forall(VarName(name), tipe, body) => array(2, name, tipe, body)
+    case Expression.Forall(VarName(name), tipe, body) => if (name == "_") array(2, tipe, body) else array(2, name, tipe, body)
 
     case e@Expression.Let(_, _, _, _) =>
       @tailrec def loop(acc: Seq[Any], expr: Expression): Seq[Any] = expr match {
@@ -229,13 +218,6 @@ object CBOR {
       val precision = getPrecision(time.getNano, 9)
       val totalSeconds: Long = (time.getSecond * math.pow(10, precision).toLong + time.getNano) / math.pow(10, precision).toLong
       array(31, time.getHour, time.getMinute, CTagged(4, array(precision, totalSeconds)))
-    //      makeArrayC(Some(31))(
-    //        CBORObject.FromObject(time.getHour),
-    //        CBORObject.FromObject(time.getMinute),
-    //        CBORObject.FromObjectAndTag(makeArrayC()(
-    //          CBORObject.FromObject(-9),
-    //          CBORObject.FromObject(totalSeconds)), 4),
-    //      )
 
     case Expression.TimeZoneLiteral(totalMinutes) =>
       val hours: Int = math.abs(totalMinutes) / 60
@@ -245,7 +227,7 @@ object CBOR {
       array(32, cborSign, hours, minutes)
     //makeArrayC(Some(32))(cborSign, CBORObject.FromObject(hours), CBORObject.FromObject(minutes))
 
-    case Expression.RecordType(defs) =>
+    case Expression.RecordType(defs) => // TODO: {,} must be parsed as a record type, not literal, while {=} is an empty record literal.
       val dict = defs
         .map { case (FieldName(name), expr) => (name, expr) }
         .toMap
@@ -274,7 +256,8 @@ object CBOR {
         case ImportType.Missing => Seq(7)
 
         case ImportType.Remote(SyntaxConstants.URL(scheme, authority, SyntaxConstants.File(segments), query), headers) =>
-          scheme.cborCode +: headers.orNull +: authority +: segments :+ query.orNull
+          val pathSegmentsForCbor = if (segments.isEmpty) Seq("") else segments
+          scheme.cborCode +: headers.orNull +: authority +: pathSegmentsForCbor :+ query.orNull
 
         case ImportType.Path(filePrefix, SyntaxConstants.File(segments)) => filePrefix.cborCode +: segments
 
