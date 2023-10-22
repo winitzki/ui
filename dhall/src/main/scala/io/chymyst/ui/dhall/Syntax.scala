@@ -163,11 +163,11 @@ object SyntaxConstants {
 
     case object Code extends ImportMode(0)
 
-    case object RawBytes extends ImportMode(1)
+    case object RawBytes extends ImportMode(3)
 
-    case object RawText extends ImportMode(2)
+    case object RawText extends ImportMode(1)
 
-    case object Location extends ImportMode(3)
+    case object Location extends ImportMode(2)
   }
 
   sealed abstract class Scheme(val cborCode: Int) extends EnumEntry
