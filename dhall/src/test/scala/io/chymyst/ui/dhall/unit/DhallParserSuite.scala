@@ -83,13 +83,13 @@ class DhallParserSuite extends FunSuite {
       val result = result1.toOption.map { case (model, bytes) =>
         if (bytes sameElements cborValidationBytes) Success(bytes)
         else if (model.toString == diagnosticString)
-          Failure(new Exception(s"CBOR encoding differs, but generated CBOR model agrees with expected:\n$model\n"))
+          Failure(new Exception(s"CBOR encoding differs, but generated CBOR model agrees with expected:\n\t\t$model\n"))
         else Failure(new Exception(s"CBOR model differs: our CBOR model is:\n$model\nbut expected CBOR model is:\n$diagnosticString\n"))
       }
       if (result.exists(_.isFailure)) println(s"CBOR validation failed for file ${file.getName}: ${result.get.failed.get.getMessage}")
       result
     }
-    println(s"Success count: ${results.count(_.isSuccess)}\nFailure count: ${results.count(_.isFailure)}")
+    println(s"Success count: ${results.count(_.isSuccess)}\nFailure count: ${results.count(_.isFailure)}\nCBOR model mismatch count: ${results.filter(_.isFailure).count(_.failed.get.getMessage.contains("model differs"))}")
   }
 
 }

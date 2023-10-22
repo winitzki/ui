@@ -1168,7 +1168,8 @@ object Parser {
     val record = RecordLiteral(Seq(dateR, timeR, zoneR).flatten)
     val recordType = RecordType(Seq(dateT, timeT, zoneT).flatten)
 
-    Annotation(record, recordType) // Return { date : Date, time : Time, timeZone : TimeZone } or some subset of that record.
+    record
+    //Annotation(record, recordType) // Return { date : Date, time : Time, timeZone : TimeZone } or some subset of that record without the type.
   }
 
   def localDateTimeWithZone(date: DateLiteral, time: TimeLiteral, zone: Int): Expression = localDateTimeZone(Some(date), Some(time), Some(zone))

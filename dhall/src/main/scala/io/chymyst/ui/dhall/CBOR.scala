@@ -64,7 +64,7 @@ object CBORmodel {
   final case class CBytes(data: Array[Byte]) extends CBORmodel {
     override def toCBOR: CBORObject = CBORObject.FromObject(data)
 
-    override def toString: String = "h'" + data.map(b => String.format("%02x", Byte.box(b))).mkString("") + "'"
+    override def toString: String = "h'" + data.map(b => String.format("%02X", Byte.box(b))).mkString("") + "'"
   }
 
   final case class CMap(data: Map[String, CBORmodel]) extends CBORmodel {
@@ -97,7 +97,7 @@ object CBORmodel {
     case x => throw new Exception(s"Invalid input toCBORmodel($x:${x.getClass})")
   }
 
-  def array(objs: Any*): CArray = CArray(Array(objs:_*).map(toCBORmodel))
+  def array(objs: Any*): CArray = CArray(Array(objs: _*).map(toCBORmodel))
 
 }
 
@@ -129,27 +129,27 @@ object CBOR {
 
   //private def makeArray(codes: Option[Int]*)(exprs: Expression*): CBORObject = makeArrayC(codes: _*)(exprs.map(e => toCbor2(e)): _*)
 
-  private def makeArrayC(codes: Option[Int]*)(exprs: CBORObject*): CBORObject = {
-    val cborCodes = codes.toSeq.map {
-      case Some(i: Int) => CBORObject.FromObject(i)
-      case None => CBORObject.Null
-    }
-    val cborExprs = exprs.toSeq
-    CBORObject.FromObject((cborCodes ++ cborExprs).toArray)
-  }
+//  private def makeArrayC(codes: Option[Int]*)(exprs: CBORObject*): CBORObject = {
+//    val cborCodes = codes.toSeq.map {
+//      case Some(i: Int) => CBORObject.FromObject(i)
+//      case None => CBORObject.Null
+//    }
+//    val cborExprs = exprs.toSeq
+//    CBORObject.FromObject((cborCodes ++ cborExprs).toArray)
+//  }
 
   def toCborModel(e: Expression): CBORmodel = e match {
     case Expression.Variable(VarName("_"), index) => toCBORmodel(index) // naturalToCbor2(index)
 
     case Expression.Variable(VarName(name), index) => array(name, index) //CBORObject.NewArray().Add(name).Add(naturalToCbor2(index))
 
-    case Expression.Lambda(VarName(name), tipe, body) => array(1, tipe, body) //makeArray(Some(1))(tipe, body)
+    case Expression.Lambda(VarName(name), tipe, body) => array(1, name, tipe, body) //makeArray(Some(1))(tipe, body)
 
-    case Expression.Forall(VarName(name), tipe, body) => array(2, tipe, body)
+    case Expression.Forall(VarName(name), tipe, body) => array(2, name, tipe, body)
 
     case e@Expression.Let(_, _, _, _) =>
       @tailrec def loop(acc: Seq[Any], expr: Expression): Seq[Any] = expr match {
-        case Expression.Let(VarName(name), tipe, subst, body) => loop((acc :+ name) ++ tipe.toSeq :+ subst, body)
+        case Expression.Let(VarName(name), tipe, subst, body) => loop((acc :+ name) :+ tipe.orNull :+ subst, body)
         case _ => acc :+ expr
       }
 
@@ -198,7 +198,7 @@ object CBOR {
         case PathComponent.Label(FieldName(name)) => name
         case PathComponent.DescendOptional => 0
       }
-      array(29, data, array(path: _*)) //makeArrayC(Some(29))(toCborModel(data), makeArrayC()(path: _*), toCborModel(body))
+      array(29, data, array(path: _*), body) //makeArrayC(Some(29))(toCborModel(data), makeArrayC()(path: _*), toCborModel(body))
 
     case Expression.DoubleLiteral(value) => CDouble(value) // CBORObject.FromObject(value) // TODO: verify that this works correctly.
 
@@ -221,8 +221,13 @@ object CBOR {
 
     case Expression.TimeLiteral(time) =>
       // Always use nanosecond precision. TODO: this is not what the standard tests do, need to fix
-      val precision = -9
-      val totalSeconds: Long = time.getSecond * math.pow(10, -precision).toLong + time.getNano
+      @tailrec def getPrecision(nanos: Long, initPrecision: Int): Int =
+        if (nanos <= 0) 0
+        else if (nanos % 10 > 0) initPrecision
+        else getPrecision(nanos / 10, initPrecision - 1)
+
+      val precision = getPrecision(time.getNano, 9)
+      val totalSeconds: Long = (time.getSecond * math.pow(10, precision).toLong + time.getNano) / math.pow(10, precision).toLong
       array(31, time.getHour, time.getMinute, CTagged(4, array(precision, totalSeconds)))
     //      makeArrayC(Some(31))(
     //        CBORObject.FromObject(time.getHour),
