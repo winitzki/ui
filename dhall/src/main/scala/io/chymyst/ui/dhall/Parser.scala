@@ -567,7 +567,7 @@ object Grammar {
   )
 
   def path_component[$: P] = P(
-    "/" ~ (unquoted_path_component | ("\"" ~ quoted_path_component ~ "\"")).!
+    "/" ~ (unquoted_path_component.! | ("\"" ~ quoted_path_component.! ~ "\""))
   )
 
   def path[$: P] = P(

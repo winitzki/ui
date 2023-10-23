@@ -184,7 +184,9 @@ class SimpleExpressionTest extends FunSuite {
     check(Grammar.complete_expression(_), "{}", Expression.RecordType(Seq()))
   }
 
-  test("variable name missing//foo") {
+  test("variable name missing//foo, conflict with import declaration") {
+    check(Grammar.complete_expression(_),  "missing as text", v("missing//foo"))
+    check(Grammar.complete_expression(_),  "missingas text", v("missing//foo"))
     check(Grammar.complete_expression(_),  "missing//foo", v("missing//foo"))
   }
 
