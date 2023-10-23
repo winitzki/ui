@@ -14,7 +14,18 @@ import scala.jdk.CollectionConverters.MapHasAsScala
 sealed trait CBORmodel {
   def toCBOR: CBORObject
 
-  final def toExpression: Expression = ???
+  final def toExpression: Expression = this match {
+    case CBORmodel.CNull => ???
+    case CBORmodel.CTrue => ???
+    case CBORmodel.CFalse => ???
+    case CInt(data) => ???
+    case CDouble(data) => ???
+    case CString(data) => ???
+    case CArray(data) => ???
+    case CBytes(data) => ???
+    case CMap(data) => ???
+    case CTagged(4, data) => ???
+  }
 
   def asString: String = throw new Exception(s"This CBORmodel is $this and not a CString")
 }
