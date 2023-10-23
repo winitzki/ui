@@ -14,7 +14,7 @@ val enumeratum = "com.beachape" %% "enumeratum" % "1.7.3"
 val flatlaf = "com.formdev" % "flatlaf" % "3.2.2"
 
 val cbor1 = "co.nstant.in" % "cbor" % "0.9"
-val cbor2  ="com.upokecenter" % "cbor" % "4.5.2"
+val cbor2 = "com.upokecenter" % "cbor" % "4.5.2"
 val cbor3 = "io.bullet" %% "borer-core" % "1.8.0"
 
 lazy val root = (project in file(".")).settings(
@@ -89,7 +89,7 @@ lazy val dhall = (project in file("dhall")).settings(
     munit,
     assertVerbose,
     enumeratum,
-//    cbor1,
+    //    cbor1,
     cbor2,
     cbor3,
   ),

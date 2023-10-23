@@ -306,8 +306,90 @@ object Syntax {
       }
 
       // TODO: implement alignment by largest common indentation prefix of " " or "\t", see https://github.com/dhall-lang/dhall-lang/blob/master/standard/multiline.md
-      def align: TextLiteral = this
+      private lazy val whitespacePrefixRegex = "[ \t]*".r
+
+      lazy val whitespacePrefix: String = {
+        val firstString = interpolations.headOption.map(_._1).getOrElse(trailing)
+        whitespacePrefixRegex.findPrefixMatchOf(firstString).map(_.matched).getOrElse("")
+      }
+
+      def isEmpty: Boolean = trailing.isEmpty && interpolations.isEmpty
+
+      private lazy val lines: Seq[TextLiteral] = ???
+
+      def align: TextLiteral = {
+
+        val removeEmpty: Seq[TextLiteral] = lines.init.filterNot(_.isEmpty) :+ lines.last
+
+        def lcip(a: String, b: String): String = a.iterator.zip(b.iterator).takeWhile { case (x, y) => x == y }.map(_._1).mkString
+
+        val indent: String = removeEmpty.map(_.whitespacePrefix).reduceRight(lcip)
+
+        flatten(indent.length)
+
+      }
+      /*
+      {-| Split a `TextLiteral` on newline boundaries to create a list of
+          `TextLiteral`s (one for each line, not including the newline)
+      -}
+      lines :: TextLiteral -> NonEmpty TextLiteral
+      lines = loop mempty
+        where
+          loop currentLine (Chunks [] z) =
+              (currentLine <> headLine) :| tailLines
+            where
+              headLine :| tailLines = fmap toChunk (lines_ z)
+
+          loop currentLine (Chunks ((x, y) : xys) z) =
+              case lines_ x of
+                  _ :| [] ->
+                      loop (currentLine <> Chunks [(x, y)] "") (Chunks xys z)
+
+                  l0 :| l1 : ls ->
+                      let ls' = l1 :| ls
+
+                      in  NonEmpty.cons
+                              (currentLine <> toChunk l0)
+                              (prepend
+                                  (fmap toChunk (NonEmpty.init ls'))
+                                  (loop
+                                      (Chunks [(NonEmpty.last ls', y)] "")
+                                      (Chunks xys z)
+                                  )
+                              )
+
+      -- | Promote a plain (uninterpolated) `Text` value to a `TextLiteral`
+      toChunk :: Text -> TextLiteral
+      toChunk text = Chunks [] text
+
+       */
+
+      private def lines_(s: String): Seq[String] = s.split("\r\n").flatMap(_.split("\n")).toSeq
+
+      private def flatten(indent: Int): TextLiteral = {
+        def join(a: TextLiteral, b: TextLiteral): TextLiteral = a ++ TextLiteral.ofString("\n") ++ b
+
+        def unlines(lines: Seq[TextLiteral]): TextLiteral = lines.reduceRight(join)
+
+        unlines(lines.map(_.stripPrefix(indent))).escape
+      }
+
+      def stripPrefix(indent: Int): TextLiteral = interpolations.headOption match {
+        case Some((head, tail)) => copy(interpolations = (head.drop(indent), tail) +: interpolations.tail)
+        case None => copy(trailing = trailing.drop(indent))
+      }
+
+      def mapStrings(f: String => String): TextLiteral = copy(
+        interpolations = interpolations.map { case (head, tail) => (f(head), tail) },
+        trailing = f(trailing),
+      )
+
+      private def reEscape(s: String): String = s.replace("'''", "''").replace("''${", "${")
+
+      private def escape: TextLiteral = mapStrings(reEscape)
+
     }
+
 
     final case class BytesLiteral(hex: String) extends Expression {
       val bytes: Array[Byte] = hexStringToByteArray(hex)
