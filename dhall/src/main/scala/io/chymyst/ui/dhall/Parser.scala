@@ -252,30 +252,30 @@ object Grammar {
 
   def single_quote_continue[$: P]: P[Expression.TextLiteral] = P(
     (interpolation ~ single_quote_continue).map { case (head, tail) => Expression.TextLiteral.ofExpression(head) ++ tail }
-      | (escaped_quote_pair ~ single_quote_continue)
-      | (escaped_interpolation ~ single_quote_continue)
-      | P("''").map(_ => Expression.TextLiteral.empty) // End of text literal
-      | (single_quote_char ~ single_quote_continue).map { case (char, tail) => TextLiteral.ofText(TextLiteralNoInterp(char)) ++ tail }
+      | (escaped_quote_pair ~ single_quote_continue).map { case (a, b) => a ++ b }
+      | (escaped_interpolation ~ single_quote_continue).map { case (a, b) => a ++ b }
+      | P("''").map(_ => Expression.TextLiteral.empty) // End of text literal.
+      | (single_quote_char ~ single_quote_continue).map { case (char, tail) => TextLiteral.ofString(char) ++ tail }
   )
 
-  def escaped_quote_pair[$: P] = P(
-    "'''"
+  def escaped_quote_pair[$: P]: P[TextLiteral] = P(
+    "'''".!.map(_ => Expression.TextLiteral.ofString(s"''"))
   )
 
-  def escaped_interpolation[$: P] = P(
-    "''${"
+  def escaped_interpolation[$: P]: P[TextLiteral] = P(
+    "''${".!.map(_ => Expression.TextLiteral.ofString("${"))
   )
 
-  def single_quote_char[$: P] = P(
+  def single_quote_char[$: P]: P[String] = P(
     CharIn("\u0020-\u007F")
       | valid_non_ascii
       | tab
       | end_of_line
   ).!
 
-  def single_quote_literal[$: P] = P(
+  def single_quote_literal[$: P]: P[TextLiteral] = P(
     "''" ~ end_of_line ~/ single_quote_continue
-  )
+  ).map(_.align)
 
   def interpolation[$: P]: P[Expression] = P(
     "${" ~ complete_expression ~/ "}"

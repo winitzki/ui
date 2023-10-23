@@ -281,6 +281,8 @@ object Syntax {
     final case class TextLiteralNoInterp(value: String) extends Expression
 
     object TextLiteral {
+      def ofString(s: String) = ofText(TextLiteralNoInterp(s))
+
       def ofText(textLiteralNoInterp: TextLiteralNoInterp) = TextLiteral(List(), textLiteralNoInterp.value)
 
       def empty = TextLiteral(List(), "")
@@ -302,6 +304,9 @@ object Syntax {
         case (headText, headExpr) :: tail =>
           TextLiteral(interpolations ++ ((trailing ++ headText, headExpr) :: tail), other.trailing)
       }
+
+      // TODO: implement alignment by largest common indentation prefix of " " or "\t", see https://github.com/dhall-lang/dhall-lang/blob/master/standard/multiline.md
+      def align: TextLiteral = this
     }
 
     final case class BytesLiteral(hex: String) extends Expression {

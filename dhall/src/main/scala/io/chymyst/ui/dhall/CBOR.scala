@@ -60,6 +60,7 @@ object CBORmodel {
       case '\f' => "\\f"
       case '\r' => "\\r"
       case '\t' => "\\t"
+      case '"' => "\\\""
       case '\\' => "\\\\"
       case c if c.toInt > 255 || c.toInt < 20 => s"\\u${c.toHexString.toUpperCase}"
       case c => c.toString
