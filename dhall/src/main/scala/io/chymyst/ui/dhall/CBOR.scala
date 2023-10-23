@@ -3,13 +3,13 @@ package io.chymyst.ui.dhall
 
 import com.upokecenter.cbor.{CBORObject, CBORType}
 import com.upokecenter.numbers.EInteger
+import io.chymyst.ui.dhall.CBORmodel._
 import io.chymyst.ui.dhall.Syntax.{Expression, Natural, PathComponent}
-import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, FilePrefix, ImportType, VarName}
-import CBORmodel._
+import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, ImportType, VarName}
 
 import scala.annotation.tailrec
 import scala.collection.immutable.Seq
-import scala.jdk.CollectionConverters.{MapHasAsJava, MapHasAsScala}
+import scala.jdk.CollectionConverters.MapHasAsScala
 
 sealed trait CBORmodel {
   def toCBOR: CBORObject
@@ -97,7 +97,7 @@ object CBORmodel {
         case Double.PositiveInfinity => CBORObject.FromFloatingPointBits(0x7c00L, 2)
         case _ => CBORObject.FromObject(java.lang.Double.valueOf(data))
       }
-      println(s"DEBUG: converting double value '$data' to CBOR, result is NAN: ${result.IsNaN()}, is zero: ${result.isZero}, is negative: ${result.isNegative}")
+//      println(s"DEBUG: converting double value '$data' to CBOR, result is NAN: ${result.IsNaN()}, is zero: ${result.isZero}, is negative: ${result.isNegative}")
       result
     }
 
@@ -139,7 +139,8 @@ object CBORmodel {
 
   final case class CMap(data: Map[String, CBORmodel]) extends CBORmodel {
     override def toCBOR: CBORObject = {
-      val dict: java.util.Map[String, CBORObject] = data.map { case (k, v) => (k, v.toCBOR) }.asJava
+      val dict = CBORObject.NewOrderedMap
+      data.toSeq.sortBy(_._1).foreach { case (k, v) => dict.Add(k, v.toCBOR) }
       CBORObject.FromObject(dict)
     }
 

@@ -343,10 +343,10 @@ object Syntax {
       }
 
       def align: TextLiteral = {
-        def lcip(a: String, b: String): String = a.iterator.zip(b.iterator).takeWhile { case (x, y) => x == y }.map(_._1).mkString
+        def longestCommonPrefix(a: String, b: String): String = a.iterator.zip(b.iterator).takeWhile { case (x, y) => x == y }.map(_._1).mkString
 
         val removeEmpty: Seq[TextLiteral] = lines.init.filterNot(_.isEmpty) :+ lines.last
-        val longestCommonIndent: String = removeEmpty.map(_.whitespacePrefix).reduceRight(lcip)
+        val longestCommonIndent: String = removeEmpty.map(_.whitespacePrefix).reduceRight(longestCommonPrefix)
         removeIndentsAndConcatenate(longestCommonIndent.length)
       }
 

@@ -1,7 +1,7 @@
 package io.chymyst.ui.dhall.unit
 
 import com.eed3si9n.expecty.Expecty.expect
-import com.upokecenter.cbor.CBORObject
+import com.upokecenter.cbor.{CBOREncodeOptions, CBORObject}
 import io.chymyst.ui.dhall.CBORmodel.{CMap, CString, CTagged}
 import io.chymyst.ui.dhall.{CBOR, CBORmodel, SyntaxConstants}
 import io.chymyst.ui.dhall.Syntax.Expression
@@ -74,5 +74,12 @@ class CBORtest extends FunSuite {
     val bytes = taggedDict.toCBOR.EncodeToBytes
     val dictAfterBytes = bytesToCBORmodel(bytes)
     expect(taggedDict == dictAfterBytes)
+  }
+
+  test("CBOR for strings containing newlines") {
+    val s = CString("\n")
+    val bytes = s.toCBOR.EncodeToBytes
+    val sAfterBytes = bytesToCBORmodel(bytes)
+    expect(s == sAfterBytes)
   }
 }
