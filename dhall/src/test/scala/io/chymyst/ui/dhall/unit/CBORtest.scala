@@ -29,12 +29,11 @@ class CBORtest extends FunSuite {
   test("CBOR roundtrips 1") {
     cborRoundtrip(Expression.Builtin(SyntaxConstants.Builtin.True))
     cborRoundtrip(Expression.Builtin(SyntaxConstants.Builtin.List))
+    cborRoundtrip(Expression.DoubleLiteral(456.0))
   }
 
   test("CBOR roundtrips 2") {
     cborRoundtrip(Expression.NaturalLiteral(123))
-    cborRoundtrip(Expression.DoubleLiteral(456.0))
-    cborRoundtrip(Expression.Variable(VarName("_"), BigInt(7)))
   }
 
   test("CBOR roundtrips 3") {
@@ -43,5 +42,9 @@ class CBORtest extends FunSuite {
 
   test("CBOR roundtrips 4") {
     cborRoundtrip(Expression.NonEmptyList(Expression.NaturalLiteral(1), Seq(2, 3, 4, 5).map(x => Expression.NaturalLiteral(x))))
+  }
+
+  test("CBOR roundtrips 5") {
+    cborRoundtrip(Expression.Variable(VarName("_"), BigInt(7)))
   }
 }

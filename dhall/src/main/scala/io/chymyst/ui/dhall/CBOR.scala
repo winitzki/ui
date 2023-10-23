@@ -162,7 +162,7 @@ object CBOR {
 
   def naturalToCbor2(index: Natural): CBORObject =
     if (index < BigInt(1).<<(64))
-      CBORObject.FromObject(index)
+      CBORObject.FromObject(index.bigInteger)
     else
       CBORObject.FromObject(EInteger.FromBytes(index.toByteArray, false)) // TODO: Does this work correctly? Do we need to set littleEndian = true?
 
