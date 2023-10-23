@@ -721,7 +721,7 @@ object Grammar {
   //  )))
 
   def http[$: P]: P[ImportType.Remote] = P(
-    http_raw ~ (whsp1 ~/ requireKeyword("using") ~ whsp1 ~/ import_expression).?
+    http_raw ~ (whsp1 ~ requireKeyword("using") ~ whsp1 ~/ import_expression).? // Do not add cut after `http_raw ~ (whsp1 ~`.
   ).map { case (url, headers) => ImportType.Remote(url, headers) }
 
   def env[$: P]: P[ImportType.Env] = P(
