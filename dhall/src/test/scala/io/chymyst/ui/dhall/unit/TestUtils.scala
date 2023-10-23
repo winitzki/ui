@@ -47,8 +47,7 @@ object TestUtils {
     val parsed = parse(input, grammarRule)
     parsed match {
       case Parsed.Success(value, index) =>
-        println(s"Error: Parsing input '$input', expected Failure but got Success($value, $index)")
-        expect(parsed == Parsed.Failure(parsedInput, lastIndex, null))
+        throw new Exception(s"Error: Parsing input '$input', expected Failure but got Success($value, $index)")
       case f@Parsed.Failure(message, index, extra) =>
         println(s"Parsing input '$input', expected index $lastIndex, got Failure('$message', $index, ${Try(extra.stack).toOption}), message '${f.msg}' as expected")
         expect(input != null && (f.msg contains expectedMessage), input != null && f.index == lastIndex)

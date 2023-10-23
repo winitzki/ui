@@ -3,13 +3,17 @@ package io.chymyst.ui.dhall.unit
 import com.eed3si9n.expecty.Expecty.expect
 import fastparse.{Parsed, parse}
 import io.chymyst.ui.dhall.Grammar.{equivalent_expression, import_alt_expression, whsp}
-import io.chymyst.ui.dhall.Syntax.Expression.{NaturalLiteral, Variable}
+import io.chymyst.ui.dhall.Syntax.Expression.{Import, Lambda, Let, NaturalLiteral, Variable}
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
-import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, VarName}
+import io.chymyst.ui.dhall.SyntaxConstants.Builtin.Natural
+import io.chymyst.ui.dhall.SyntaxConstants.ImportMode.RawText
+import io.chymyst.ui.dhall.SyntaxConstants.ImportType.Missing
+import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, ImportMode, VarName}
 import io.chymyst.ui.dhall.unit.TestUtils.{check, printFailure, toFail, v}
 import io.chymyst.ui.dhall.{Grammar, Parser, SyntaxConstants}
 import munit.FunSuite
 
+import java.rmi.server.ExportException
 import scala.util.Try
 
 class SimpleExpressionTest extends FunSuite {
@@ -174,20 +178,33 @@ class SimpleExpressionTest extends FunSuite {
 
   test("simple_label") {
     val input = "witha"
-    check(Grammar.simple_label(_), input, ())
+    check(Grammar.simple_label(_), input,  "witha")
   }
 
   test("empty record literal") {
-    check(Grammar.complete_expression(_),  "{ }", Expression.RecordType(Seq()))
-    check(Grammar.complete_expression(_),  "{=}", Expression.RecordLiteral(Seq()))
+    check(Grammar.complete_expression(_), "{ }", Expression.RecordType(Seq()))
+    check(Grammar.complete_expression(_), "{=}", Expression.RecordLiteral(Seq()))
     check(Grammar.complete_expression(_), "{,}", Expression.RecordType(Seq()))
     check(Grammar.complete_expression(_), "{}", Expression.RecordType(Seq()))
   }
 
   test("variable name missing//foo, conflict with import declaration") {
-    check(Grammar.complete_expression(_),  "missing as text", v("missing//foo"))
-    check(Grammar.complete_expression(_),  "missingas text", v("missing//foo"))
-    check(Grammar.complete_expression(_),  "missing//foo", v("missing//foo"))
+
+    check(Grammar.simple_label(_), "missingas",  "missingas")
+    check(Grammar.identifier(_), "missingas",  v("missingas"))
+
+    toFail(Grammar.complete_expression(_), "missing as text", "", "", 8)
+
+    check(Seq(
+      "missing as Text" -> Expression.Import(Missing, RawText, None),
+      "missingas text" -> Expression.Application(v("missingas"), v("text")),
+      "missing//foo" -> v("missing//foo"),
+    ) ++ Seq("missingas", "Natural/blah", "lets").map { m =>
+      s"let $m = \\(x: Natural) -> x in let text = 2 in $m text" -> Let(VarName(m), None, Lambda(VarName("x"), Expression.Builtin(Natural), v("x")), Let(VarName("text"), None, NaturalLiteral(2), Expression.Application(v(m), v("text"))))
+    }, Grammar.complete_expression(_))
+
+    toFail(Grammar.complete_expression(_), "missingas Text", "", "", 7)
+
   }
 
   test("invalid utf-8") {

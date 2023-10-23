@@ -159,7 +159,7 @@ class ParserTest extends FunSuite {
     ).foreach { input =>
       check(Grammar.simple_label(_), input, (), input.length)
     }
-    check(Grammar.simple_label(_), "x∀ ", (), 1)
+    check(Grammar.simple_label(_), "x∀ ", "x", 1)
     toFail(Grammar.simple_label(_), "∀", "", "", 0)
     toFail(Grammar.simple_label(_), "∀x", "", "", 0)
   }
