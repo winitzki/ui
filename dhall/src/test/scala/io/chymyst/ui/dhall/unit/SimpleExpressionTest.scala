@@ -188,12 +188,18 @@ class SimpleExpressionTest extends FunSuite {
     check(Grammar.complete_expression(_), "{}", Expression.RecordType(Seq()))
   }
 
+  test("variables or missing import ambiguity 1") {
+    toFail(Grammar.complete_expression(_), "missingas Text", "", "", 7)
+  }
+
+  test("variables or missing import ambiguity 2") {
+    toFail(Grammar.complete_expression(_), "missing as text", "", "", 8)
+  }
+
   test("variable name missing//foo, conflict with import declaration") {
 
     check(Grammar.simple_label(_), "missingas",  "missingas")
     check(Grammar.identifier(_), "missingas",  v("missingas"))
-
-    toFail(Grammar.complete_expression(_), "missing as text", "", "", 8)
 
     check(Seq(
       "missing as Text" -> Expression.Import(Missing, RawText, None),
@@ -203,7 +209,6 @@ class SimpleExpressionTest extends FunSuite {
       s"let $m = \\(x: Natural) -> x in let text = 2 in $m text" -> Let(VarName(m), None, Lambda(VarName("x"), Expression.Builtin(Natural), v("x")), Let(VarName("text"), None, NaturalLiteral(2), Expression.Application(v(m), v("text"))))
     }, Grammar.complete_expression(_))
 
-    toFail(Grammar.complete_expression(_), "missingas Text", "", "", 7)
   }
 
   test("invalid utf-8") {
