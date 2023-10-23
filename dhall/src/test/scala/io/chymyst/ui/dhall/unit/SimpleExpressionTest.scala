@@ -184,6 +184,10 @@ class SimpleExpressionTest extends FunSuite {
     check(Grammar.complete_expression(_), "{}", Expression.RecordType(Seq()))
   }
 
+  test("variable name missing//foo") {
+    check(Grammar.complete_expression(_),  "missing//foo", v("missing//foo"))
+  }
+
   test("invalid utf-8") {
     val input = Array[Byte](-19, -96, -128)
     import fastparse._, NoWhitespace._
