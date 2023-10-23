@@ -6,17 +6,54 @@ import com.upokecenter.numbers.EInteger
 import io.chymyst.ui.dhall.Syntax.{Expression, Natural, PathComponent}
 import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, FilePrefix, ImportType, VarName}
 import CBORmodel._
+
 import scala.annotation.tailrec
 import scala.collection.immutable.Seq
-import scala.jdk.CollectionConverters.MapHasAsJava
+import scala.jdk.CollectionConverters.{MapHasAsJava, MapHasAsScala}
 
 sealed trait CBORmodel {
   def toCBOR: CBORObject
 
   final def toExpression: Expression = ???
+
+  def asString: String = throw new Exception(s"This CBORmodel is $this and not a CString")
 }
 
 object CBORmodel {
+
+  def fromCbor(obj: CBORObject): CBORmodel = if (obj == null) CNull else obj.getType match {
+    case CBORType.Number => ???
+
+    case CBORType.Boolean => obj.getSimpleValue match {
+      case 20 => CFalse
+      case 21 => CTrue
+      case 22 => CNull
+      case x => throw new Exception(s"boolean has unexpected simple value $x")
+    }
+
+    case CBORType.SimpleValue => obj.getSimpleValue match {
+      case 20 => CFalse
+      case 21 => CTrue
+      case 22 => CNull
+      case x => throw new Exception(s"got CBOR simple value $x")
+    }
+
+    case CBORType.ByteString => CBytes(obj.GetByteString)
+    case CBORType.TextString => CString(obj.AsString)
+    case CBORType.Array =>
+      val objs: Array[CBORObject] = obj.ToObject(classOf[Array[CBORObject]])
+      val array = CArray(objs.map(fromCbor))
+      if (obj.isTagged) CTagged(4, array) else array
+    case CBORType.Map =>
+      val objs: java.util.Map[CBORObject, CBORObject] = obj.ToObject(classOf[java.util.Map[CBORObject, CBORObject]])
+      CMap(objs.asScala.map { case (k, v) => (fromCbor(k).asString, fromCbor(v)) }.toMap)
+    case CBORType.Integer =>
+      if (obj.CanValueFitInInt64()) CInt(BigInt(obj.AsInt64Value)) else {
+        val eInt = obj.AsEIntegerValue
+        CInt(BigInt(eInt.signum, eInt.ToBytes(false)))
+      }
+    case CBORType.FloatingPoint => CDouble(obj.AsDoubleValue)
+  }
 
   final case object CNull extends CBORmodel {
     override def toCBOR: CBORObject = CBORObject.Null
@@ -51,6 +88,8 @@ object CBORmodel {
 
   final case class CString(data: String) extends CBORmodel {
     override def toCBOR: CBORObject = CBORObject.FromObject(data)
+
+    override def asString: String = data
 
     override def toString: String = s"\"$escaped\""
 
@@ -120,19 +159,6 @@ object CBOR {
   def exprToBytes(e: Expression): Array[Byte] = toCborModel(e).toCBOR.EncodeToBytes()
 
   def bytesToExpr(bytes: Array[Byte]): Expression = fromCbor(CBORObject.DecodeFromBytes(bytes)).toExpression
-
-  def fromCbor(obj: CBORObject): CBORmodel = obj.getType match {
-    case CBORType.Number => ???
-    case CBORType.Boolean => ???
-    case CBORType.SimpleValue => ???
-    case CBORType.ByteString => ???
-    case CBORType.TextString => ???
-    case CBORType.Array => ???
-    case CBORType.Map => ???
-    case CBORType.Integer =>
-      ???
-    case CBORType.FloatingPoint => ???
-  }
 
   def naturalToCbor2(index: Natural): CBORObject =
     if (index < BigInt(1).<<(64))
