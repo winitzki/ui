@@ -17,6 +17,7 @@ sealed trait CBORmodel {
 }
 
 object CBORmodel {
+
   final case object CNull extends CBORmodel {
     override def toCBOR: CBORObject = CBORObject.Null
 
@@ -51,7 +52,18 @@ object CBORmodel {
   final case class CString(data: String) extends CBORmodel {
     override def toCBOR: CBORObject = CBORObject.FromObject(data)
 
-    override def toString: String = s"\"$data\""
+    override def toString: String = s"\"$escaped\""
+
+    lazy val escaped: String = data.flatMap {
+      case '\b' => "\\b"
+      case '\n' => "\\n"
+      case '\f' => "\\f"
+      case '\r' => "\\r"
+      case '\t' => "\\t"
+      case '\\' => "\\\\"
+      case c if c.toInt > 255 || c.toInt < 20 => s"\\u${c.toHexString.toUpperCase}"
+      case c => c.toString
+    }
   }
 
   final case class CArray(data: Array[CBORmodel]) extends CBORmodel {
