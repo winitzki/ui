@@ -21,39 +21,46 @@ sealed trait CBORmodel {
 
 object CBORmodel {
 
-  def fromCbor(obj: CBORObject): CBORmodel = if (obj == null) CNull else obj.getType match {
-    case CBORType.Number => ???
+  def fromCbor(obj: CBORObject): CBORmodel = if (obj == null) CNull else {
+    val decoded: CBORmodel = obj.getType match {
+      case CBORType.Number => ???
 
-    case CBORType.Boolean => obj.getSimpleValue match {
-      case 20 => CFalse
-      case 21 => CTrue
-      case 22 => CNull
-      case x => throw new Exception(s"boolean has unexpected simple value $x")
-    }
-
-    case CBORType.SimpleValue => obj.getSimpleValue match {
-      case 20 => CFalse
-      case 21 => CTrue
-      case 22 => CNull
-      case x => throw new Exception(s"got CBOR simple value $x")
-    }
-
-    case CBORType.ByteString => CBytes(obj.GetByteString)
-    case CBORType.TextString => CString(obj.AsString)
-    case CBORType.Array =>
-      val objs: Array[CBORObject] = obj.ToObject(classOf[Array[CBORObject]])
-      val array = CArray(objs.map(fromCbor))
-      if (obj.isTagged) CTagged(4, array) else array
-    case CBORType.Map =>
-      val objs: java.util.Map[CBORObject, CBORObject] = obj.ToObject(classOf[java.util.Map[CBORObject, CBORObject]])
-      CMap(objs.asScala.map { case (k, v) => (fromCbor(k).asString, fromCbor(v)) }.toMap)
-    case CBORType.Integer =>
-      if (obj.CanValueFitInInt64()) CInt(BigInt(obj.AsInt64Value)) else {
-        val eInt = obj.AsEIntegerValue
-        CInt(BigInt(eInt.signum, eInt.ToBytes(false)))
+      case CBORType.Boolean => obj.getSimpleValue match {
+        case 20 => CFalse
+        case 21 => CTrue
+        case 22 => CNull
+        case x => throw new Exception(s"boolean has unexpected simple value $x")
       }
-    case CBORType.FloatingPoint => CDouble(obj.AsDoubleValue)
+
+      case CBORType.SimpleValue => obj.getSimpleValue match {
+        case 20 => CFalse
+        case 21 => CTrue
+        case 22 => CNull
+        case x => throw new Exception(s"got CBOR simple value $x")
+      }
+
+      case CBORType.ByteString => CBytes(obj.GetByteString)
+      case CBORType.TextString => CString(obj.AsString)
+      case CBORType.Array =>
+        val objs: Array[CBORObject] = obj.ToObject(classOf[Array[CBORObject]])
+        CArray(objs.map(fromCbor))
+      case CBORType.Map =>
+        val objs: java.util.Map[CBORObject, CBORObject] = obj.ToObject(classOf[java.util.Map[CBORObject, CBORObject]])
+        CMap(objs.asScala.map { case (k, v) => (fromCbor(k).asString, fromCbor(v)) }.toMap)
+      case CBORType.Integer =>
+        if (obj.CanValueFitInInt64()) CInt(BigInt(obj.AsInt64Value)) else CInt(eIntegerToBigInt(obj.AsEIntegerValue))
+      case CBORType.FloatingPoint => CDouble(obj.AsDoubleValue)
+    }
+
+    if (obj.isTagged) {
+      val tags: Array[Natural] = obj.GetAllTags.map(eIntegerToBigInt)
+      if (obj.HasOneTag)
+        CTagged(tags(0).toInt, decoded)
+      else throw new Exception(s"CBOR object $decoded has more than one tag, this is unsupported by Dhall")
+    } else decoded
   }
+
+  def eIntegerToBigInt(eInt: EInteger): BigInt = BigInt(eInt.signum, eInt.ToBytes(false))
 
   final case object CNull extends CBORmodel {
     override def toCBOR: CBORObject = CBORObject.Null
@@ -81,7 +88,18 @@ object CBORmodel {
   }
 
   final case class CDouble(data: Double) extends CBORmodel {
-    override def toCBOR: CBORObject = CBORObject.FromObject(data)
+    override def toCBOR: CBORObject = {
+      val result = data match {
+        case 0.0 => CBORObject.FromFloatingPointBits(0L, 2)
+        case -0.0 => CBORObject.FromFloatingPointBits(0x8000L, 2)
+        case Double.NaN => CBORObject.FromFloatingPointBits(0x7e00L, 2)
+        case Double.NegativeInfinity => CBORObject.FromFloatingPointBits(0xfc00L, 2)
+        case Double.PositiveInfinity => CBORObject.FromFloatingPointBits(0x7c00L, 2)
+        case _ => CBORObject.FromObject(java.lang.Double.valueOf(data))
+      }
+      println(s"DEBUG: converting double value '$data' to CBOR, result is NAN: ${result.IsNaN()}, is zero: ${result.isZero}, is negative: ${result.isNegative}")
+      result
+    }
 
     override def toString: String = f"$data%.1f"
   }
@@ -129,7 +147,7 @@ object CBORmodel {
   }
 
   final case class CTagged(tag: Int, data: CBORmodel) extends CBORmodel {
-    override def toCBOR: CBORObject = CBORObject.FromObjectAndTag(data, tag)
+    override def toCBOR: CBORObject = CBORObject.FromObjectAndTag(data.toCBOR, tag)
 
     override def toString: String = s"$tag($data)"
   }

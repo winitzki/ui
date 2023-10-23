@@ -82,13 +82,13 @@ class DhallParserSuite extends FunSuite {
         Parsed.Success(dhallValue, _) <- Try(Parser.parseDhall(new FileInputStream(file)))
         model <- Try(CBOR.toCborModel(dhallValue.value))
         bytesGeneratedByUs <- Try(model.toCBOR.EncodeToBytes())
-      } yield (model, bytesGeneratedByUs)
-      val result = result1.toOption.map { case (model, bytesGeneratedByUs) =>
+      } yield (model, bytesGeneratedByUs, dhallValue.value)
+      val result = result1.toOption.map { case (model, bytesGeneratedByUs, expression) =>
         Files.write(Paths.get(outDir + "/" + file.getName.replace("A.dhall", "A.dhallb")), bytesGeneratedByUs)
         if (bytesGeneratedByUs sameElements cborValidationBytes) Success(bytesGeneratedByUs)
         else if (model.toString == diagnosticString) {
           val extraMessage = if (model.toString != cborValidationModel) s"\nwhile our reading of the validation file also differs:\n\t\t$cborValidationModel" else ""
-            Failure(new Exception(s"CBOR encoding differs, but generated CBOR model agrees with expected:\n\t\t$model$extraMessage\n"))
+            Failure(new Exception(s"CBOR encoding differs, our expression is '$expression', but generated CBOR model agrees with expected:\n\t\t$model$extraMessage\n"))
           } else Failure(new Exception(s"CBOR model differs: our CBOR model is:\n$model\nbut expected CBOR model is:\n$diagnosticString\n"))
       }
       if (result.exists(_.isFailure)) println(s"CBOR validation failed for file ${file.getName}: ${result.get.failed.get.getMessage}")
