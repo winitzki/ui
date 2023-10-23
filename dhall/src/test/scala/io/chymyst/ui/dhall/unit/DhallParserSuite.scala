@@ -70,6 +70,8 @@ class DhallParserSuite extends FunSuite {
   }
 
   test("validate CBOR encoding for standard examples") {
+    val outDir = "./testdhallb"
+    Try(Files.createDirectory(Paths.get(outDir)))
     val results = testFilesForSuccess.flatMap { file =>
       val validationFile = file.getAbsolutePath.replace("A.dhall", "B.dhallb")
       val cborValidationBytes = Files.readAllBytes(Paths.get(validationFile))
@@ -78,10 +80,11 @@ class DhallParserSuite extends FunSuite {
       val result1 = for {
         Parsed.Success(dhallValue, _) <- Try(Parser.parseDhall(new FileInputStream(file)))
         model <- Try(CBOR.toCborModel(dhallValue.value))
-        bytes <- Try(model.toCBOR.EncodeToBytes())
-      } yield (model, bytes)
-      val result = result1.toOption.map { case (model, bytes) =>
-        if (bytes sameElements cborValidationBytes) Success(bytes)
+        bytesGeneratedByUs <- Try(model.toCBOR.EncodeToBytes())
+      } yield (model, bytesGeneratedByUs)
+      val result = result1.toOption.map { case (model, bytesGeneratedByUs) =>
+        Files.write(Paths.get(outDir + "/" + file.getName.replace("A.dhall", "A.dhallb")), bytesGeneratedByUs)
+        if (bytesGeneratedByUs sameElements cborValidationBytes) Success(bytesGeneratedByUs)
         else if (model.toString == diagnosticString)
           Failure(new Exception(s"CBOR encoding differs, but generated CBOR model agrees with expected:\n\t\t$model\n"))
         else Failure(new Exception(s"CBOR model differs: our CBOR model is:\n$model\nbut expected CBOR model is:\n$diagnosticString\n"))

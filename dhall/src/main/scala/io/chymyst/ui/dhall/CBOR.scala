@@ -68,7 +68,7 @@ object CBORmodel {
   }
 
   final case class CArray(data: Array[CBORmodel]) extends CBORmodel {
-    override def toCBOR: CBORObject = CBORObject.FromObject(data)
+    override def toCBOR: CBORObject = CBORObject.FromObject(data.map(_.toCBOR))
 
     override def toString: String = "[" + data.map(_.toString).mkString(", ") + "]"
   }
