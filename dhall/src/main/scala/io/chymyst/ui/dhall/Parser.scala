@@ -1059,11 +1059,11 @@ object Grammar {
       //  "{ foo = 1      , bar = True }"
       //  "{ foo : Integer, bar : Bool }"
       | ("{" ~ whsp ~/ ("," ~/ whsp./).? ~ record_type_or_literal ~ whsp ~ "}")
-      .map(_.getOrElse(Expression.RecordLiteral(Seq())))
+      .map(_.getOrElse(Expression.RecordType(Seq())))
       //
       //  "< Foo : Integer | Bar : Bool >"
       //  "< Foo | Bar : Bool >"
-      | ("<" ~ whsp ~/ ("|" / whsp./).? ~ union_type ~ whsp ~ ">")
+      | P("<" ~ whsp ~/ ("|" / whsp./).? ~ union_type ~ whsp ~ ">")
       //
       //  "[1, 2, 3]"
       | non_empty_list_literal
@@ -1073,7 +1073,7 @@ object Grammar {
       | identifier
       //
       //  "( e )"
-      | ("(" ~/ complete_expression ~/ ")")
+      | P("(" ~/ complete_expression ~/ ")")
   )
 
   def record_type_or_literal[$: P]: P[Option[Expression]] = P(

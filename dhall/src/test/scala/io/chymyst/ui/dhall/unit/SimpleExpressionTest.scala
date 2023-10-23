@@ -177,6 +177,13 @@ class SimpleExpressionTest extends FunSuite {
     check(Grammar.simple_label(_), input, ())
   }
 
+  test("empty record literal") {
+    check(Grammar.complete_expression(_),  "{ }", Expression.RecordType(Seq()))
+    check(Grammar.complete_expression(_),  "{=}", Expression.RecordLiteral(Seq()))
+    check(Grammar.complete_expression(_), "{,}", Expression.RecordType(Seq()))
+    check(Grammar.complete_expression(_), "{}", Expression.RecordType(Seq()))
+  }
+
   test("invalid utf-8") {
     val input = Array[Byte](-19, -96, -128)
     import fastparse._, NoWhitespace._
