@@ -3,7 +3,7 @@ package io.chymyst.ui.dhall.unit
 import com.eed3si9n.expecty.Expecty.expect
 import fastparse.{Parsed, parse}
 import io.chymyst.ui.dhall.Grammar.{equivalent_expression, import_alt_expression, whsp}
-import io.chymyst.ui.dhall.Syntax.Expression.{Import, Lambda, Let, NaturalLiteral, Variable}
+import io.chymyst.ui.dhall.Syntax.Expression.{Import, Lambda, Let, NaturalLiteral, TextLiteral, Variable}
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
 import io.chymyst.ui.dhall.SyntaxConstants.Builtin.Natural
 import io.chymyst.ui.dhall.SyntaxConstants.ImportMode.RawText
@@ -204,7 +204,6 @@ class SimpleExpressionTest extends FunSuite {
     }, Grammar.complete_expression(_))
 
     toFail(Grammar.complete_expression(_), "missingas Text", "", "", 7)
-
   }
 
   test("invalid utf-8") {
@@ -215,6 +214,23 @@ class SimpleExpressionTest extends FunSuite {
     val result = parse(input, grammar(_))
     result.get.value.foreach(s => println(s"Char: ${s.toInt}"))
     // TODO: figure out how `fastparse` decodes a byte array into characters. This test shows that the non-UTF8 sequence is decoded as a single character 65533.
+  }
+
+  test("quoted multiline string ends with newline") {
+    check(Grammar.complete_expression(_),
+      """''
+        |  a
+        |  ''""".stripMargin, TextLiteral(List(),"a\n"))
+
+    check(Grammar.complete_expression(_),
+      """''
+        |  b
+        |''""".stripMargin, TextLiteral(List(), "  b\n"))
+
+    check(Grammar.complete_expression(_),
+      """''
+        |c
+        |''""".stripMargin, TextLiteral(List(), "c\n"))
   }
 
 }

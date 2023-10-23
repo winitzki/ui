@@ -28,7 +28,7 @@ class DhallParserSuite extends FunSuite {
     val results = testFilesForSuccess.map { file =>
       val result = for {
         result1 <- Try(Parser.parseDhall(new FileInputStream(file)))
-          .recoverWith { case exception => Failure(new Exception(s"Parsing file ${file.getName} expecting success. Result: parser crashed with $exception")) }
+          .recoverWith { case exception => Failure(new Exception(s"Parsing file ${file.getName} expecting success. Result: parser crashed with: ${printFailure(exception)}")) }
         result2 <- result1 match {
           case Parsed.Success(value, index) => Success(value)
           case Parsed.Failure(a, b, c) => Failure(new Exception(s"Parsing file ${file.getName} expecting success. Result: $result1, diagnostics: ${c.stack}"))

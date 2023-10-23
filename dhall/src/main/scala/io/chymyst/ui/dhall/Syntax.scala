@@ -6,6 +6,8 @@ import io.chymyst.ui.dhall.Syntax.Expression
 import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, DirName, FieldName, VarName}
 
 import java.time.{LocalDate, LocalTime, ZoneOffset}
+import scala.annotation.tailrec
+import scala.util.chaining.scalaUtilChainingOps
 
 object SyntaxConstants {
   final case class VarName(name: String) extends AnyVal
@@ -315,63 +317,51 @@ object Syntax {
 
       def isEmpty: Boolean = trailing.isEmpty && interpolations.isEmpty
 
-      private lazy val lines: Seq[TextLiteral] = ???
+      private lazy val lines: Seq[TextLiteral] = {
+        def loop(currentLine: TextLiteral, nextLine: TextLiteral): Seq[TextLiteral] = {
+          nextLine.interpolations.headOption match {
+            case None =>
+              val splitLines = splitByAllNewlines(nextLine.trailing).map(TextLiteral.ofString)
+              (currentLine ++ splitLines.head) +: splitLines.tail
+
+            case Some((head, interpolation)) =>
+              val headSplit = splitByAllNewlines(head)
+              val l0 = headSplit.head // Guaranteed to exist.
+              val ls = headSplit.tail
+              if (ls.isEmpty) loop(
+                currentLine ++ TextLiteral(List((head, interpolation)), ""),
+                TextLiteral(nextLine.interpolations.tail, trailing),
+              )
+              else (currentLine ++ TextLiteral.ofString(l0)) +: (ls.init.map(TextLiteral.ofString) ++ loop(
+                TextLiteral(List((ls.last, interpolation)), ""),
+                TextLiteral(nextLine.interpolations.tail, trailing),
+              ))
+          }
+        }
+
+        loop(TextLiteral.empty, this)
+      }
 
       def align: TextLiteral = {
-
-        val removeEmpty: Seq[TextLiteral] = lines.init.filterNot(_.isEmpty) :+ lines.last
-
         def lcip(a: String, b: String): String = a.iterator.zip(b.iterator).takeWhile { case (x, y) => x == y }.map(_._1).mkString
 
-        val indent: String = removeEmpty.map(_.whitespacePrefix).reduceRight(lcip)
-
-        flatten(indent.length)
-
+        val removeEmpty: Seq[TextLiteral] = lines.init.filterNot(_.isEmpty) :+ lines.last
+        val longestCommonIndent: String = removeEmpty.map(_.whitespacePrefix).reduceRight(lcip)
+        removeIndentsAndConcatenate(longestCommonIndent.length)
       }
-      /*
-      {-| Split a `TextLiteral` on newline boundaries to create a list of
-          `TextLiteral`s (one for each line, not including the newline)
-      -}
-      lines :: TextLiteral -> NonEmpty TextLiteral
-      lines = loop mempty
-        where
-          loop currentLine (Chunks [] z) =
-              (currentLine <> headLine) :| tailLines
-            where
-              headLine :| tailLines = fmap toChunk (lines_ z)
 
-          loop currentLine (Chunks ((x, y) : xys) z) =
-              case lines_ x of
-                  _ :| [] ->
-                      loop (currentLine <> Chunks [(x, y)] "") (Chunks xys z)
+      private def splitByAllNewlines(s: String): Seq[String] =
+        s.split("\r\n", -1)
+          .flatMap(_.split("\n", -1))
+          .toSeq
+          .pipe(s => if (s.isEmpty) Seq("") else s)
 
-                  l0 :| l1 : ls ->
-                      let ls' = l1 :| ls
-
-                      in  NonEmpty.cons
-                              (currentLine <> toChunk l0)
-                              (prepend
-                                  (fmap toChunk (NonEmpty.init ls'))
-                                  (loop
-                                      (Chunks [(NonEmpty.last ls', y)] "")
-                                      (Chunks xys z)
-                                  )
-                              )
-
-      -- | Promote a plain (uninterpolated) `Text` value to a `TextLiteral`
-      toChunk :: Text -> TextLiteral
-      toChunk text = Chunks [] text
-
-       */
-
-      private def lines_(s: String): Seq[String] = s.split("\r\n").flatMap(_.split("\n")).toSeq
-
-      private def flatten(indent: Int): TextLiteral = {
+      private def removeIndentsAndConcatenate(indent: Int): TextLiteral = {
         def join(a: TextLiteral, b: TextLiteral): TextLiteral = a ++ TextLiteral.ofString("\n") ++ b
 
-        def unlines(lines: Seq[TextLiteral]): TextLiteral = lines.reduceRight(join)
+        def joinLines(lines: Seq[TextLiteral]): TextLiteral = lines.reduceRight(join)
 
-        unlines(lines.map(_.stripPrefix(indent))).escape
+        joinLines(lines.map(_.stripPrefix(indent))).escape
       }
 
       def stripPrefix(indent: Int): TextLiteral = interpolations.headOption match {
