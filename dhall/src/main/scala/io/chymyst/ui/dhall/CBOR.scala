@@ -3,6 +3,7 @@ package io.chymyst.ui.dhall
 
 import com.upokecenter.cbor.{CBORObject, CBORType}
 import com.upokecenter.numbers.EInteger
+import io.chymyst.ui.dhall.CBORmodel.CBytes.byteArrayToHexString
 import io.chymyst.ui.dhall.CBORmodel._
 import io.chymyst.ui.dhall.Syntax.{Expression, Natural, PathComponent}
 import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, ImportType, VarName}
@@ -10,31 +11,121 @@ import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, ImportTy
 import scala.annotation.tailrec
 import scala.collection.immutable.Seq
 import scala.jdk.CollectionConverters.MapHasAsScala
+import scala.util.{Failure, Success, Try}
 
 sealed trait CBORmodel {
   def toCBOR: CBORObject
 
-  final def toExpression: Expression = this match {
-    case CBORmodel.CNull => ???
-    case CBORmodel.CTrue => ???
-    case CBORmodel.CFalse => ???
-    case CInt(data) => ???
-    case CDouble(data) => ???
-    case CString(data) => ???
-    case CArray(data) => ???
-    case CBytes(data) => ???
-    case CMap(data) => ???
-    case CTagged(4, data) => ???
+  private implicit class OrError[A](expr: => A) {
+    def die(message: String, t: Throwable = null): Nothing = throw new Exception(message, t)
+
+    def or(message: String): A = Try(expr) match {
+      case Failure(t) => die(message, t)
+      case Success(value) => value
+    }
   }
 
-  def asString: String = throw new Exception(s"This CBORmodel is $this and not a CString")
+  final def toExpression: Expression = this match {
+    case CNull => ().die(s"Invalid null value")
+    case CTrue => Expression.Builtin(SyntaxConstants.Builtin.True)
+    case CFalse => Expression.Builtin(SyntaxConstants.Builtin.False)
+    case CInt(data) => Expression.Variable(VarName("_"), data)
+    case CDouble(data) => Expression.DoubleLiteral(data)
+
+    case CString(data) => Expression.Builtin(SyntaxConstants.Builtin.withName(data)).or(s"String '$data' must be a Builtin name (one of ${SyntaxConstants.Builtin.values.mkString(", ")})")
+
+    case CArray(data) =>
+      data.toList match {
+        case CInt(0) :: head :: firstArg :: tail =>
+          val firstTerm = Expression.Application(head.toExpression, firstArg.toExpression)
+          tail.map(_.toExpression).foldLeft(firstTerm)((prev, x) => Expression.Application(prev, x))
+
+        case CNull :: _ | CTrue :: _ | CFalse :: _ | CDouble(_) :: _ => ().die(s"Invalid array $this - may not start with ${data.head}")
+        case CInt(1) :: tipe :: body :: Nil => Expression.Lambda(VarName("_"), tipe.toExpression, body.toExpression)
+        case CInt(1) :: CString(name) :: tipe :: body :: Nil if name != "_" => Expression.Lambda(VarName(name), tipe.toExpression, body.toExpression)
+
+        case CInt(2) :: tipe :: body :: Nil => Expression.Forall(VarName("_"), tipe.toExpression, body.toExpression)
+        case CInt(2) :: CString(name) :: tipe :: body :: Nil if name != "_" => Expression.Forall(VarName(name), tipe.toExpression, body.toExpression)
+
+        case CInt(3) :: CInt(codeBigInt) :: left :: right :: Nil if codeBigInt.isValidByte && codeBigInt >= 0 && codeBigInt < 13 => // Expression.Operator
+          Expression.Operator(left.toExpression, SyntaxConstants.Operator.byCode(codeBigInt.toInt), right.toExpression)
+
+        case CInt(3) :: CInt(codeBigInt) :: left :: right :: Nil if codeBigInt.isValidInt && codeBigInt.intValue == 13 => // Expression.Operator
+          Expression.Completion(left.toExpression, right.toExpression)
+
+        case CInt(28) :: tipe :: Nil => Expression.EmptyList(tipe.toExpression)
+
+        case CInt(4) :: CNull :: head :: tail => Expression.NonEmptyList(head.toExpression, tail.map(_.toExpression))
+
+        case CInt(5) :: CNull :: body :: Nil => Expression.KeywordSome(body.toExpression)
+
+        case CInt(6) :: t :: u :: Nil => Expression.Merge(t.toExpression, u.toExpression, None)
+        case CInt(6) :: t :: u :: v :: Nil => Expression.Merge(t.toExpression, u.toExpression, Some(v.toExpression))
+
+        case CInt(27) :: u :: Nil => Expression.ToMap(u.toExpression, None)
+        case CInt(27) :: u :: v :: Nil => Expression.ToMap(u.toExpression, Some(v.toExpression))
+
+        case CInt(34) :: u :: Nil => Expression.ShowConstructor(u.toExpression)
+
+        case CInt(7) :: CMap(data) :: Nil => Expression.RecordType(data.toSeq.map { case (name, expr) => (FieldName(name), expr.toExpression) })
+        case CInt(8) :: CMap(data) :: Nil => Expression.RecordLiteral(data.toSeq.map { case (name, expr) => (FieldName(name), expr.toExpression) })
+
+        case CInt(9) :: t :: CString(name) :: Nil => Expression.Field(t.toExpression, FieldName(name))
+
+        case CInt(10) :: t :: tails if tails.nonEmpty && tails.forall(_.isInstanceOf[CString]) =>
+          Expression.ProjectByLabels(t.toExpression, tails.map(_.asInstanceOf[CString].data).map(FieldName))
+
+        case CInt(10) :: t :: CArray(Array(tipe)) :: Nil => Expression.ProjectByType(t.toExpression, tipe.toExpression)
+
+        case CInt(11) :: CMap(data) :: Nil => Expression.UnionType(data.toSeq.map { case (name, expr) => (ConstructorName(name), if (expr == CNull) None else Some(expr.toExpression)) })
+
+        case CInt(14) :: cond :: ifTrue :: ifFalse :: Nil => Expression.If(cond.toExpression, ifTrue.toExpression, ifFalse.toExpression)
+
+        case CInt(15) :: CInt(n) :: Nil if n >= 0 => Expression.NaturalLiteral(n)
+        case CInt(16) :: CInt(n) :: Nil => Expression.IntegerLiteral(n)
+
+        case CInt(18) :: CString(head) :: tail
+          if tail.zipWithIndex.forall {
+            case (t, i) if i % 2 == 0 && t.toExpression != null => true
+            case (CString(_), i) if i % 2 == 1 => true
+            case _ => false
+          } =>
+          if (tail.isEmpty)
+            Expression.TextLiteral(List(), head)
+          else {
+            val trailing = tail.last.asInstanceOf[CString].data
+            Expression.TextLiteral(data.drop(1).init.grouped(2).toList.map { array => (array(0).asInstanceOf[CString].data, array(1).toExpression) }, trailing)
+          }
+
+        case CString(name) :: CInt(index) :: Nil => Expression.Variable(VarName(name), index)
+
+        case CInt(33) :: CBytes(bytes) :: Nil => Expression.BytesLiteral(CBytes.byteArrayToHexString(bytes))
+
+        case CInt(19) :: t :: Nil => Expression.Assert(t.toExpression)
+
+        case CInt(26) :: body :: tipe :: Nil => Expression.Annotation(body.toExpression, tipe.toExpression)
+
+        case CArray(data) => ???
+        case CBytes(data) => ???
+        case CMap(data) => ???
+        case CTagged(tag, data) => ???
+      }
+      
+    case CBytes(data) => ???
+    case CMap(data) => ???
+    case CTagged(55799, data) => data.toExpression
+    case CTagged(4, data) => ???
+    case CTagged(tag, data) => ().die(s"Unexpected CBOR tag $tag with data $data")
+  }
+
+  def asString: String = ().die(s"This CBORmodel is $this and not a CString")
 }
 
 object CBORmodel {
 
   def fromCbor(obj: CBORObject): CBORmodel = if (obj == null) CNull else {
     val decoded: CBORmodel = obj.getType match {
-      case CBORType.Number => ???
+      case CBORType.Number => throw new Exception(s"Unexpected CBOR type Number in object $obj")
 
       case CBORType.Boolean => obj.getSimpleValue match {
         case 20 => CFalse
@@ -102,7 +193,7 @@ object CBORmodel {
     override def toCBOR: CBORObject = {
       val result = data match {
         // Important: match -0.0 before 0.0 or else it cannot match.
-        case -0.0 => CBORObject.FromObject(java.lang.Double.valueOf(data))//CBORObject.FromFloatingPointBits(0x8000L, 2)
+        case -0.0 => CBORObject.FromObject(java.lang.Double.valueOf(data)) //CBORObject.FromFloatingPointBits(0x8000L, 2)
         case 0.0 => CBORObject.FromFloatingPointBits(0L, 2)
         case Double.NaN => CBORObject.FromFloatingPointBits(0x7e00L, 2)
         case Double.NegativeInfinity => CBORObject.FromFloatingPointBits(0xfc00L, 2)
@@ -117,8 +208,6 @@ object CBORmodel {
 
   final case class CString(data: String) extends CBORmodel {
     override def toCBOR: CBORObject = CBORObject.FromObject(data)
-
-    override def asString: String = data
 
     override def toString: String = s"\"$escaped\""
 
@@ -141,11 +230,14 @@ object CBORmodel {
     override def toString: String = "[" + data.map(_.toString).mkString(", ") + "]"
   }
 
+  object CBytes {
+    def byteArrayToHexString(data: Array[Byte]): String = data.map(b => String.format("%02X", Byte.box(b))).mkString("")
+  }
 
   final case class CBytes(data: Array[Byte]) extends CBORmodel {
     override def toCBOR: CBORObject = CBORObject.FromObject(data)
 
-    override def toString: String = "h'" + data.map(b => String.format("%02X", Byte.box(b))).mkString("") + "'"
+    override def toString: String = "h'" + byteArrayToHexString(data) + "'"
   }
 
   final case class CMap(data: Map[String, CBORmodel]) extends CBORmodel {

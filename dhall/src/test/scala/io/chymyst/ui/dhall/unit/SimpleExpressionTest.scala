@@ -212,12 +212,13 @@ class SimpleExpressionTest extends FunSuite {
   }
 
   test("invalid utf-8") {
-    val input = Array[Byte](-19, -96, -128)
+    val input = Array(0x20.toByte, 0xED.toByte, 0xA0.toByte, 0x80.toByte)
     import fastparse._, NoWhitespace._
     def grammar[$: P] = P(SingleChar.rep)
 
     val result = parse(input, grammar(_))
     result.get.value.foreach(s => println(s"Char: ${s.toInt}"))
+    assert(result.get.value == Seq(32.toChar, 65533.toChar))
     // TODO: figure out how `fastparse` decodes a byte array into characters. This test shows that the non-UTF8 sequence is decoded as a single character 65533.
   }
 

@@ -23,6 +23,8 @@ object SyntaxConstants {
   object Operator extends Enum[Operator] {
     val values = findValues
 
+    val byCode: Map[Int, Operator] = findValues.map { op => (op.cborCode, op) }.toMap
+
     case object Or extends Operator("||", 0)
 
     case object Plus extends Operator("+", 4)
