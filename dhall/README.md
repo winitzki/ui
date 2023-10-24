@@ -28,6 +28,8 @@ So far, there are some issues with the Unicode characters:
 - If the input contains non-UTF8 sequences, the `fastparse` library appears to skip some of the input and create a valid UTF-8 string. However, the Dhall standard specifies that non-UTF8 input should be rejected by the parser.
 - If the input contains Unicode characters greater than 65535 the `fastparse` library seems to truncate those characters.
 
+There is also a failing test with `missing//blah` or `missingas text` and such. The keyword `missing` somehow conflicts with parsing.
+
 ## CBOR encoding
 
 The CBOR encoding is implemented using the library `"com.upokecenter" % "cbor" % "4.5.2"` because it seems to be the only open-source CBOR library providing support for big integers out of the box.

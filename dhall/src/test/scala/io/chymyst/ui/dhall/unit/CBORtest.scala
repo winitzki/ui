@@ -1,8 +1,8 @@
 package io.chymyst.ui.dhall.unit
 
 import com.eed3si9n.expecty.Expecty.expect
-import com.upokecenter.cbor.{CBOREncodeOptions, CBORObject}
-import io.chymyst.ui.dhall.CBORmodel.{CMap, CString, CTagged}
+import com.upokecenter.cbor.{CBORDataUtilities, CBOREncodeOptions, CBORObject}
+import io.chymyst.ui.dhall.CBORmodel.{CDouble, CMap, CString, CTagged}
 import io.chymyst.ui.dhall.{CBOR, CBORmodel, SyntaxConstants}
 import io.chymyst.ui.dhall.Syntax.Expression
 import io.chymyst.ui.dhall.SyntaxConstants.VarName
@@ -38,12 +38,35 @@ class CBORtest extends FunSuite {
     cborRoundtrip(Expression.NaturalLiteral(123))
     cborRoundtrip(Expression.DoubleLiteral(456.0))
     cborRoundtrip(Expression.DoubleLiteral(0.0))
-    intercept[AssertionError] { // This fails because the CBOR library converts all doubles even after specifying the half-precision bits.
-      cborRoundtrip(Expression.DoubleLiteral(-0.0))
-    }
     cborRoundtrip(Expression.DoubleLiteral(Double.NaN))
     cborRoundtrip(Expression.DoubleLiteral(Double.NegativeInfinity))
     cborRoundtrip(Expression.DoubleLiteral(Double.PositiveInfinity))
+  }
+
+  test("CBOR roundtrips 2a") {
+    intercept[AssertionError] { // This fails because the CBOR library converts all doubles even after specifying the half-precision bits.
+      cborRoundtrip(Expression.DoubleLiteral(-0.0))
+    }
+  }
+
+  test("CBOR roundtrips for half-precision float") {
+    expect(CBORObject.FromObject(1.0f).EncodeToBytes().length == 3)
+    expect(CBORObject.FromObject(0.0f).EncodeToBytes().length == 5)
+    expect(CBORObject.FromObject(-0.0f).EncodeToBytes().length == 5)
+    expect(CBORObject.FromObject(0.0).EncodeToBytes().length == 5)
+    expect(CBORObject.FromObject(-0.0).EncodeToBytes().length == 5)
+  }
+
+  test("CBOR roundtrips for half-precision double") {
+    //expect(CBORObject.FromObject(-1.0).EncodeToBytes.length == 3)
+    val mantissa = 0L
+    val exponent = 1007L // Between 999 and 1008.
+    val sign = 1L
+    val obj = CBORObject.FromFloatingPointBits(((sign & 0x1) << 63) | ((exponent & 0x7ff) << 52) | (mantissa & 0xfffffffffffffL), 8)
+    //    expect(obj.AsDoubleValue == -1.0)
+    val bytes = obj.EncodeToBytes
+    expect(bytes.length == 3)
+    expect(bytesToCBORmodel(bytes).asInstanceOf[CDouble].data == -0.0)
   }
 
   test("CBOR roundtrips 3") {

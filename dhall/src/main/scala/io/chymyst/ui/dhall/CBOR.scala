@@ -101,14 +101,14 @@ object CBORmodel {
   final case class CDouble(data: Double) extends CBORmodel {
     override def toCBOR: CBORObject = {
       val result = data match {
+        // Important: match -0.0 before 0.0 or else it cannot match.
+        case -0.0 => CBORObject.FromObject(java.lang.Double.valueOf(data))//CBORObject.FromFloatingPointBits(0x8000L, 2)
         case 0.0 => CBORObject.FromFloatingPointBits(0L, 2)
-        case -0.0 => CBORObject.FromFloatingPointBits(0x8000L, 2)
         case Double.NaN => CBORObject.FromFloatingPointBits(0x7e00L, 2)
         case Double.NegativeInfinity => CBORObject.FromFloatingPointBits(0xfc00L, 2)
         case Double.PositiveInfinity => CBORObject.FromFloatingPointBits(0x7c00L, 2)
         case _ => CBORObject.FromObject(java.lang.Double.valueOf(data))
       }
-//      println(s"DEBUG: converting double value '$data' to CBOR, result is NAN: ${result.IsNaN()}, is zero: ${result.isZero}, is negative: ${result.isNegative}")
       result
     }
 
@@ -151,11 +151,11 @@ object CBORmodel {
   final case class CMap(data: Map[String, CBORmodel]) extends CBORmodel {
     override def toCBOR: CBORObject = {
       val dict = CBORObject.NewOrderedMap
-      data.toSeq.sortBy(_._1).foreach { case (k, v) => dict.Add(k, v.toCBOR) }
+      data.toSeq.sortBy(_._1).foreach { case (k, v) => dict.Add(k, v.toCBOR) } // Dhall requires sorting by the dictionary's keys.
       CBORObject.FromObject(dict)
     }
 
-    override def toString: String = "{" + data.toSeq.sortBy(_._1.toString).map { case (k, v) => s"\"$k\": $v" }.mkString(", ") + "}"
+    override def toString: String = "{" + data.toSeq.sortBy(_._1).map { case (k, v) => s"\"$k\": $v" }.mkString(", ") + "}"
   }
 
   final case class CTagged(tag: Int, data: CBORmodel) extends CBORmodel {
@@ -197,11 +197,11 @@ object CBOR {
       CBORObject.FromObject(EInteger.FromBytes(index.toByteArray, false)) // TODO: Does this work correctly? Do we need to set littleEndian = true?
 
   def toCborModel(e: Expression): CBORmodel = e match {
-    case Expression.Variable(VarName("_"), index) => CInt(index) // naturalToCbor2(index)
+    case Expression.Variable(VarName("_"), index) => CInt(index)
 
-    case Expression.Variable(VarName(name), index) => array(name, index) //CBORObject.NewArray().Add(name).Add(naturalToCbor2(index))
+    case Expression.Variable(VarName(name), index) => array(name, index)
 
-    case Expression.Lambda(VarName(name), tipe, body) => if (name == "_") array(1, tipe, body) else array(1, name, tipe, body) //makeArray(Some(1))(tipe, body)
+    case Expression.Lambda(VarName(name), tipe, body) => if (name == "_") array(1, tipe, body) else array(1, name, tipe, body)
 
     case Expression.Forall(VarName(name), tipe, body) => if (name == "_") array(2, tipe, body) else array(2, name, tipe, body)
 
@@ -227,11 +227,11 @@ object CBOR {
 
     case Expression.EmptyList(tipe) => array(28, tipe)
 
-    case Expression.NonEmptyList(head, tail) => array(4 +: null +: head +: tail: _*) //makeArray(Some(4), None)((head +: tail): _*)
+    case Expression.NonEmptyList(head, tail) => array(4 +: null +: head +: tail: _*)
 
-    case Expression.Annotation(data, tipe) => array(26, data, tipe) //makeArray(Some(26))(data, tipe)
+    case Expression.Annotation(data, tipe) => array(26, data, tipe)
 
-    case Expression.Operator(lop, op, rop) => array(3, op.cborCode, lop, rop) //makeArray(Some(3), Some(op.cborCode))(lop, rop)
+    case Expression.Operator(lop, op, rop) => array(3, op.cborCode, lop, rop)
 
     case f@Expression.Application(_, _) =>
       @tailrec def loop(args: Seq[Expression], expr: Expression): Seq[Expression] = expr match {
@@ -239,46 +239,42 @@ object CBOR {
         case _ => expr +: args
       }
 
-      array(0 +: loop(Seq(), f): _*) //makeArray(Some(0))(loop(Seq(), f): _*)
+      array(0 +: loop(Seq(), f): _*)
 
-    case Expression.Field(base, FieldName(name)) => array(9, base, name) //makeArrayC(Some(9))(toCborModel(base), CBORObject.FromObject(name))
+    case Expression.Field(base, FieldName(name)) => array(9, base, name)
 
-    case Expression.ProjectByLabels(base, labels) => array(10 +: base +: labels.map(_.name): _*) //makeArrayC(Some(10))(toCborModel(base) +: labels.map(label => CBORObject.FromObject(label.name)): _*)
+    case Expression.ProjectByLabels(base, labels) => array(10 +: base +: labels.map(_.name): _*)
 
-    case Expression.ProjectByType(base, by) => array(10, base, array(by)) // makeArrayC(Some(10))(toCborModel(base), makeArrayC()(toCborModel(by)))
+    case Expression.ProjectByType(base, by) => array(10, base, array(by))
 
-    case Expression.Completion(base, target) => array(3, 13, base, target) //makeArray(Some(3), Some(13))(base, target)
+    case Expression.Completion(base, target) => array(3, 13, base, target)
 
-    case Expression.Assert(data) => array(19, data) //makeArray(Some(19))(data)
+    case Expression.Assert(data) => array(19, data)
 
     case Expression.With(data, pathComponents, body) =>
       val path: Seq[Any] = pathComponents.map {
         case PathComponent.Label(FieldName(name)) => name
         case PathComponent.DescendOptional => 0
       }
-      array(29, data, array(path: _*), body) //makeArrayC(Some(29))(toCborModel(data), makeArrayC()(path: _*), toCborModel(body))
+      array(29, data, array(path: _*), body)
 
-    case Expression.DoubleLiteral(value) => CDouble(value) // CBORObject.FromObject(value) // TODO: verify that this works correctly.
+    case Expression.DoubleLiteral(value) => CDouble(value) // TODO: verify that this works correctly.
 
-    case Expression.NaturalLiteral(value) => array(15, value) // makeArrayC(Some(15))(naturalToCbor2(value))
+    case Expression.NaturalLiteral(value) => array(15, value)
 
-    case Expression.IntegerLiteral(value) => array(16, value) //makeArrayC(Some(16))(CBORObject.FromObject(value)) // TODO: verify that this works correctly.
+    case Expression.IntegerLiteral(value) => array(16, value)
 
-    case Expression.TextLiteralNoInterp(value) => array(18, value) // makeArrayC(Some(18))(CBORObject.FromObject(value))
+    case Expression.TextLiteralNoInterp(value) => array(18, value)
 
     case Expression.TextLiteral(interpolations, trailing) =>
-      val objects: Seq[Any] =
-        interpolations.flatMap { case (head, tail) => Seq(head, tail) } :+ trailing
-
+      val objects: Seq[Any] = interpolations.flatMap { case (head, tail) => Seq(head, tail) } :+ trailing
       array(18 +: objects: _*)
-    //makeArrayC(Some(18))(objects: _*)
 
-    case b@Expression.BytesLiteral(_) => array(33, CBytes(b.bytes)) // makeArrayC(Some(33))(CBORObject.FromObject(b.bytes))
+    case b@Expression.BytesLiteral(_) => array(33, CBytes(b.bytes))
 
-    case Expression.DateLiteral(y, m, d) => array(30, y, m, d) //makeArrayC(Some(30))(Seq(y, m, d).map(x => CBORObject.FromObject(x)): _*)
+    case Expression.DateLiteral(y, m, d) => array(30, y, m, d)
 
     case Expression.TimeLiteral(time) =>
-      // Always use nanosecond precision. TODO: this is not what the standard tests do, need to fix
       @tailrec def getPrecision(nanos: Long, initPrecision: Int): Int =
         if (nanos <= 0) 0
         else if (nanos % 10 > 0) initPrecision
@@ -292,29 +288,28 @@ object CBOR {
       val hours: Int = math.abs(totalMinutes) / 60
       val minutes: Int = math.abs(totalMinutes) % 60
       val isPositive: Boolean = totalMinutes >= 0
-      val cborSign = if (isPositive) CTrue else CFalse
+      val cborSign: CBORmodel = if (isPositive) CTrue else CFalse
       array(32, cborSign, hours, minutes)
-    //makeArrayC(Some(32))(cborSign, CBORObject.FromObject(hours), CBORObject.FromObject(minutes))
 
-    case Expression.RecordType(defs) => // TODO: {,} must be parsed as a record type, not literal, while {=} is an empty record literal.
+    case Expression.RecordType(defs) =>
       val dict = defs
         .map { case (FieldName(name), expr) => (name, expr) }
         .toMap
-      array(7, dict) //     makeArrayC(Some(7))(CBORObject.FromObject(dict))
+      array(7, dict)
 
     case Expression.RecordLiteral(defs) =>
       val dict = defs
         .map { case (FieldName(name), expr) => (name, expr) }
         .toMap
-      array(8, dict) //makeArrayC(Some(8))(CBORObject.FromObject(dict))
+      array(8, dict)
 
-    case e@Expression.RawRecordLiteral(_, _) => toCborModel(Expression.RecordLiteral.of(Seq(e))) // This is a type defined at parse time and should not occur here.
+    case e@Expression.RawRecordLiteral(_, _) => toCborModel(Expression.RecordLiteral.of(Seq(e)))
 
     case Expression.UnionType(defs) =>
       val dict = defs
         .map { case (ConstructorName(name), maybeExpr) => (name, maybeExpr.orNull)
         }.toMap
-      array(11, dict) //makeArrayC(Some(11))(CBORObject.FromObject(dict))
+      array(11, dict)
 
     case Expression.ShowConstructor(data) => array(34, data)
 
@@ -332,9 +327,9 @@ object CBOR {
 
         case ImportType.Env(envVarName) => Seq(6, envVarName)
       }
-      array(24 +: (part1 ++ part2): _*) // makeArrayC(Some(24))(part1 ++ part2: _*)
+      array(24 +: (part1 ++ part2): _*)
 
-    case Expression.KeywordSome(data) => array(5, null, data) //makeArray(Some(5), None)(data)
+    case Expression.KeywordSome(data) => array(5, null, data)
 
     case Expression.Builtin(SyntaxConstants.Builtin.True) | Expression.Constant(SyntaxConstants.Constant.True) => CTrue
 
@@ -343,7 +338,6 @@ object CBOR {
     case Expression.Builtin(builtin) => CString(builtin.entryName)
 
     case Expression.Constant(constant) => CString(constant.entryName)
-
   }
 
 }
