@@ -2,6 +2,7 @@ package io.chymyst.ui.dhall
 
 import fastparse.NoWhitespace._
 import fastparse._
+import io.chymyst.ui.dhall.ABNFGrammar.BIT
 import io.chymyst.ui.dhall.Syntax.Expression.{KeywordSome => ExpressionSome, _}
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression, PathComponent}
 import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, ImportType, VarName}
@@ -161,7 +162,7 @@ object Grammar {
   // Example: "let `in` = 1 in `in`" evaluates to "1".
   // A successfully parsed `label` is guaranteed to be either quoted or not a keyword.
   def label[$: P]: P[String] = P(
-    ("`" ~ quoted_label  ~ "`") | simple_label
+    ("`" ~ quoted_label ~ "`") | simple_label
   )
 
   // A successfully parsed `nonreserved_label` is guaranteed to be either quoted or not a builtin.
@@ -430,8 +431,10 @@ object Grammar {
   )
 
   def natural_literal[$: P]: P[NaturalLiteral] = P(
-    // Hexadecimal with "0x" prefix
-    ("0x" ~ HEXDIG.rep(1).!).map(hexdigits => BigInt(hexdigits, 16))
+    // Binary with "0b" prefix
+    ("0b" ~ BIT.rep(1).!).map(bindigits => BigInt(bindigits, 2))
+      // Hexadecimal with "0x" prefix
+      | ("0x" ~ HEXDIG.rep(1).!).map(hexdigits => BigInt(hexdigits, 16))
       // Decimal; leading 0 digits are not allowed
       | (CharIn("1-9") ~ DIGIT.rep).!.map(digits => BigInt(digits, 10))
       // ... except for 0 itself

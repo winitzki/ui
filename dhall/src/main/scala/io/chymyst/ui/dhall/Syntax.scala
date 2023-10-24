@@ -3,10 +3,9 @@ package io.chymyst.ui.dhall
 import enumeratum._
 import io.chymyst.ui.dhall.Grammar.hexStringToByteArray
 import io.chymyst.ui.dhall.Syntax.Expression
-import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, DirName, FieldName, VarName}
+import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, VarName}
 
-import java.time.{LocalDate, LocalTime, ZoneOffset}
-import scala.annotation.tailrec
+import java.time.LocalTime
 import scala.util.chaining.scalaUtilChainingOps
 
 object SyntaxConstants {

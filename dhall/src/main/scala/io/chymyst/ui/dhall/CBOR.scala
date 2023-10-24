@@ -105,17 +105,12 @@ sealed trait CBORmodel {
 
         case CInt(26) :: body :: tipe :: Nil => Expression.Annotation(body.toExpression, tipe.toExpression)
 
-        case CArray(data) => ???
-        case CBytes(data) => ???
-        case CMap(data) => ???
-        case CTagged(tag, data) => ???
+        case _ => ().die(s"Invalid top-level array $this while parsing CBOR")
       }
-      
-    case CBytes(data) => ???
-    case CMap(data) => ???
+
     case CTagged(55799, data) => data.toExpression
-    case CTagged(4, data) => ???
-    case CTagged(tag, data) => ().die(s"Unexpected CBOR tag $tag with data $data")
+    case CTagged(tag, data) => ().die(s"Unexpected tagged top-level CBOR object: tag $tag with data $data")
+    case CBytes(_) | CMap(_) => ().die(s"Unexpected top-level CBOR object: $this")
   }
 
   def asString: String = ().die(s"This CBORmodel is $this and not a CString")
