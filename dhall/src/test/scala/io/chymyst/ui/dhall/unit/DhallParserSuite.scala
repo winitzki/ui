@@ -119,7 +119,7 @@ class DhallParserSuite extends FunSuite {
           val extraMessage = if (model.toString != cborValidationModel) s"\nwhile our reading of the validation file also differs:\n\t\t$cborValidationModel" else ""
           Failure(new Exception(s"CBOR encoding differs, our expression is '$expression', but generated CBOR model agrees with expected:\n\t\t$model$extraMessage\n"))
         } else Failure(new Exception(s"CBOR model differs: our CBOR model is:\n$model\nbut expected CBOR model is:\n$diagnosticString\n"))
-      }.map(_.toOption).flatten
+      }.flatMap(_.toOption)
       result2.map { case (model, expression) =>
         Try(model.toExpression == expression) match {
           case Failure(exception) => Failure(new Exception(s"File ${file.getName}: Parser crashed on model $model: $exception"))
@@ -129,6 +129,7 @@ class DhallParserSuite extends FunSuite {
       }
 
     }
+
     println(s"Success count: ${results.count(_.isSuccess)}\nFailure count: ${results.count(_.isFailure)}\nCBOR expression mismatch count: ${results.filter(_.isFailure).count(_.failed.get.getMessage.contains("expression differs"))}")
     results.filter(_.isFailure).map(_.failed.get.getMessage).foreach(println)
   }
