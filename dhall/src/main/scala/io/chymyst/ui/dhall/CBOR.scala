@@ -118,6 +118,8 @@ sealed trait CBORmodel {
 
         case CIntTag(28) :: tipe :: Nil => Expression.EmptyList(tipe.toExpression)
 
+        case CIntTag(4) :: tipe :: Nil if tipe != CNull => Expression.EmptyList(Expression.Application(Expression.Builtin(SyntaxConstants.Builtin.List), tipe.toExpression))
+
         case CIntTag(4) :: CNull :: head :: tail => Expression.NonEmptyList(head.toExpression, tail.map(_.toExpression))
 
         case CIntTag(5) :: CNull :: body :: Nil => Expression.KeywordSome(body.toExpression)
