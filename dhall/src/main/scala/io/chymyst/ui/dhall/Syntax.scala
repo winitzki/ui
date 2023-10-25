@@ -1,8 +1,11 @@
 package io.chymyst.ui.dhall
 
 import enumeratum._
+import io.chymyst.ui.dhall.CBORmodel.CBytes
 import io.chymyst.ui.dhall.Grammar.hexStringToByteArray
 import io.chymyst.ui.dhall.Syntax.Expression
+import io.chymyst.ui.dhall.SyntaxConstants.Operator.findValues
+import io.chymyst.ui.dhall.SyntaxConstants.Scheme.findValues
 import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, VarName}
 
 import java.time.LocalTime
@@ -15,14 +18,19 @@ object SyntaxConstants {
 
   final case class ConstructorName(name: String) extends AnyVal
 
-  final case class DirName(name: String) extends AnyVal
+  trait HasCborCode[A, B] {
+    def cborCode: B
+  }
 
-  sealed abstract class Operator(val op: String, val cborCode: Int) extends EnumEntry
+  trait HasCborCodeDict[B, A <: EnumEntry with HasCborCode[A, B]] {
+    self: Enum[A] =>
+    lazy val cborCodeDict: Map[B, A] = values.map { op => (op.cborCode, op) }.toMap
+  }
 
-  object Operator extends Enum[Operator] {
+  sealed abstract class Operator(val op: String, val cborCode: Int) extends EnumEntry with HasCborCode[Operator, Int]
+
+  object Operator extends Enum[Operator] with HasCborCodeDict[Int, Operator] {
     val values = findValues
-
-    val byCode: Map[Int, Operator] = findValues.map { op => (op.cborCode, op) }.toMap
 
     case object Or extends Operator("||", 0)
 
@@ -159,9 +167,9 @@ object SyntaxConstants {
 
   }
 
-  sealed abstract class ImportMode(val cborCode: Int) extends EnumEntry
+  sealed abstract class ImportMode(val cborCode: Int) extends EnumEntry with HasCborCode[ImportMode, Int]
 
-  object ImportMode extends Enum[ImportMode] {
+  object ImportMode extends Enum[ImportMode] with HasCborCodeDict[Int, ImportMode] {
     val values = findValues
 
     case object Code extends ImportMode(0)
@@ -173,9 +181,9 @@ object SyntaxConstants {
     case object Location extends ImportMode(2)
   }
 
-  sealed abstract class Scheme(val cborCode: Int) extends EnumEntry
+  sealed abstract class Scheme(val cborCode: Int) extends EnumEntry with HasCborCode[Scheme, Int]
 
-  object Scheme extends Enum[Scheme] {
+  object Scheme extends Enum[Scheme] with HasCborCodeDict[Int, Scheme] {
     val values = findValues
 
     case object HTTP extends Scheme(0)
@@ -183,9 +191,11 @@ object SyntaxConstants {
     case object HTTPS extends Scheme(1)
   }
 
-  sealed abstract class FilePrefix(val cborCode: Int)
+  sealed abstract class FilePrefix(val cborCode: Int) extends EnumEntry with HasCborCode[FilePrefix, Int]
 
-  object FilePrefix {
+  object FilePrefix extends Enum[FilePrefix] with HasCborCodeDict[Int, FilePrefix] {
+    val values = findValues
+
     case object Absolute extends FilePrefix(2)
 
     case object Here extends FilePrefix(3) // ./something relative to the current working directory
@@ -381,9 +391,15 @@ object Syntax {
 
     }
 
-
-    final case class BytesLiteral(hex: String) extends Expression {
+    // The hex string must be lowercase.
+    final case class BytesLiteral private(hex: String) extends Expression {
       val bytes: Array[Byte] = hexStringToByteArray(hex)
+    }
+
+    object BytesLiteral {
+      def of(hex: String) = BytesLiteral(hex.toUpperCase)
+
+      def of(bytes: Array[Byte]) = BytesLiteral(CBytes.byteArrayToHexString(bytes))
     }
 
     final case class DateLiteral(year: Int, month: Int, day: Int) extends Expression

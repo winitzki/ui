@@ -302,7 +302,7 @@ object Grammar {
 
   def bytes_literal[$: P]: P[Expression.BytesLiteral] = P(
     "0x\"" ~ HEXDIG.rep(exactly = 2).rep.! ~ "\""
-  ).map(Expression.BytesLiteral)
+  ).map(Expression.BytesLiteral.of)
 
   val simpleKeywords = Seq(
     "if",
@@ -790,7 +790,7 @@ object Grammar {
       case Some("Text") => SyntaxConstants.ImportMode.RawText
       case None => SyntaxConstants.ImportMode.Code
     }
-    Import(importType, importMode, digest.map(BytesLiteral))
+    Import(importType, importMode, digest.map(BytesLiteral.of))
   }
 
   // The ABNF spec does not define those sub-rules. They are created only to help with debugging.

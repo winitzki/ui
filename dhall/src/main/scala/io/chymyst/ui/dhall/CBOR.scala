@@ -5,8 +5,9 @@ import com.upokecenter.cbor.{CBORObject, CBORType}
 import com.upokecenter.numbers.EInteger
 import io.chymyst.ui.dhall.CBORmodel.CBytes.byteArrayToHexString
 import io.chymyst.ui.dhall.CBORmodel._
+import io.chymyst.ui.dhall.Syntax.Expression.BytesLiteral
 import io.chymyst.ui.dhall.Syntax.{Expression, Natural, PathComponent}
-import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, ImportType, VarName}
+import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, FilePrefix, ImportMode, ImportType, VarName}
 
 import java.time.LocalTime
 import scala.annotation.tailrec
@@ -111,7 +112,7 @@ sealed trait CBORmodel {
         case CIntTag(2) :: CString(name) :: tipe :: body :: Nil if name != "_" => Expression.Forall(VarName(name), tipe.toExpression, body.toExpression)
 
         case CIntTag(3) :: CInt(code) :: left :: right :: Nil if code.isValidByte && code >= 0 && code < 13 => // Expression.Operator
-          Expression.Operator(left.toExpression, SyntaxConstants.Operator.byCode(code.toInt), right.toExpression)
+          Expression.Operator(left.toExpression, SyntaxConstants.Operator.cborCodeDict(code.toInt), right.toExpression)
 
         case CIntTag(3) :: CInt(code) :: left :: right :: Nil if code.isValidInt && code.intValue == 13 => // Expression.Operator
           Expression.Completion(left.toExpression, right.toExpression)
@@ -170,7 +171,29 @@ sealed trait CBORmodel {
 
         case CIntTag(26) :: body :: tipe :: Nil => Expression.Annotation(body.toExpression, tipe.toExpression)
 
-        case CIntTag(24) :: maybeHash :: code => ??? // Expression.Import
+        case CIntTag(24) :: maybeHash :: CIntTag(importModeTag) :: CIntTag(schemeTag) :: tail => // Expression.Import
+          val digest = maybeHash match {
+            case CNull => None
+            case CBytes(bytes) if bytes.length == 34 && bytes(0) == 0x12.toByte && bytes(1) == 0x20.toByte => Some(BytesLiteral(CBytes.byteArrayToHexString(bytes.drop(2))))
+          }
+          val importMode = ImportMode.cborCodeDict(importModeTag)
+          val importType: ImportType = (schemeTag, tail) match {
+            case (t, headersOrCNull :: CString(authority) :: relativeURL) if SyntaxConstants.Scheme.cborCodeDict.keySet contains t =>
+              val headers = if (headersOrCNull == CNull) None else Some(headersOrCNull.toExpression)
+              val query = if (relativeURL.last == CNull) None else Some(relativeURL.last.asString)
+              val segments = relativeURL.init.map(_.asString)
+              val url = SyntaxConstants.URL(scheme = SyntaxConstants.Scheme.cborCodeDict(t), authority = authority, path = SyntaxConstants.File(segments), query = query)
+              ImportType.Remote(url, headers)
+
+            case (t, filePath) if SyntaxConstants.FilePrefix.cborCodeDict.keySet contains t =>
+              val filePrefix: FilePrefix = FilePrefix.cborCodeDict(t)
+              ImportType.Path(filePrefix, SyntaxConstants.File(filePath.map(_.asString)))
+
+            case (6, List(CString(varName))) => ImportType.Env(varName)
+
+            case (7, List()) => ImportType.Missing
+          }
+          Expression.Import(importType, importMode, digest)
 
         case CIntTag(25) :: defs if defs.length > 3 => // Expression.Let
           val target = defs.last
@@ -451,7 +474,7 @@ object CBOR {
       }
       array(29, data, array(path: _*), body)
 
-    case Expression.DoubleLiteral(value) => CDouble(value) // TODO: verify that this works correctly.
+    case Expression.DoubleLiteral(value) => CDouble(value) // TODO: this does not work correctly for value = -0.0 or value = +0.0 because of CBOR-java issue #24
 
     case Expression.NaturalLiteral(value) => array(15, value)
 
