@@ -13,6 +13,68 @@ import scala.collection.immutable.Seq
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.util.{Failure, Success, Try}
 
+object CBORfix {
+  //  def write(obj: CBORObject, writer: CBORWriter, )???
+  /*
+  public CborWriter WriteUsingCborWriter(CBORObject obj, CborWriter writer, int depth) {
+
+    foreach(var tag in obj.GetAllTags()){
+      writer.WriteTag((CborTag)(ulong)tag);
+    }
+    obj=obj.Untag();
+    switch(obj.Type) {
+       case CBORType.Integer:
+          if(obj.CanValueFitInInt64())
+             writer.WriteInt64(obj.AsInt64Value());
+          else {
+             var ei=obj.AsEIntegerValue();
+             if(ei<0) {
+               ei=ei.Abs()-1;
+               writer.WriteCborNegativeIntegerRepresentation((ulong)ei);
+             } else {
+               writer.WriteUInt64((ulong)ei);
+             }
+          }
+          break;
+       case CBORType.FloatingPoint:
+          writer.WriteDouble(obj.AsDouble());
+          break;
+       case CBORType.Boolean:
+          if(obj.IsTrue)writer.WriteSimpleValue(CborSimpleValue.True);
+          else writer.WriteSimpleValue(CborSimpleValue.False);
+          break;
+       case CBORType.SimpleValue:
+          writer.WriteSimpleValue((CborSimpleValue)obj.SimpleValue);
+          break;
+       case CBORType.ByteString:
+          writer.WriteByteString(obj.GetByteString());
+          break;
+       case CBORType.TextString:
+          writer.WriteTextString(obj.AsString());
+          break;
+       case CBORType.Array:
+          writer.WriteStartArray(obj.Count);
+          foreach(var o in obj.Values){
+             WriteUsingCborWriter(o, writer, depth+1);
+          }
+          writer.WriteEndArray();
+          break;
+       case CBORType.Map:
+          writer.WriteStartMap(obj.Count);
+          foreach(var o in obj.Keys){
+             WriteUsingCborWriter(o, writer, depth+1);
+             WriteUsingCborWriter(obj[o], writer, depth+1);
+          }
+          writer.WriteEndMap();
+          break;
+    }
+    return writer;
+  }
+
+
+   */
+}
+
 sealed trait CBORmodel {
   def toCBOR: CBORObject
 
@@ -36,55 +98,55 @@ sealed trait CBORmodel {
 
     case CArray(data) =>
       data.toList match {
-        case CInt(0) :: head :: firstArg :: tail =>
+        case CIntTag(0) :: head :: firstArg :: tail =>
           val firstTerm = Expression.Application(head.toExpression, firstArg.toExpression)
           tail.map(_.toExpression).foldLeft(firstTerm)((prev, x) => Expression.Application(prev, x))
 
         case CNull :: _ | CTrue :: _ | CFalse :: _ | CDouble(_) :: _ => ().die(s"Invalid array $this - may not start with ${data.head}")
-        case CInt(1) :: tipe :: body :: Nil => Expression.Lambda(VarName("_"), tipe.toExpression, body.toExpression)
-        case CInt(1) :: CString(name) :: tipe :: body :: Nil if name != "_" => Expression.Lambda(VarName(name), tipe.toExpression, body.toExpression)
+        case CIntTag(1) :: tipe :: body :: Nil => Expression.Lambda(VarName("_"), tipe.toExpression, body.toExpression)
+        case CIntTag(1) :: CString(name) :: tipe :: body :: Nil if name != "_" => Expression.Lambda(VarName(name), tipe.toExpression, body.toExpression)
 
-        case CInt(2) :: tipe :: body :: Nil => Expression.Forall(VarName("_"), tipe.toExpression, body.toExpression)
-        case CInt(2) :: CString(name) :: tipe :: body :: Nil if name != "_" => Expression.Forall(VarName(name), tipe.toExpression, body.toExpression)
+        case CIntTag(2) :: tipe :: body :: Nil => Expression.Forall(VarName("_"), tipe.toExpression, body.toExpression)
+        case CIntTag(2) :: CString(name) :: tipe :: body :: Nil if name != "_" => Expression.Forall(VarName(name), tipe.toExpression, body.toExpression)
 
-        case CInt(3) :: CInt(codeBigInt) :: left :: right :: Nil if codeBigInt.isValidByte && codeBigInt >= 0 && codeBigInt < 13 => // Expression.Operator
-          Expression.Operator(left.toExpression, SyntaxConstants.Operator.byCode(codeBigInt.toInt), right.toExpression)
+        case CIntTag(3) :: CInt(code) :: left :: right :: Nil if code.isValidByte && code >= 0 && code < 13 => // Expression.Operator
+          Expression.Operator(left.toExpression, SyntaxConstants.Operator.byCode(code.toInt), right.toExpression)
 
-        case CInt(3) :: CInt(codeBigInt) :: left :: right :: Nil if codeBigInt.isValidInt && codeBigInt.intValue == 13 => // Expression.Operator
+        case CIntTag(3) :: CInt(code) :: left :: right :: Nil if code.isValidInt && code.intValue == 13 => // Expression.Operator
           Expression.Completion(left.toExpression, right.toExpression)
 
-        case CInt(28) :: tipe :: Nil => Expression.EmptyList(tipe.toExpression)
+        case CIntTag(28) :: tipe :: Nil => Expression.EmptyList(tipe.toExpression)
 
-        case CInt(4) :: CNull :: head :: tail => Expression.NonEmptyList(head.toExpression, tail.map(_.toExpression))
+        case CIntTag(4) :: CNull :: head :: tail => Expression.NonEmptyList(head.toExpression, tail.map(_.toExpression))
 
-        case CInt(5) :: CNull :: body :: Nil => Expression.KeywordSome(body.toExpression)
+        case CIntTag(5) :: CNull :: body :: Nil => Expression.KeywordSome(body.toExpression)
 
-        case CInt(6) :: t :: u :: Nil => Expression.Merge(t.toExpression, u.toExpression, None)
-        case CInt(6) :: t :: u :: v :: Nil => Expression.Merge(t.toExpression, u.toExpression, Some(v.toExpression))
+        case CIntTag(6) :: t :: u :: Nil => Expression.Merge(t.toExpression, u.toExpression, None)
+        case CIntTag(6) :: t :: u :: v :: Nil => Expression.Merge(t.toExpression, u.toExpression, Some(v.toExpression))
 
-        case CInt(27) :: u :: Nil => Expression.ToMap(u.toExpression, None)
-        case CInt(27) :: u :: v :: Nil => Expression.ToMap(u.toExpression, Some(v.toExpression))
+        case CIntTag(27) :: u :: Nil => Expression.ToMap(u.toExpression, None)
+        case CIntTag(27) :: u :: v :: Nil => Expression.ToMap(u.toExpression, Some(v.toExpression))
 
-        case CInt(34) :: u :: Nil => Expression.ShowConstructor(u.toExpression)
+        case CIntTag(34) :: u :: Nil => Expression.ShowConstructor(u.toExpression)
 
-        case CInt(7) :: CMap(data) :: Nil => Expression.RecordType(data.toSeq.map { case (name, expr) => (FieldName(name), expr.toExpression) })
-        case CInt(8) :: CMap(data) :: Nil => Expression.RecordLiteral(data.toSeq.map { case (name, expr) => (FieldName(name), expr.toExpression) })
+        case CIntTag(7) :: CMap(data) :: Nil => Expression.RecordType(data.toSeq.map { case (name, expr) => (FieldName(name), expr.toExpression) })
+        case CIntTag(8) :: CMap(data) :: Nil => Expression.RecordLiteral(data.toSeq.map { case (name, expr) => (FieldName(name), expr.toExpression) })
 
-        case CInt(9) :: t :: CString(name) :: Nil => Expression.Field(t.toExpression, FieldName(name))
+        case CIntTag(9) :: t :: CString(name) :: Nil => Expression.Field(t.toExpression, FieldName(name))
 
-        case CInt(10) :: t :: tails if tails.nonEmpty && tails.forall(_.isInstanceOf[CString]) =>
+        case CIntTag(10) :: t :: tails if tails.nonEmpty && tails.forall(_.isInstanceOf[CString]) =>
           Expression.ProjectByLabels(t.toExpression, tails.map(_.asInstanceOf[CString].data).map(FieldName))
 
-        case CInt(10) :: t :: CArray(Array(tipe)) :: Nil => Expression.ProjectByType(t.toExpression, tipe.toExpression)
+        case CIntTag(10) :: t :: CArray(Array(tipe)) :: Nil => Expression.ProjectByType(t.toExpression, tipe.toExpression)
 
-        case CInt(11) :: CMap(data) :: Nil => Expression.UnionType(data.toSeq.map { case (name, expr) => (ConstructorName(name), if (expr == CNull) None else Some(expr.toExpression)) })
+        case CIntTag(11) :: CMap(data) :: Nil => Expression.UnionType(data.toSeq.map { case (name, expr) => (ConstructorName(name), if (expr == CNull) None else Some(expr.toExpression)) })
 
-        case CInt(14) :: cond :: ifTrue :: ifFalse :: Nil => Expression.If(cond.toExpression, ifTrue.toExpression, ifFalse.toExpression)
+        case CIntTag(14) :: cond :: ifTrue :: ifFalse :: Nil => Expression.If(cond.toExpression, ifTrue.toExpression, ifFalse.toExpression)
 
-        case CInt(15) :: CInt(n) :: Nil if n >= 0 => Expression.NaturalLiteral(n)
-        case CInt(16) :: CInt(n) :: Nil => Expression.IntegerLiteral(n)
+        case CIntTag(15) :: CInt(n) :: Nil if n >= 0 => Expression.NaturalLiteral(n)
+        case CIntTag(16) :: CInt(n) :: Nil => Expression.IntegerLiteral(n)
 
-        case CInt(18) :: CString(head) :: tail
+        case CIntTag(18) :: CString(head) :: tail
           if tail.zipWithIndex.forall {
             case (t, i) if i % 2 == 0 && t.toExpression != null => true
             case (CString(_), i) if i % 2 == 1 => true
@@ -99,11 +161,25 @@ sealed trait CBORmodel {
 
         case CString(name) :: CInt(index) :: Nil => Expression.Variable(VarName(name), index)
 
-        case CInt(33) :: CBytes(bytes) :: Nil => Expression.BytesLiteral(CBytes.byteArrayToHexString(bytes))
+        case CIntTag(33) :: CBytes(bytes) :: Nil => Expression.BytesLiteral(CBytes.byteArrayToHexString(bytes))
 
-        case CInt(19) :: t :: Nil => Expression.Assert(t.toExpression)
+        case CIntTag(19) :: x :: Nil => Expression.Assert(x.toExpression)
 
-        case CInt(26) :: body :: tipe :: Nil => Expression.Annotation(body.toExpression, tipe.toExpression)
+        case CIntTag(26) :: body :: tipe :: Nil => Expression.Annotation(body.toExpression, tipe.toExpression)
+
+        case CIntTag(24) :: maybeHash :: code => ??? // Expression.Import
+
+        case CIntTag(25) :: defs => ??? // Expression.Let
+
+        case CIntTag(29) :: base :: CArray(defs) :: target :: Nil if defs.forall {
+          case CIntTag(0) | CString(_) => true
+          case _ => false
+        } => Expression.With(base.toExpression, defs.map {
+          case CIntTag(0) => PathComponent.DescendOptional
+          case CString(name) => PathComponent.Label(FieldName(name))
+        }, target.toExpression)
+
+        case CIntTag(30) :: defs => ??? // Expression.Date
 
         case _ => ().die(s"Invalid top-level array $this while parsing CBOR")
       }
@@ -113,7 +189,7 @@ sealed trait CBORmodel {
     case CBytes(_) | CMap(_) => ().die(s"Unexpected top-level CBOR object: $this")
   }
 
-  def asString: String = ().die(s"This CBORmodel is $this and not a CString")
+  def asString: String = (this.asInstanceOf[CString].data).or(s"This CBORmodel is $this and not a CString")
 }
 
 object CBORmodel {
@@ -175,6 +251,12 @@ object CBORmodel {
     override def toCBOR: CBORObject = CBORObject.False
 
     override def toString: String = "false"
+  }
+
+  // Pattern-match CInt with an integer value. (Note: BigInt does not have `unapply`.)
+  object CIntTag {
+    // Cheat sheet: `x match { case CIntTag(1) => ... }` will match successfully when CIntTag.unapply(x) == Some(1).
+    def unapply(x: CInt): Option[Int] = Some(x.data.intValue).filter(_ => x.data.isValidInt)
   }
 
   // Either a 64-bit int or a bigint.

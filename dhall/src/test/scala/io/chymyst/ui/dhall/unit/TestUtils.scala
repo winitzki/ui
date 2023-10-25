@@ -20,27 +20,39 @@ object TestUtils {
     stackTrace.toString
   }
 
-  // Do not verify the last parsed position.
-  def check[A](grammarRule: P[_] => P[A], input: String, expectedResult: A): Unit = {
-    val parsed = parse(input, grammarRule)
+
+  def checkMaybeLastPosition[A](parsed: Parsed[A], input: String, expectedResult: A, lastPosition: Option[Int] = None): Unit = {
     parsed match {
       case Parsed.Success(value, index) =>
         println(s"Parsing input '$input', got Success($value, $index), expecting Success($expectedResult, _)")
       case Parsed.Failure(message, index, extra) =>
         println(s"Error: Parsing input '$input', expected Success($expectedResult, $index) but got Failure('$message', $index, ${Try(extra.stack).toOption})")
     }
-    expect((input != null) && (parsed.get.value == expectedResult))
+    lastPosition match {
+      case Some(lastIndex) => expect((input != null) && (parsed == Parsed.Success(expectedResult, lastIndex)))
+      case None => expect((input != null) && (parsed.get.value == expectedResult))
+    }
+  }
+
+  // Do not verify the last parsed position.
+  def check[A](grammarRule: P[_] => P[A], input: String, expectedResult: A): Unit = {
+    val parsed = parse(input, grammarRule)
+    checkMaybeLastPosition(parsed, input, expectedResult)
+  }
+
+  def check[A](grammarRule: P[_] => P[A], input: Array[Byte], expectedResult: A): Unit = {
+    val parsed = parse(input, grammarRule)
+    checkMaybeLastPosition(parsed, new String(input), expectedResult)
   }
 
   def check[A](grammarRule: P[_] => P[A], input: String, expectedResult: A, lastIndex: Int): Unit = {
     val parsed = parse(input, grammarRule)
-    parsed match {
-      case Parsed.Success(value, index) =>
-        println(s"Parsing input '$input', got Success($value, $index), expecting Success($expectedResult, $lastIndex)")
-      case Parsed.Failure(message, index, extra) =>
-        println(s"Error: Parsing input '$input', expected Success($expectedResult, $index) but got Failure('$message', $index, ${Try(extra.stack).toOption})")
-    }
-    expect((input != null) && (parsed == Parsed.Success(expectedResult, lastIndex)))
+    checkMaybeLastPosition(parsed, input, expectedResult, Some(lastIndex))
+  }
+
+  def check[A](grammarRule: P[_] => P[A], input: Array[Byte], expectedResult: A, lastIndex: Int): Unit = {
+    val parsed = parse(input, grammarRule)
+    checkMaybeLastPosition(parsed, new String(input), expectedResult, Some(lastIndex))
   }
 
   def toFail[A](grammarRule: P[_] => P[A], input: String, parsedInput: String, expectedMessage: String, lastIndex: Int): Unit = {

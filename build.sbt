@@ -84,6 +84,7 @@ lazy val dhall = (project in file("dhall")).settings(
   scalaVersion := scalaV,
   crossScalaVersions := Seq(scala2V, scala3V),
   testFrameworks += munitFramework,
+  Test / parallelExecution := true,
   libraryDependencies ++= Seq(
     fastparse,
     munit,

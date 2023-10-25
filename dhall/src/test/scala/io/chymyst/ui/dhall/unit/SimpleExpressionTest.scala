@@ -178,7 +178,7 @@ class SimpleExpressionTest extends FunSuite {
 
   test("simple_label") {
     val input = "witha"
-    check(Grammar.simple_label(_), input,  "witha")
+    check(Grammar.simple_label(_), input, "witha")
   }
 
   test("empty record literal") {
@@ -198,8 +198,8 @@ class SimpleExpressionTest extends FunSuite {
 
   test("variable name missing//foo, conflict with import declaration") {
 
-    check(Grammar.simple_label(_), "missingas",  "missingas")
-    check(Grammar.identifier(_), "missingas",  v("missingas"))
+    check(Grammar.simple_label(_), "missingas", "missingas")
+    check(Grammar.identifier(_), "missingas", v("missingas"))
 
     check(Seq(
       "missing as Text" -> Expression.Import(Missing, RawText, None),
@@ -212,21 +212,28 @@ class SimpleExpressionTest extends FunSuite {
   }
 
   test("invalid utf-8") {
-    val input = Array(0x20.toByte, 0xED.toByte, 0xA0.toByte, 0x80.toByte)
+    // The byte sequence 0xED, 0xA0, 0x80 is not a valid UTF-8 sequence.
+    val input = Array(0x20, 0xED, 0xA0, 0x80, 0x20).map(_.toByte)
     import fastparse._, NoWhitespace._
     def grammar[$: P] = P(SingleChar.rep)
 
     val result = parse(input, grammar(_))
-    result.get.value.foreach(s => println(s"Char: ${s.toInt}"))
-    assert(result.get.value == Seq(32.toChar, 65533.toChar))
-    // TODO: figure out how `fastparse` decodes a byte array into characters. This test shows that the non-UTF8 sequence is decoded as a single character 65533.
+    // \uFFFD is the "replacement character" that is substituted for invalid UTF-8 sequences.
+    assert(result.get.value == Seq(0x20, 0xFFFD, 0x20).map(_.toChar))
+    // TODO: figure out how `fastparse` decodes a byte array into characters. This test shows that the non-UTF8 sequence is decoded as a single character \uFFFD.
+
+    val invalidUtf8 = " {-".getBytes ++ input ++ "-}".getBytes
+    check(Grammar.whsp(_), invalidUtf8, (), 1)
+
+    val invalidUtf8a = " {- \uFFFD -}"
+    check(Grammar.whsp(_), invalidUtf8a, (), 1)
   }
 
   test("quoted multiline string ends with newline") {
     check(Grammar.complete_expression(_),
       """''
         |  a
-        |  ''""".stripMargin, TextLiteral(List(),"a\n"))
+        |  ''""".stripMargin, TextLiteral(List(), "a\n"))
 
     check(Grammar.complete_expression(_),
       """''

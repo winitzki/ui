@@ -50,7 +50,7 @@ class CBORtest extends FunSuite {
   }
 
   test("CBOR roundtrips for half-precision float") {
-    expect(CBORObject.FromObject(1.0f).EncodeToBytes().length == 3)
+    expect(CBORObject.FromObject(1.0).EncodeToBytes().length == 3)
     expect(CBORObject.FromObject(0.0f).EncodeToBytes().length == 5)
     expect(CBORObject.FromObject(-0.0f).EncodeToBytes().length == 5)
     expect(CBORObject.FromObject(0.0).EncodeToBytes().length == 5)

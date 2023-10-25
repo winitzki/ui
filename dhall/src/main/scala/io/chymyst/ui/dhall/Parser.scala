@@ -19,7 +19,8 @@ object Grammar {
     CharIn(
       "\u0080-\uD7FF",
       // %xD800_DFFF = surrogate pairs
-      "\uE000-\uFFFD",
+//      "\uE000-\uFFFC",
+      "\uE000-\uFFFC", // Workaround: Disallow the "replacement" character ("\uFFFD") because it will be generated for invalid utf-8 encodings.
     )
       | (CharIn("\uD800-\uD83E") ~ CharIn("\uDC00-\uDFFF"))
       | (CharIn("\uD83F") ~ CharIn("\uDC00-\uDFFD"))
@@ -70,7 +71,7 @@ object Grammar {
   def tab[$: P] = P("\t")
 
   def block_comment[$: P] = P(
-    "{-" ~ block_comment_continue // Do not use cut here, because then block comment will fail the entire identifier when parsing "x {- -}" without a following @.
+    "{-" ~/ block_comment_continue // Do not use cut here, because then block comment will fail the entire identifier when parsing "x {- -}" without a following @.
   )
 
   def block_comment_char[$: P] = P(
@@ -82,7 +83,7 @@ object Grammar {
 
   def block_comment_continue[$: P]: P[Unit] = P(
     "-}"
-      | (block_comment ~ block_comment_continue)
+      | (block_comment ~/ block_comment_continue)
       | (block_comment_char ~ block_comment_continue)
   )
 
@@ -107,11 +108,11 @@ object Grammar {
   )
 
   def whsp[$: P]: P[Unit] = P(
-    whitespace_chunk.rep
+    NoCut(whitespace_chunk.rep)
   )
 
   def whsp1[$: P]: P[Unit] = P(
-    whitespace_chunk.rep(1)
+    NoCut(whitespace_chunk.rep(1))
   )
 
   def ALPHA[$: P] = P(CharIn("\u0041-\u005A", "\u0061-\u007A"))
