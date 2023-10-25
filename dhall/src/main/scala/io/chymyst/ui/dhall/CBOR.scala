@@ -8,6 +8,7 @@ import io.chymyst.ui.dhall.CBORmodel._
 import io.chymyst.ui.dhall.Syntax.{Expression, Natural, PathComponent}
 import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, ImportType, VarName}
 
+import java.time.LocalTime
 import scala.annotation.tailrec
 import scala.collection.immutable.Seq
 import scala.jdk.CollectionConverters.MapHasAsScala
@@ -88,7 +89,7 @@ sealed trait CBORmodel {
   }
 
   final def toExpression: Expression = this match {
-    case CNull => ().die(s"Invalid null value")
+    case CNull => ().die(s"Invalid top-level CBOR null value")
     case CTrue => Expression.Builtin(SyntaxConstants.Builtin.True)
     case CFalse => Expression.Builtin(SyntaxConstants.Builtin.False)
     case CInt(data) => Expression.Variable(VarName("_"), data)
@@ -169,7 +170,11 @@ sealed trait CBORmodel {
 
         case CIntTag(24) :: maybeHash :: code => ??? // Expression.Import
 
-        case CIntTag(25) :: defs => ??? // Expression.Let
+        case CIntTag(25) :: defs if defs.length > 3 => // Expression.Let
+          val target = defs.last
+          defs.init.grouped(3).foldRight(target.toExpression) { case (List(name, tipe, expr), t) =>
+            Expression.Let(VarName(name.asString), if (tipe == CNull) None else Some(tipe.toExpression), expr.toExpression, t)
+          }
 
         case CIntTag(29) :: base :: CArray(defs) :: target :: Nil if defs.forall {
           case CIntTag(0) | CString(_) => true
@@ -179,7 +184,24 @@ sealed trait CBORmodel {
           case CString(name) => PathComponent.Label(FieldName(name))
         }, target.toExpression)
 
-        case CIntTag(30) :: defs => ??? // Expression.Date
+        case CIntTag(30) :: CIntTag(year) :: CIntTag(month) :: CIntTag(day) :: Nil if month >= 1 && month <= 12 && day >= 1 && day <= 31 => Expression.DateLiteral(year, month, day)
+
+        case CIntTag(31) :: CIntTag(hours) :: CIntTag(minutes) :: CTagged(4, CArray(Array(CIntTag(precision), CIntTag(totalSeconds)))) :: Nil if hours >= 0 && hours <= 23 && minutes >= 0 && minutes < 60 && precision <= 0 && precision >= -9 =>
+          val power = math.pow(10, -precision).toInt
+          assert(power > 0)
+          val seconds: Int = totalSeconds / power
+          val nanos: Int = (totalSeconds % power) * math.pow(10, precision + 9).toInt
+
+          Expression.TimeLiteral(LocalTime.of(hours, minutes, seconds, nanos))
+
+
+        case CIntTag(32) :: (CTrue | CFalse) :: CIntTag(hours) :: CIntTag(minutes) :: Nil if hours >= 0 && hours <= 23 && minutes >= 0 && minutes < 60 =>
+          val sign = data(1) match {
+            case CTrue => 1
+            case CFalse => -1
+          }
+          Expression.TimeZoneLiteral(sign * (hours * 60 + minutes))
+
 
         case _ => ().die(s"Invalid top-level array $this while parsing CBOR")
       }
