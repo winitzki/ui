@@ -7,10 +7,10 @@ import io.chymyst.ui.dhall.Syntax.Expression.{Import, Lambda, Let, NaturalLitera
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
 import io.chymyst.ui.dhall.SyntaxConstants.Builtin.Natural
 import io.chymyst.ui.dhall.SyntaxConstants.ImportMode.RawText
-import io.chymyst.ui.dhall.SyntaxConstants.ImportType.Missing
+import io.chymyst.ui.dhall.SyntaxConstants.ImportType.{Missing, Remote}
 import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, ImportMode, VarName}
 import io.chymyst.ui.dhall.unit.TestUtils.{check, printFailure, toFail, v}
-import io.chymyst.ui.dhall.{Grammar, Parser, SyntaxConstants}
+import io.chymyst.ui.dhall.{CBOR, Grammar, Parser, SyntaxConstants}
 import munit.FunSuite
 
 import java.rmi.server.ExportException
@@ -223,10 +223,10 @@ class SimpleExpressionTest extends FunSuite {
     // TODO: figure out how `fastparse` decodes a byte array into characters. This test shows that the non-UTF8 sequence is decoded as a single character \uFFFD.
 
     val invalidUtf8 = " {-".getBytes ++ input ++ "-}".getBytes
-    check(Grammar.whsp(_), invalidUtf8, (), 1)
+    toFail(Grammar.whsp(_), invalidUtf8,   3)
 
-    val invalidUtf8a = " {- \uFFFD -}"
-    check(Grammar.whsp(_), invalidUtf8a, (), 1)
+    val utfReplacementChar = " {- \uFFFD -}"
+    toFail(Grammar.whsp(_), utfReplacementChar.getBytes("UTF-8"),   3)
   }
 
   test("quoted multiline string ends with newline") {
@@ -246,4 +246,16 @@ class SimpleExpressionTest extends FunSuite {
         |''""".stripMargin, TextLiteral(List(), "c\n"))
   }
 
+  test("empty url path") {
+    Seq(
+      "http://example.com",
+      "https://example.com",
+      "http://example.com/",
+    ).foreach { urlString =>
+      val expr1a = Parser.parseDhall(urlString).get.value.value.asInstanceOf[Import]
+      val expr1b = CBOR.bytesToExpr(CBOR.exprToBytes(expr1a)).asInstanceOf[Import]
+      expect(expr1a == expr1b)
+    }
+
+  }
 }

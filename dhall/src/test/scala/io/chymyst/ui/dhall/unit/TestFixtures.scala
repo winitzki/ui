@@ -115,7 +115,7 @@ object TestFixtures {
 
   val importExpressions: Seq[(String, Expression)] = Seq(
     s"./a.dhall sha256:$sha256example" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("a.dhall"))), ImportMode.Code, Some(Expression.BytesLiteral(sha256example))),
-    s"./a.dhall sha256:$sha256lc" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("a.dhall"))), ImportMode.Code, Some(Expression.BytesLiteral(sha256lc))),
+    s"./a.dhall sha256:$sha256lc" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("a.dhall"))), ImportMode.Code, Some(Expression.BytesLiteral(sha256lc.toUpperCase))),
     "./local/import as Location" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.Location, None),
     s"./local/import sha256:$sha256example" -> Expression.Import(ImportType.Path(FilePrefix.Here, File(Seq("local", "import"))), ImportMode.Code, Some
     (Expression.BytesLiteral(sha256example))),

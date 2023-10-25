@@ -133,7 +133,8 @@ sealed trait CBORmodel {
 
         case CIntTag(34) :: u :: Nil => Expression.ShowConstructor(u.toExpression)
 
-        case CIntTag(7) :: CMap(data) :: Nil => Expression.RecordType(data.toSeq.map { case (name, expr) => (FieldName(name), expr.toExpression) })
+        case CIntTag(7) :: CMap(data) :: Nil => Expression.RecordType(data.toSeq.sortBy(_._1).map { case (name, expr) => (FieldName(name), expr.toExpression) })
+
         case CIntTag(8) :: CMap(data) :: Nil => Expression.RecordLiteral(data.toSeq.map { case (name, expr) => (FieldName(name), expr.toExpression) })
 
         case CIntTag(9) :: t :: CString(name) :: Nil => Expression.Field(t.toExpression, FieldName(name))
@@ -182,12 +183,12 @@ sealed trait CBORmodel {
               val headers = if (headersOrCNull == CNull) None else Some(headersOrCNull.toExpression)
               val query = if (relativeURL.last == CNull) None else Some(relativeURL.last.asString)
               val segments = relativeURL.init.map(_.asString)
-              val url = SyntaxConstants.URL(scheme = SyntaxConstants.Scheme.cborCodeDict(t), authority = authority, path = SyntaxConstants.File(segments), query = query)
+              val url = SyntaxConstants.URL(scheme = SyntaxConstants.Scheme.cborCodeDict(t), authority = authority, path = SyntaxConstants.File.of(segments), query = query)
               ImportType.Remote(url, headers)
 
             case (t, filePath) if SyntaxConstants.FilePrefix.cborCodeDict.keySet contains t =>
               val filePrefix: FilePrefix = FilePrefix.cborCodeDict(t)
-              ImportType.Path(filePrefix, SyntaxConstants.File(filePath.map(_.asString)))
+              ImportType.Path(filePrefix, SyntaxConstants.File.of(filePath.map(_.asString)))
 
             case (6, List(CString(varName))) => ImportType.Env(varName)
 
@@ -536,8 +537,7 @@ object CBOR {
         case ImportType.Missing => Seq(7)
 
         case ImportType.Remote(SyntaxConstants.URL(scheme, authority, SyntaxConstants.File(segments), query), headers) =>
-          val pathSegmentsForCbor = if (segments.isEmpty) Seq("") else segments
-          scheme.cborCode +: headers.orNull +: authority +: pathSegmentsForCbor :+ query.orNull
+          scheme.cborCode +: headers.orNull +: authority +: segments :+ query.orNull
 
         case ImportType.Path(filePrefix, SyntaxConstants.File(segments)) => filePrefix.cborCode +: segments
 

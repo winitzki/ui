@@ -4,8 +4,6 @@ import enumeratum._
 import io.chymyst.ui.dhall.CBORmodel.CBytes
 import io.chymyst.ui.dhall.Grammar.hexStringToByteArray
 import io.chymyst.ui.dhall.Syntax.Expression
-import io.chymyst.ui.dhall.SyntaxConstants.Operator.findValues
-import io.chymyst.ui.dhall.SyntaxConstants.Scheme.findValues
 import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, VarName}
 
 import java.time.LocalTime
@@ -221,7 +219,13 @@ object SyntaxConstants {
   // The query of ?foo=1&bar=true is stored as "foo=1&bar=true".
   final case class URL(scheme: Scheme, authority: String, path: File, query: Option[String])
 
-  final case class File(segments: Seq[String])
+  final case class File(segments: Seq[String]) {
+    require(segments.nonEmpty)
+  }
+
+  object File {
+    def of(segments: Seq[String]) = if (segments.isEmpty) File(Seq("")) else File(segments)
+  }
 }
 
 object Syntax {
@@ -272,7 +276,12 @@ object Syntax {
 
     final case class With(data: Expression, pathComponents: Seq[PathComponent], body: Expression) extends Expression
 
-    final case class DoubleLiteral(value: Double) extends Expression
+    final case class DoubleLiteral(value: Double) extends Expression {
+      override def equals(other: Any): Boolean =  other.isInstanceOf[DoubleLiteral] && {
+        val otherValue = other.asInstanceOf[DoubleLiteral].value
+        (value == otherValue) || (value.isNaN && otherValue.isNaN)
+      }
+    }
 
     final case class NaturalLiteral(value: Natural) extends Expression
 

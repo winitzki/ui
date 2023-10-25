@@ -55,6 +55,17 @@ object TestUtils {
     checkMaybeLastPosition(parsed, new String(input), expectedResult, Some(lastIndex))
   }
 
+  def toFail[A](grammarRule: P[_] => P[A], input: Array[Byte], lastIndex: Int): Unit = {
+    val parsed = parse(input, grammarRule)
+    parsed match {
+      case Parsed.Success(value, index) =>
+        throw new Exception(s"Error: Parsing input '$input', expected Failure but got Success($value, $index)")
+      case f@Parsed.Failure(message, index, extra) =>
+        println(s"Parsing input '$input', expected index $lastIndex, got Failure('$message', $index, ${Try(extra.stack).toOption}), message '${f.msg}' as expected")
+        expect(input != null && f.index == lastIndex)
+    }
+  }
+
   def toFail[A](grammarRule: P[_] => P[A], input: String, parsedInput: String, expectedMessage: String, lastIndex: Int): Unit = {
     val parsed = parse(input, grammarRule)
     parsed match {

@@ -13,11 +13,11 @@ import java.nio.file.{Files, Paths}
 class ParserTest extends FunSuite {
 
   test("quoted_label_char") {
-    val Parsed.Success((), 1) = parse("asdf", Grammar.quoted_label_char(_))
-    val f@Parsed.Failure(failure, index, _) = parse("`asdf", Grammar.quoted_label_char(_))
+    val Parsed.Success((), 1) = parse("expected", Grammar.quoted_label_char(_))
+    val f@Parsed.Failure(failure, index, _) = parse("`expected", Grammar.quoted_label_char(_))
     expect(failure == "")
     expect(index == 0)
-    expect(f.msg == """Position 1:1, found "`asdf"""")
+    expect(f.msg == """Position 1:1, found "`expected"""")
   }
 
   test("requireKeyword") {
@@ -91,8 +91,8 @@ class ParserTest extends FunSuite {
     // Incomplete comments will not fail to parse without ~End unless `{-` cuts. But if it cuts we cannot parse identifiers with trailing comments.
     def whspClosed[$: P] = Grammar.whsp ~ End
 
-    toFail(whspClosed(_), "{-", "", "", 0)
-    toFail(whspClosed(_), "{- {- -} -0", "", "", 9)
+    toFail(whspClosed(_), "{-", "", "", 2)
+    toFail(whspClosed(_), "{- {- -} -0", "", "", 8)
   }
 
   test("comment fails when incomplete") {
@@ -116,7 +116,7 @@ class ParserTest extends FunSuite {
         |}  |
         |- }""".stripMargin,
     ).foreach { input =>
-      toFail(whspClosed(_), input, "", "", 3)
+      toFail(whspClosed(_), input, "", "", 5)
     }
 
   }
