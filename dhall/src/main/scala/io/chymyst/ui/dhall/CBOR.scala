@@ -133,7 +133,8 @@ sealed trait CBORmodel {
 
         case CIntTag(34) :: u :: Nil => Expression.ShowConstructor(u.toExpression)
 
-        case CIntTag(7) :: CMap(data) :: Nil => Expression.RecordType(data.toSeq.sortBy(_._1).map { case (name, expr) => (FieldName(name), expr.toExpression) })
+        // Doing data.toSeq.sortBy(_._1).map { ... } increases the number of mismatches in the standard tests after CBOR roundtrip.
+        case CIntTag(7) :: CMap(data) :: Nil => Expression.RecordType(data.toSeq.map { case (name, expr) => (FieldName(name), expr.toExpression) })
 
         case CIntTag(8) :: CMap(data) :: Nil => Expression.RecordLiteral(data.toSeq.map { case (name, expr) => (FieldName(name), expr.toExpression) })
 

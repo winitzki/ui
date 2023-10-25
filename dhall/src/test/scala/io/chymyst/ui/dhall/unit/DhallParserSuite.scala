@@ -4,6 +4,7 @@ import fastparse.Parsed
 import io.chymyst.ui.dhall.{CBOR, Parser, Syntax}
 import munit.FunSuite
 import TestUtils._
+import com.eed3si9n.expecty.Expecty.expect
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
 
 import java.io.{File, FileInputStream}
@@ -53,7 +54,9 @@ class DhallParserSuite extends FunSuite {
       if (result.isSuccess) println(s"Parsing file ${file.getName} expecting failure. Result: unexpected success:\n\t\t\t${result.get}\n")
       result
     }
-    println(s"Success count: ${results.count(_.isSuccess)}\nFailure count: ${results.count(_.isFailure)}")
+    val failures = results.count(_.isSuccess) // We expect that all examples fail to parse here.
+    println(s"Success count: ${results.count(_.isFailure)}\nFailure count: $failures")
+    expect(failures == 0)
   }
 
   test("convert standard examples for successful parsing into CBOR") {
@@ -67,6 +70,7 @@ class DhallParserSuite extends FunSuite {
       result
     }
     println(s"Success count: ${results.count(_.isSuccess)}\nFailure count: ${results.count(_.isFailure)}")
+    expect(results.count(_.isFailure) == 0)
   }
 
   test("validate CBOR encoding for standard examples") {

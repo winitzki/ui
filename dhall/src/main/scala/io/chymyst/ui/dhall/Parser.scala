@@ -19,7 +19,7 @@ object Grammar {
     CharIn(
       "\u0080-\uD7FF",
       // %xD800_DFFF = surrogate pairs
-//      "\uE000-\uFFFC",
+      //      "\uE000-\uFFFC",
       "\uE000-\uFFFC", // Workaround: Disallow the "replacement" character ("\uFFFD") because it will be generated for invalid utf-8 encodings.
     )
       | (CharIn("\uD800-\uD83E") ~ CharIn("\uDC00-\uDFFF"))
@@ -410,7 +410,11 @@ object Grammar {
   def numeric_double_literal[$: P]: P[DoubleLiteral] = P(
     // [ "+" | "-" ] 1*DIGIT ( "." 1*DIGIT [ exponent ] | exponent)
     (("+" | "-").? ~ DIGIT.rep(1) ~ ("." ~ DIGIT.rep(1) ~ exponent.? | exponent)).!
-  ).map(digits => DoubleLiteral(digits.toDouble))
+  ).flatMap { digits =>
+    val number = digits.toDouble
+    if (number.isFinite)
+      Pass(DoubleLiteral(number)) else Fail(s"Digits $digits do not represent a finite Double value")
+  }
 
   def minus_infinity_literal[$: P]: P[DoubleLiteral] = P(
     "-" ~ requireKeyword("Infinity")
