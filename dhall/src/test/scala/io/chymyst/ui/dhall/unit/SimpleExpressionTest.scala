@@ -280,4 +280,5 @@ class SimpleExpressionTest extends FunSuite {
       check(Grammar.posix_environment_variable(_), input, envVarName)
     }
   }
+
 }

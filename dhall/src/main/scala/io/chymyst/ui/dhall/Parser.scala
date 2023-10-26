@@ -1112,12 +1112,12 @@ object Grammar {
       //
       //  "{ foo = 1      , bar = True }"
       //  "{ foo : Integer, bar : Bool }"
-      | ("{" ~ whsp ~/ ("," ~/ whsp./).? ~ record_type_or_literal ~ whsp ~ "}")
+      | ("{" ~ whsp ~ ("," ~ whsp).? ~ record_type_or_literal ~ whsp ~ "}")
       .map(_.getOrElse(Expression.RecordType(Seq())))
       //
       //  "< Foo : Integer | Bar : Bool >"
       //  "< Foo | Bar : Bool >"
-      | P("<" ~ whsp ~/ ("|" / whsp./).? ~ union_type ~ whsp ~ ">")
+      | P("<" ~ whsp ~ ("|" / whsp /* No cut here, or else < | Foo > cannot be parsed. */).? ~ union_type ~ whsp ~ ">")
       //
       //  "[1, 2, 3]"
       | non_empty_list_literal
@@ -1164,18 +1164,18 @@ object Grammar {
   )
 
   def union_type[$: P]: P[Expression.UnionType] = P(
-    (union_type_entry ~ (whsp ~ "|" ~ whsp ~/ union_type_entry).rep ~ (whsp ~ "|").?).?
+    (union_type_entry ~ (whsp ~ "|" ~ whsp ~ union_type_entry).rep ~ (whsp ~ "|").?).?
   ).map {
     case Some((headName, headType, tail)) => Expression.UnionType((headName, headType) +: tail)
     case None => Expression.UnionType(Seq())
   }
 
   def union_type_entry[$: P] = P(
-    any_label_or_some.map(ConstructorName) ~ (whsp ~ ":" ~ whsp1 ~/ expression).?
+    any_label_or_some.map(ConstructorName) ~ (whsp ~ ":" ~/ whsp1 ~/ expression).?
   )
 
   def non_empty_list_literal[$: P]: P[Expression.NonEmptyList] = P(
-    "[" ~ whsp ~ ("," ~ whsp).? ~ expression ~ whsp ~ ("," ~ whsp ~/ expression ~ whsp).rep ~ ("," ~ whsp).? ~ "]"
+    "[" ~ whsp ~ ("," ~ whsp).? ~ expression ~ whsp ~ ("," ~ whsp ~ /* No cut here, or else [, ,] cannot be parsed. */ expression ~ whsp).rep ~ ("," ~/ whsp).? ~ "]"
   ).map { case (head, tail) => Expression.NonEmptyList(head, tail) }
 
   def shebang[$: P] = P(
