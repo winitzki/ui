@@ -765,10 +765,10 @@ object Grammar {
   ).map { case (url, headers) => ImportType.Remote(url, headers) }
 
   def env[$: P]: P[ImportType.Env] = P(
-    "env:" ~/
-      (bash_environment_variable.!
+    "env:" ~/ (
+      bash_environment_variable.!
         | ("\u0022" ~ posix_environment_variable.! ~ "\u0022")
-        )
+      )
   ).map(name => ImportType.Env(name))
 
   def bash_environment_variable[$: P] = P(
@@ -780,7 +780,7 @@ object Grammar {
   )
 
   def posix_environment_variable_character[$: P] = P(
-    ("\\" ~ CharIn("\"\\abfnrtv"))
+    ("\\" ~ (CharIn("\"", "abfnrtv") | "\\"))
       //    %x5C                 // '\'    Beginning of escape sequence
       //      ( %x22               // '"'    quotation mark  U+0022
       //        | %x5C               // '\'    reverse solidus U+005C

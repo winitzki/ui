@@ -7,7 +7,7 @@ import io.chymyst.ui.dhall.Syntax.Expression.{Import, Lambda, Let, NaturalLitera
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
 import io.chymyst.ui.dhall.SyntaxConstants.Builtin.Natural
 import io.chymyst.ui.dhall.SyntaxConstants.ImportMode.RawText
-import io.chymyst.ui.dhall.SyntaxConstants.ImportType.{Missing, Remote}
+import io.chymyst.ui.dhall.SyntaxConstants.ImportType.{Env, Missing, Remote}
 import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, ImportMode, VarName}
 import io.chymyst.ui.dhall.unit.TestUtils.{check, printFailure, toFail, v}
 import io.chymyst.ui.dhall.{CBOR, Grammar, Parser, SyntaxConstants}
@@ -223,10 +223,10 @@ class SimpleExpressionTest extends FunSuite {
     // TODO: figure out how `fastparse` decodes a byte array into characters. This test shows that the non-UTF8 sequence is decoded as a single character \uFFFD.
 
     val invalidUtf8 = " {-".getBytes ++ input ++ "-}".getBytes
-    toFail(Grammar.whsp(_), invalidUtf8,   3)
+    toFail(Grammar.whsp(_), invalidUtf8, 3)
 
     val utfReplacementChar = " {- \uFFFD -}"
-    toFail(Grammar.whsp(_), utfReplacementChar.getBytes("UTF-8"),   3)
+    toFail(Grammar.whsp(_), utfReplacementChar.getBytes("UTF-8"), 3)
   }
 
   test("quoted multiline string ends with newline") {
@@ -256,6 +256,27 @@ class SimpleExpressionTest extends FunSuite {
       val expr1b = CBOR.bytesToExpr(CBOR.exprToBytes(expr1a)).asInstanceOf[Import]
       expect(expr1a == expr1b)
     }
+  }
 
+  test("posix env var names") {
+    Seq(
+      "\\\"",
+      "\\\\",
+      "\\a",
+      "\\b",
+      "\\f",
+      "\\n",
+      "\\r",
+      "\\t",
+      "\\v",
+      "!",
+      "<",
+      "[",
+      "~",
+    ).foreach { input =>
+      check(Grammar.env(_), s"env:\"$input\"", Env(input))
+      check(Grammar.posix_environment_variable_character(_), input, ())
+      check(Grammar.posix_environment_variable(_), input, ())
+    }
   }
 }
