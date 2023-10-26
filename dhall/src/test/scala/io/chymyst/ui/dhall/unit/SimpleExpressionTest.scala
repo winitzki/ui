@@ -190,11 +190,11 @@ class SimpleExpressionTest extends FunSuite {
   }
 
   test("variables or missing import ambiguity 1") {
-    toFail(Grammar.complete_expression(_), "missingas Text", "", "", 7)
+    check(Grammar.complete_expression(_), "missingas Text", Application(v("missingas"),Builtin(SyntaxConstants.Builtin.Text)) )
   }
 
   test("variables or missing import ambiguity 2") {
-    toFail(Grammar.complete_expression(_), "missing as text", "", "", 8)
+    toFail(Grammar.complete_expression(_), "missing as text", "", "", 11)
   }
 
   test("variables or missing import ambiguity 3") {

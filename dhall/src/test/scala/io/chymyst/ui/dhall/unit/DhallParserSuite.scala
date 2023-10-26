@@ -42,7 +42,7 @@ class DhallParserSuite extends FunSuite {
       result
     }
     println(s"Success count: ${results.count(_.isSuccess)}\nFailure count: ${results.count(_.isFailure)}")
-    expect(results.count(_.isFailure) <= 3) // Decrease this limit when more tests pass.
+    expect(results.count(_.isFailure) == 0)
   }
 
   test("parse standard examples for failed parsing") {
@@ -102,7 +102,7 @@ class DhallParserSuite extends FunSuite {
     val failures = results.count(_.isFailure)
     val modelFailures = results.filter(_.isFailure).count(_.failed.get.getMessage.contains("model differs"))
     println(s"Success count: ${results.count(_.isSuccess)}\nFailure count: $failures\nCBOR model mismatch count: $modelFailures")
-    expect(failures <= 3 && modelFailures <= 1)
+    expect(failures <= 2 && modelFailures == 0) // Two failures are due to a bug in CBOR-Java. PR was already merged to fix that bug.
   }
 
   test("validate CBOR decoding for standard examples") {
