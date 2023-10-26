@@ -9,6 +9,7 @@ import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, ImportTy
 
 import java.io.InputStream
 import java.time.{LocalDate, LocalTime, ZoneOffset}
+import scala.util.chaining.scalaUtilChainingOps
 import scala.util.{Failure, Success, Try}
 
 object Grammar {
@@ -794,7 +795,7 @@ object Grammar {
   }
 
   def posix_environment_variable_character[$: P]: P[Char] = P(
-    ("\\" ~ (CharIn("\"abfnrtv") | "\\").!.map(mapPosixEnvCharacter) )
+    ("\\" ~ (CharIn("\"abfnrtv") | "\\").!.map(mapPosixEnvCharacter))
       //    %x5C                 // '\'    Beginning of escape sequence
       //      ( %x22               // '"'    quotation mark  U+0022
       //        | %x5C               // '\'    reverse solidus U+005C
@@ -1112,12 +1113,12 @@ object Grammar {
       //
       //  "{ foo = 1      , bar = True }"
       //  "{ foo : Integer, bar : Bool }"
-      | ("{" ~ whsp ~ ("," ~ whsp).? ~ record_type_or_literal ~ whsp ~ "}")
+      | ("{" ~/ whsp ~ ("," ~ whsp).? ~ record_type_or_literal ~ whsp ~ "}")
       .map(_.getOrElse(Expression.RecordType(Seq())))
       //
       //  "< Foo : Integer | Bar : Bool >"
       //  "< Foo | Bar : Bool >"
-      | P("<" ~ whsp ~ ("|" / whsp /* No cut here, or else < | Foo > cannot be parsed. */).? ~ union_type ~ whsp ~ ">")
+      | P("<" ~/ whsp ~ ("|" ~/ whsp).? ~ union_type ~ whsp ~ ">")
       //
       //  "[1, 2, 3]"
       | non_empty_list_literal
@@ -1145,7 +1146,7 @@ object Grammar {
 
   def non_empty_record_type[$: P]: P[Expression.RecordType] = P(
     record_type_entry ~ (whsp ~ "," ~ whsp ~ record_type_entry).rep ~ (whsp ~ ",").?
-  ).map { case (headName, headExpr, tail) => (headName, headExpr) +: tail }.map(Expression.RecordType)
+  ).map { case (headName, headExpr, tail) => (headName, headExpr) +: tail }.map(_.sortBy(_._1.name)).map(Expression.RecordType)
 
   def record_type_entry[$: P]: P[(FieldName, Expression)] = P(
     any_label_or_some.map(FieldName) ~ whsp ~ ":" ~ whsp1 ~ expression
@@ -1175,7 +1176,7 @@ object Grammar {
   )
 
   def non_empty_list_literal[$: P]: P[Expression.NonEmptyList] = P(
-    "[" ~ whsp ~ ("," ~ whsp).? ~ expression ~ whsp ~ ("," ~ whsp ~ /* No cut here, or else [, ,] cannot be parsed. */ expression ~ whsp).rep ~ ("," ~/ whsp).? ~ "]"
+    "[" ~/ whsp ~ ("," ~ whsp).? ~ expression ~ whsp ~ ("," ~ whsp ~ /* No cut here, or else [, ,] cannot be parsed. */ expression ~ whsp).rep ~ ("," ~/ whsp).? ~ "]"
   ).map { case (head, tail) => Expression.NonEmptyList(head, tail) }
 
   def shebang[$: P] = P(

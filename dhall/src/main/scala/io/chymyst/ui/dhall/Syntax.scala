@@ -462,7 +462,7 @@ object Syntax {
           defs.map(_._1).distinct.map { fieldName => (fieldName, recordMap(fieldName)) }
         }
 
-        RecordLiteral(desugarRepetition(desugared))
+        RecordLiteral(desugarRepetition(desugared).sortBy(_._1.name)) // TODO: do we need this sorting?
       }
     }
 

@@ -1,16 +1,17 @@
 package io.chymyst.ui.dhall.unit
 
 import com.eed3si9n.expecty.Expecty.expect
+import com.upokecenter.cbor.CBORObject
 import fastparse.{Parsed, parse}
-import io.chymyst.ui.dhall.Grammar.{equivalent_expression, import_alt_expression, whsp}
-import io.chymyst.ui.dhall.Syntax.Expression.{Import, Lambda, Let, NaturalLiteral, TextLiteral, Variable}
+import io.chymyst.ui.dhall.Grammar.{equivalent_expression, expression, import_alt_expression, whsp}
+import io.chymyst.ui.dhall.Syntax.Expression.{Import, Lambda, Let, NaturalLiteral, TextLiteral, UnionType, Variable}
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
 import io.chymyst.ui.dhall.SyntaxConstants.Builtin.Natural
 import io.chymyst.ui.dhall.SyntaxConstants.ImportMode.RawText
 import io.chymyst.ui.dhall.SyntaxConstants.ImportType.{Env, Missing, Remote}
-import io.chymyst.ui.dhall.SyntaxConstants.{FieldName, ImportMode, VarName}
+import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, ImportMode, VarName}
 import io.chymyst.ui.dhall.unit.TestUtils.{check, printFailure, toFail, v}
-import io.chymyst.ui.dhall.{CBOR, Grammar, Parser, SyntaxConstants}
+import io.chymyst.ui.dhall.{CBOR, CBORmodel, Grammar, Parser, SyntaxConstants}
 import munit.FunSuite
 
 import java.rmi.server.ExportException
@@ -281,4 +282,21 @@ class SimpleExpressionTest extends FunSuite {
     }
   }
 
+  test("leading delimiter in union type") {
+    val expected = UnionType(List((ConstructorName("Foo"),Some(Expression.Builtin(Natural)))))
+    check(Grammar.primitive_expression(_), "< Foo : Natural >", expected)
+    check(Grammar.primitive_expression(_), "<  Foo : Natural  | >", expected)
+    check(Grammar.primitive_expression(_), "< | Foo : Natural >", expected)
+  }
+
+  test("records have sorted fields in CBOR") {
+    val testFileA = getClass.getClassLoader.getResourceAsStream("parser-succeed/leadingSeparatorsA.dhall")
+    val expr = Parser.parseDhall(testFileA).get.value.value
+    val testFileB = getClass.getClassLoader.getResourceAsStream("parser-succeed/leadingSeparatorsB.dhallb")
+    val cborModelFromExampleFile = CBORmodel.fromCbor(CBORObject.Read(testFileB))
+    val cborModelAfterRoundtrip = CBORmodel.fromCbor(CBORObject.DecodeFromBytes(CBOR.exprToBytes(expr)))
+    expect(cborModelFromExampleFile.toString == cborModelAfterRoundtrip.toString)
+    val exprFromExampleFile = cborModelFromExampleFile.toExpression
+    expect(exprFromExampleFile == expr)
+  }
 }

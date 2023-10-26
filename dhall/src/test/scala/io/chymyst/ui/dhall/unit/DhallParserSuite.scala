@@ -42,7 +42,7 @@ class DhallParserSuite extends FunSuite {
       result
     }
     println(s"Success count: ${results.count(_.isSuccess)}\nFailure count: ${results.count(_.isFailure)}")
-    expect(results.count(_.isFailure) <= 9) // Decrease this limit when more tests pass.
+    expect(results.count(_.isFailure) <= 3) // Decrease this limit when more tests pass.
   }
 
   test("parse standard examples for failed parsing") {
