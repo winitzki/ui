@@ -199,9 +199,9 @@ class SimpleExpressionTest extends FunSuite {
 
   test("variables or missing import ambiguity 3") {
     import fastparse._, NoWhitespace._, Grammar._
-    def grammar[$: P] = P( ("missing".log.! | completion_expression) ~ End).log
+    def grammar[$: P] = P( (NoCut("a") | "ab") ~ End).log
 
-    check(grammar(_), "missingfoo", v("missingfoo"))
+    check(grammar(_), "ab",  ())
   }
 
   test("variable name missing//foo, conflict with import declaration") {
