@@ -5,11 +5,11 @@ val scalaV = scala2V
 //val utest = "com.lihaoyi" %% "utest" % "0.8.1" % Test
 //def utestFramework = new TestFramework("utest.runner.Framework")
 
-val munit = "org.scalameta" %% "munit" % "0.7.29" % Test
+val munitTest = "org.scalameta" %% "munit" % "0.7.29" % Test
 def munitFramework = new TestFramework("munit.Framework")
 
 val fastparse = "com.lihaoyi" %% "fastparse" % "3.0.2"
-val assertVerbose = "com.eed3si9n.expecty" %% "expecty" % "0.16.0" % Test
+val assertVerboseTest = "com.eed3si9n.expecty" %% "expecty" % "0.16.0" % Test
 val enumeratum = "com.beachape" %% "enumeratum" % "1.7.3"
 val flatlaf = "com.formdev" % "flatlaf" % "3.2.2"
 
@@ -39,7 +39,7 @@ lazy val macros = (project in file("macros")).settings(
     )
     case Some((3, _)) => Seq.empty // No need for scala-reflect with Scala 3.
   }) ++ Seq(
-    munit,
+    munitTest,
   ),
 )
 
@@ -48,7 +48,7 @@ lazy val core_elm = (project in file("core_elm")).settings(
   crossScalaVersions := Seq(scala2V, scala3V),
   testFrameworks += munitFramework,
   libraryDependencies ++= Seq(
-    munit,
+    munitTest,
   ),
 )
 
@@ -57,7 +57,7 @@ lazy val example_elm = (project in file("example_elm")).settings(
   crossScalaVersions := Seq(scala2V, scala3V),
   testFrameworks += munitFramework,
   libraryDependencies ++= Seq(
-    munit,
+    munitTest,
   ),
 ).dependsOn(core_elm)
 
@@ -66,7 +66,7 @@ lazy val backend_awt = (project in file("backend_awt")).settings(
   crossScalaVersions := Seq(scala2V, scala3V),
   testFrameworks += munitFramework,
   libraryDependencies ++= Seq(
-    munit,
+    munitTest,
   ),
 ).dependsOn(core_elm, macros, example_elm % "test->compile")
 
@@ -76,7 +76,7 @@ lazy val backend_swing = (project in file("backend_swing")).settings(
   testFrameworks += munitFramework,
   libraryDependencies ++= Seq(
     flatlaf,
-    munit,
+    munitTest,
   ),
 ).dependsOn(core_elm, macros, backend_awt, example_elm % "test->compile")
 
@@ -87,8 +87,8 @@ lazy val dhall = (project in file("dhall")).settings(
   Test / parallelExecution := true,
   libraryDependencies ++= Seq(
     fastparse,
-    munit,
-    assertVerbose,
+    munitTest,
+    assertVerboseTest,
     enumeratum,
     //    cbor1,
     cbor2,

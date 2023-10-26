@@ -233,7 +233,8 @@ object Grammar {
       | "n".!.map(_ => "\n") // 'n'    line feed       U+000A
       | "r".!.map(_ => "\r") // 'r'    carriage return U+000D
       | "t".!.map(_ => "\t") // 't'    tab             U+0009
-      | ("u" ~ unicode_escape.map(hex => Character.toChars(Integer.parseInt(hex, 16)).mkString)) // 'uXXXX' | 'u{XXXX}'    U+XXXX
+      | ("u" ~ unicode_escape.map(hex => new String(Character.toChars(Integer.parseInt(hex, 16))))) // 'uXXXX' | 'u{XXXX}'    U+XXXX
+    // See https://stackoverflow.com/questions/5585919/creating-unicode-character-from-its-number
   )
 
   def unicode_escape[$: P]: P[String] = P(
