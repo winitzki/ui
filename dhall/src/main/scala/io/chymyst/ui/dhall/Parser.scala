@@ -631,7 +631,7 @@ object Grammar {
   ).map(segments => ImportType.Path(SyntaxConstants.FilePrefix.Parent, SyntaxConstants.File.of(segments)))
 
   def here_path[$: P] = P(
-    "." ~/ path // Relative path
+    "." ~ path // Relative path
   ).map(segments => ImportType.Path(SyntaxConstants.FilePrefix.Here, SyntaxConstants.File.of(segments)))
 
   def home_path[$: P] = P(
@@ -1049,7 +1049,7 @@ object Grammar {
   )
 
   def import_expression[$: P]: P[Expression] = P(
-    import_only | completion_expression
+    NoCut(import_only) | completion_expression
   )
 
   def completion_expression[$: P]: P[Expression] = P(

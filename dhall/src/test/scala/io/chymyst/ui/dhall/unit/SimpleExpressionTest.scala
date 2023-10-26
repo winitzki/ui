@@ -30,8 +30,8 @@ class SimpleExpressionTest extends FunSuite {
     val expected = Expression.RecordLiteral(List(
       (FieldName("foo"), v("foo")),
       (FieldName("bar"), v("bar")),
-    ))
-    expect(result == expected, "{ foo, bar } must be parsed in the order foo, bar".nonEmpty)
+    )).sorted
+    expect(result == expected, "{ foo, bar } must be parsed in the order bar, foo".nonEmpty)
   }
 
   test("simple expression: x") {
@@ -197,6 +197,13 @@ class SimpleExpressionTest extends FunSuite {
     toFail(Grammar.complete_expression(_), "missing as text", "", "", 8)
   }
 
+  test("variables or missing import ambiguity 3") {
+    import fastparse._, NoWhitespace._, Grammar._
+    def grammar[$: P] = P( ("missing".log.! | completion_expression) ~ End).log
+
+    check(grammar(_), "missingfoo", v("missingfoo"))
+  }
+
   test("variable name missing//foo, conflict with import declaration") {
 
     check(Grammar.simple_label(_), "missingas", "missingas")
@@ -302,7 +309,7 @@ class SimpleExpressionTest extends FunSuite {
   }
 
   test("application to an import") {
-    val expected = Application(Expression.Builtin(SyntaxConstants.Builtin.List),Import(Path(Here,File(List("file"))),Code,None))
+    val expected = Application(Expression.Builtin(SyntaxConstants.Builtin.List), Import(Path(Here, File(List("file"))), Code, None))
     check(Grammar.application_expression(_), "List ./file", expected)
   }
 }

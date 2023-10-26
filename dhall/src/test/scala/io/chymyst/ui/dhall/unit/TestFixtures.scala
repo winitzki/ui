@@ -84,18 +84,18 @@ object TestFixtures {
     "Natural/show" -> Expression.Builtin(SyntaxConstants.Builtin.NaturalShow),
     "Natural" -> Expression.Builtin(SyntaxConstants.Builtin.Natural),
     "{foo: Natural, bar: Type}" -> Expression.RecordType(Seq(
-      (FieldName("foo"), Expression.Builtin(SyntaxConstants.Builtin.Natural)),
       (FieldName("bar"), Expression.Builtin(SyntaxConstants.Builtin.Type)),
+      (FieldName("foo"), Expression.Builtin(SyntaxConstants.Builtin.Natural)),
     )),
     "{ foo = 1, bar = 2 }" -> Expression.RecordLiteral(Seq(
-      (FieldName("foo"), Expression.NaturalLiteral(1)),
       (FieldName("bar"), Expression.NaturalLiteral(2)),
+      (FieldName("foo"), Expression.NaturalLiteral(1)),
     )),
     "< Foo : Integer | Bar : Bool >" -> Expression.UnionType(Seq(
       (ConstructorName("Foo"), Some(Expression.Builtin(SyntaxConstants.Builtin.Integer))),
       (ConstructorName("Bar"), Some(Expression.Builtin(SyntaxConstants.Builtin.Bool)))),
-    ),
-    "< Foo | Bar : Bool >" -> Expression.UnionType(List((ConstructorName("Foo"), None), (ConstructorName("Bar"), Some(Expression.Builtin(SyntaxConstants.Builtin.Bool))))),
+    ).sorted,
+    "< Foo | Bar : Bool >" -> Expression.UnionType(List((ConstructorName("Foo"), None), (ConstructorName("Bar"), Some(Expression.Builtin(SyntaxConstants.Builtin.Bool))))).sorted,
   )
 
   val selectorExpressions = Map(
@@ -141,8 +141,8 @@ object TestFixtures {
 
   val recordExpressions: Seq[(String, Expression)] = Seq(
     "{ foo, bar }" -> Expression.RecordLiteral(List(
-      (FieldName("foo"), v("foo")),
       (FieldName("bar"), v("bar")),
+      (FieldName("foo"), v("foo")),
     )),
   )
 
