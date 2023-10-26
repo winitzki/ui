@@ -470,9 +470,6 @@ object Syntax {
       }
     }
 
-    // Raw record syntax: { x.y.z = 1 } that needs to be processed further.
-    final case class RawRecordLiteral(base: FieldName, defs: Option[(Seq[FieldName], Expression)]) extends Expression
-
     final case class UnionType(defs: Seq[(ConstructorName, Option[Expression])]) extends Expression {
       def sorted = UnionType(defs.sortBy(_._1.name))
     }
@@ -496,6 +493,9 @@ object Syntax {
 
     final case object DescendOptional extends PathComponent
   }
+
+  // Raw record syntax: { x.y.z = 1 } that needs to be processed further. This is a part of a RecordLiteral.
+  final case class RawRecordLiteral(base: FieldName, defs: Option[(Seq[FieldName], Expression)])
 
 }
 

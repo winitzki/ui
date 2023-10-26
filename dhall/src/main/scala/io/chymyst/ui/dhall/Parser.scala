@@ -4,7 +4,7 @@ import fastparse.NoWhitespace._
 import fastparse._
 import io.chymyst.ui.dhall.ABNFGrammar.BIT
 import io.chymyst.ui.dhall.Syntax.Expression.{KeywordSome => ExpressionSome, _}
-import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression, PathComponent}
+import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression, PathComponent, RawRecordLiteral}
 import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, ImportType, VarName}
 
 import java.io.InputStream
@@ -1149,7 +1149,7 @@ object Grammar {
   ).map { case (headName, headExpr, tail) => (headName, headExpr) +: tail }.map(Expression.RecordType).map(_.sorted)
 
   def record_type_entry[$: P]: P[(FieldName, Expression)] = P(
-    any_label_or_some.map(FieldName) ~ whsp ~ ":" ~ whsp1 ~ expression
+    any_label_or_some.map(FieldName) ~ whsp ~ ":" ~/ whsp1 ~/ expression
   )
 
   def non_empty_record_literal[$: P]: P[Expression.RecordLiteral] = P(

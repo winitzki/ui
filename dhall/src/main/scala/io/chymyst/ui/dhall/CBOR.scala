@@ -7,7 +7,7 @@ import io.chymyst.ui.dhall.CBORmodel.CBytes.byteArrayToHexString
 import io.chymyst.ui.dhall.CBORmodel._
 import io.chymyst.ui.dhall.Syntax.Expression.BytesLiteral
 import io.chymyst.ui.dhall.Syntax.{Expression, Natural, PathComponent}
-import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, FilePrefix, ImportMode, ImportType, VarName}
+import io.chymyst.ui.dhall.SyntaxConstants._
 
 import java.time.LocalTime
 import scala.annotation.tailrec
@@ -522,8 +522,6 @@ object CBOR {
         .map { case (FieldName(name), expr) => (name, expr) }
         .toMap
       array(8, dict)
-
-    case e@Expression.RawRecordLiteral(_, _) => toCborModel(Expression.RecordLiteral.of(Seq(e)))
 
     case Expression.UnionType(defs) =>
       val dict = defs
