@@ -42,6 +42,7 @@ class DhallParserSuite extends FunSuite {
       result
     }
     println(s"Success count: ${results.count(_.isSuccess)}\nFailure count: ${results.count(_.isFailure)}")
+    expect(results.count(_.isFailure) <= 9) // Decrease this limit when more tests pass.
   }
 
   test("parse standard examples for failed parsing") {
@@ -98,7 +99,10 @@ class DhallParserSuite extends FunSuite {
       if (result.exists(_.isFailure)) println(s"CBOR validation failed for file ${file.getName}: ${result.get.failed.get.getMessage}")
       result
     }
-    println(s"Success count: ${results.count(_.isSuccess)}\nFailure count: ${results.count(_.isFailure)}\nCBOR model mismatch count: ${results.filter(_.isFailure).count(_.failed.get.getMessage.contains("model differs"))}")
+    val failures = results.count(_.isFailure)
+    val modelFailures = results.filter(_.isFailure).count(_.failed.get.getMessage.contains("model differs"))
+    println(s"Success count: ${results.count(_.isSuccess)}\nFailure count: $failures\nCBOR model mismatch count: $modelFailures")
+    expect(failures <= 3 && modelFailures <= 1)
   }
 
   test("validate CBOR decoding for standard examples") {
