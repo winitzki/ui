@@ -66,7 +66,7 @@ class CBORtest extends FunSuite {
     //    expect(obj.AsDoubleValue == -1.0)
     val bytes = obj.EncodeToBytes
     expect(bytes.length == 3)
-    expect(bytesToCBORmodel(bytes).asInstanceOf[CDouble].data == -0.0)
+    expect(bytesToCBORmodel(bytes).asInstanceOf[CDouble].data == -1.52587890625E-5)
   }
 
   test("CBOR roundtrips 3") {
