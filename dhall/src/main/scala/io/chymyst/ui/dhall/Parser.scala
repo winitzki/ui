@@ -780,18 +780,21 @@ object Grammar {
     posix_environment_variable_character.rep(1).map(_.mkString)
   )
 
+  def mapPosixEnvCharacter: String => Char = {
+    case "\"" => '"'
+    case "\\" => '\\'
+    case "a" => '\u0007'
+    case "b" => '\u0008'
+    case "f" => '\u000C'
+    case "n" => '\u000A'
+    case "r" => '\u000D'
+    case "t" => '\u0009'
+    case "v" => '\u000B'
+    case x => x.last
+  }
+
   def posix_environment_variable_character[$: P]: P[Char] = P(
-    ("\\" ~ (CharIn("\"abfnrtv") | "\\").!.map {
-      case "\"" => '"'
-      case "\\" => '\\'
-      case "a"  => '\u0007'
-      case "b"  => '\u0008'
-      case "f"  => '\u000C'
-      case "n"  => '\u000A'
-      case "r"  => '\u000D'
-      case "t"  => '\u0009'
-      case "v"  => '\u000B'
-    })
+    ("\\" ~ (CharIn("\"abfnrtv") | "\\").!.map(mapPosixEnvCharacter) )
       //    %x5C                 // '\'    Beginning of escape sequence
       //      ( %x22               // '"'    quotation mark  U+0022
       //        | %x5C               // '\'    reverse solidus U+005C

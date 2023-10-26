@@ -274,9 +274,10 @@ class SimpleExpressionTest extends FunSuite {
       "[",
       "~",
     ).foreach { input =>
-      check(Grammar.env(_), s"env:\"$input\"", Env(input))
-      check(Grammar.posix_environment_variable_character(_), input, ())
-      check(Grammar.posix_environment_variable(_), input, ())
+      val envVarName = Character.toString(Grammar.mapPosixEnvCharacter(if (input.length == 2) input.drop(1) else input))
+      check(Grammar.env(_), s"env:\"$input\"", Env(envVarName))
+      check(Grammar.posix_environment_variable_character(_), input, envVarName.head)
+      check(Grammar.posix_environment_variable(_), input, envVarName)
     }
   }
 }
