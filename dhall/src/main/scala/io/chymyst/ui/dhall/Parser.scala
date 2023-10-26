@@ -817,8 +817,8 @@ object Grammar {
     //      | %x5D_7E
   )
 
-  def import_type[$: P]: P[ImportType] = P(
-    requireKeyword("missing").map(_ => ImportType.Missing)
+  def import_type[$: P]: P[ImportType] = P( // Prevent parsing `missingfoo` as `missing` followed by a parse failure.
+    (requireKeyword("missing") ~ !simple_label_next_char).map(_ => ImportType.Missing)
       | local
       | http
       | env
@@ -1049,7 +1049,7 @@ object Grammar {
   )
 
   def import_expression[$: P]: P[Expression] = P(
-    NoCut(import_only) | completion_expression
+     import_only | completion_expression
   )
 
   def completion_expression[$: P]: P[Expression] = P(

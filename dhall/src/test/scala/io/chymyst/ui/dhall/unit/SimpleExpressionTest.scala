@@ -199,7 +199,7 @@ class SimpleExpressionTest extends FunSuite {
 
   test("variables or missing import ambiguity 3") {
     import fastparse._, NoWhitespace._, Grammar._
-    def grammar[$: P] = P( (NoCut("a") | "ab") ~ End).log
+    def grammar[$: P] = P( ( "a" ~ !"b" | "ab") ~ End)
 
     check(grammar(_), "ab",  ())
   }
