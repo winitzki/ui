@@ -1,8 +1,8 @@
 {
-, emptyList = [,] : List Natural
 , emptyRecordLiteral = { , = }
-, emptyRecordType = { , }
+, emptyList = [,] : List Natural
 , emptyUnionType = < | >
+, emptyRecordType = { , }
 
 , list = [ , 1, 2 ]
 , recordLiteral = { , x = 1, y = True }

@@ -1060,7 +1060,7 @@ object Grammar {
   }
 
   def selector_expression[$: P]: P[Expression] = P(
-    primitive_expression ~ (whsp ~ "." ~ whsp ~/ selector).rep
+    primitive_expression ~ (whsp ~ "." ~ whsp ~ /* No cut here, or else (List ./imported.file) cannot be parsed. */ selector).rep
   ).map { case (base, selectors) => selectors.foldLeft(base)((prev, selector) => selector.chooseExpression(prev)) }
 
   sealed trait ExpressionSelector {

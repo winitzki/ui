@@ -3,18 +3,17 @@ package io.chymyst.ui.dhall.unit
 import com.eed3si9n.expecty.Expecty.expect
 import com.upokecenter.cbor.CBORObject
 import fastparse.{Parsed, parse}
-import io.chymyst.ui.dhall.Grammar.{equivalent_expression, expression, import_alt_expression, whsp}
-import io.chymyst.ui.dhall.Syntax.Expression.{Import, Lambda, Let, NaturalLiteral, TextLiteral, UnionType, Variable}
+import io.chymyst.ui.dhall.Syntax.Expression._
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
 import io.chymyst.ui.dhall.SyntaxConstants.Builtin.Natural
-import io.chymyst.ui.dhall.SyntaxConstants.ImportMode.RawText
-import io.chymyst.ui.dhall.SyntaxConstants.ImportType.{Env, Missing, Remote}
-import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, ImportMode, VarName}
+import io.chymyst.ui.dhall.SyntaxConstants.FilePrefix.Here
+import io.chymyst.ui.dhall.SyntaxConstants.ImportMode.{Code, RawText}
+import io.chymyst.ui.dhall.SyntaxConstants.ImportType.{Env, Missing, Path}
+import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, File, VarName}
 import io.chymyst.ui.dhall.unit.TestUtils.{check, printFailure, toFail, v}
-import io.chymyst.ui.dhall.{CBOR, CBORmodel, Grammar, Parser, SyntaxConstants}
+import io.chymyst.ui.dhall._
 import munit.FunSuite
 
-import java.rmi.server.ExportException
 import scala.util.Try
 
 class SimpleExpressionTest extends FunSuite {
@@ -101,7 +100,8 @@ class SimpleExpressionTest extends FunSuite {
   }
 
   test("expression followed by comment") {
-    import fastparse._, NoWhitespace._
+    import fastparse._
+    import NoWhitespace._
     val input = "x {- -}"
     val expected = v("x")
 
@@ -132,7 +132,7 @@ class SimpleExpressionTest extends FunSuite {
   }
 
   test("parse x === y") {
-    import fastparse._, NoWhitespace._
+    import fastparse._
     val input = "x === y"
     val expected = Expression.Operator(v("x"), SyntaxConstants.Operator.Equivalent, v("y"))
 
@@ -215,7 +215,8 @@ class SimpleExpressionTest extends FunSuite {
   test("invalid utf-8") {
     // The byte sequence 0xED, 0xA0, 0x80 is not a valid UTF-8 sequence.
     val input = Array(0x20, 0xED, 0xA0, 0x80, 0x20).map(_.toByte)
-    import fastparse._, NoWhitespace._
+    import fastparse._
+    import NoWhitespace._
     def grammar[$: P] = P(SingleChar.rep)
 
     val result = parse(input, grammar(_))
@@ -283,7 +284,7 @@ class SimpleExpressionTest extends FunSuite {
   }
 
   test("leading delimiter in union type") {
-    val expected = UnionType(List((ConstructorName("Foo"),Some(Expression.Builtin(Natural)))))
+    val expected = UnionType(List((ConstructorName("Foo"), Some(Expression.Builtin(Natural)))))
     check(Grammar.primitive_expression(_), "< Foo : Natural >", expected)
     check(Grammar.primitive_expression(_), "<  Foo : Natural  | >", expected)
     check(Grammar.primitive_expression(_), "< | Foo : Natural >", expected)
@@ -298,5 +299,10 @@ class SimpleExpressionTest extends FunSuite {
     expect(cborModelFromExampleFile.toString == cborModelAfterRoundtrip.toString)
     val exprFromExampleFile = cborModelFromExampleFile.toExpression
     expect(exprFromExampleFile == expr)
+  }
+
+  test("application to an import") {
+    val expected = Application(Expression.Builtin(SyntaxConstants.Builtin.List),Import(Path(Here,File(List("file"))),Code,None))
+    check(Grammar.application_expression(_), "List ./file", expected)
   }
 }
