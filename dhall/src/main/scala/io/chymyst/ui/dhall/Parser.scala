@@ -755,6 +755,7 @@ object Grammar {
     "!" | "$" | "&" | "'" | "*" | "+" | ";" | "="
   )
 
+  // This does not seem to be necessary. The headers field is optional.
   //  val emptyHeaders: Expression = Expression.EmptyList(Expression.RecordType(Seq(
   //    (FieldName("mapKey"), Expression.Builtin(SyntaxConstants.Builtin.Text)),
   //    (FieldName("mapValue"), Expression.Builtin(SyntaxConstants.Builtin.Text)),
@@ -767,7 +768,7 @@ object Grammar {
   def env[$: P]: P[ImportType.Env] = P(
     "env:" ~/ (
       bash_environment_variable.!
-        | ("\u0022" ~ posix_environment_variable.! ~ "\u0022")
+        | ("\u0022" ~ posix_environment_variable ~ "\u0022")
       )
   ).map(name => ImportType.Env(name))
 
@@ -776,11 +777,21 @@ object Grammar {
   )
 
   def posix_environment_variable[$: P] = P(
-    posix_environment_variable_character.rep(1)
+    posix_environment_variable_character.rep(1).map(_.mkString)
   )
 
-  def posix_environment_variable_character[$: P] = P(
-    ("\\" ~ (CharIn("\"", "abfnrtv") | "\\"))
+  def posix_environment_variable_character[$: P]: P[Char] = P(
+    ("\\" ~ (CharIn("\"abfnrtv") | "\\").!.map {
+      case "\"" => '"'
+      case "\\" => '\\'
+      case "a"  => '\u0007'
+      case "b"  => '\u0008'
+      case "f"  => '\u000C'
+      case "n"  => '\u000A'
+      case "r"  => '\u000D'
+      case "t"  => '\u0009'
+      case "v"  => '\u000B'
+    })
       //    %x5C                 // '\'    Beginning of escape sequence
       //      ( %x22               // '"'    quotation mark  U+0022
       //        | %x5C               // '\'    reverse solidus U+005C
@@ -792,7 +803,7 @@ object Grammar {
       //        | %x74               // 't'    tab             U+0009
       //          | %x76               // 'v'    vertical tab    U+000B
       // Printable characters except double quote, backslash and equals
-      | CharIn("\u0020-\u0021", "\u0023-\u003C", "\u003E-\u005B", "\u005D-\u007E")
+      | CharIn("\u0020-\u0021", "\u0023-\u003C", "\u003E-\u005B", "\u005D-\u007E").!.map(_.head)
     //  %x20_21
     //      // %x22 = '"'
     //      | %x23_3C

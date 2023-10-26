@@ -335,7 +335,7 @@ object CBORmodel {
   final case class CString(data: String) extends CBORmodel {
     override def toCBOR: CBORObject = CBORObject.FromObject(data)
 
-    override def toString: String = s"\"$escaped\""
+    override def toString: String = s"\"$data\"" //s"\"$escaped\""
 
     lazy val escaped: String = data.flatMap {
       case '\b' => "\\b"

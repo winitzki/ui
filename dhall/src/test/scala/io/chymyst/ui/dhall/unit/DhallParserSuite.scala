@@ -93,8 +93,8 @@ class DhallParserSuite extends FunSuite {
         if (bytesGeneratedByUs sameElements cborValidationBytes) Success(bytesGeneratedByUs)
         else if (model.toString == diagnosticString) {
           val extraMessage = if (model.toString != cborValidationModel) s"\nwhile our reading of the validation file also differs:\n\t\t$cborValidationModel" else ""
-          Failure(new Exception(s"CBOR encoding differs, our expression is '$expression', but generated CBOR model agrees with expected:\n\t\t$model$extraMessage\n"))
-        } else Failure(new Exception(s"CBOR model differs: our CBOR model is:\n$model\nbut expected CBOR model is:\n$diagnosticString\n"))
+          Failure(new Exception(s"CBOR encoding differs, our expression is '$expression', but the generated CBOR model agrees with expected:\n\t\t$model$extraMessage\n"))
+        } else Failure(new Exception(s"CBOR model differs: our CBOR model is:\n$model\nbut the expected CBOR model is:\n$diagnosticString\n"))
       }
       if (result.exists(_.isFailure)) println(s"CBOR validation failed for file ${file.getName}: ${result.get.failed.get.getMessage}")
       result
@@ -121,8 +121,8 @@ class DhallParserSuite extends FunSuite {
         if (bytesGeneratedByUs sameElements cborValidationBytes) Success((model, expression))
         else if (model.toString == diagnosticString) {
           val extraMessage = if (model.toString != cborValidationModel) s"\nwhile our reading of the validation file also differs:\n\t\t$cborValidationModel" else ""
-          Failure(new Exception(s"CBOR encoding differs, our expression is '$expression', but generated CBOR model agrees with expected:\n\t\t$model$extraMessage\n"))
-        } else Failure(new Exception(s"CBOR model differs: our CBOR model is:\n$model\nbut expected CBOR model is:\n$diagnosticString\n"))
+          Failure(new Exception(s"CBOR encoding differs, our expression is '$expression', but the generated CBOR model agrees with expected:\n\t\t$model$extraMessage\n"))
+        } else Failure(new Exception(s"CBOR model differs: our CBOR model is:\n$model\nbut the expected CBOR model is:\n$diagnosticString\n"))
       }.flatMap(_.toOption) // We ignore any failures with CBOR encoding because those failures are detected in the previous test.
       result2.map { case (model, expression) =>
         Try(model.toExpression == expression) match {
