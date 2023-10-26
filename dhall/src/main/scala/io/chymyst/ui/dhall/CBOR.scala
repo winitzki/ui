@@ -133,9 +133,9 @@ sealed trait CBORmodel {
 
         case CIntTag(34) :: u :: Nil => Expression.ShowConstructor(u.toExpression)
 
-        case CIntTag(7) :: CMap(data) :: Nil => Expression.RecordType(sortRecordFields(data))
+        case CIntTag(7) :: CMap(data) :: Nil => Expression.RecordType(sortRecordFields(data)).sorted
 
-        case CIntTag(8) :: CMap(data) :: Nil => Expression.RecordLiteral(sortRecordFields(data))
+        case CIntTag(8) :: CMap(data) :: Nil => Expression.RecordLiteral(sortRecordFields(data)).sorted
 
         case CIntTag(9) :: t :: CString(name) :: Nil => Expression.Field(t.toExpression, FieldName(name))
 
@@ -144,7 +144,7 @@ sealed trait CBORmodel {
 
         case CIntTag(10) :: t :: CArray(Array(tipe)) :: Nil => Expression.ProjectByType(t.toExpression, tipe.toExpression)
 
-        case CIntTag(11) :: CMap(data) :: Nil => Expression.UnionType(data.toSeq.map { case (name, expr) => (ConstructorName(name), if (expr == CNull) None else Some(expr.toExpression)) })
+        case CIntTag(11) :: CMap(data) :: Nil => Expression.UnionType(data.toSeq.map { case (name, expr) => (ConstructorName(name), if (expr == CNull) None else Some(expr.toExpression)) }).sorted
 
         case CIntTag(14) :: cond :: ifTrue :: ifFalse :: Nil => Expression.If(cond.toExpression, ifTrue.toExpression, ifFalse.toExpression)
 
@@ -283,8 +283,8 @@ object CBORmodel {
 
   def eIntegerToBigInt(eInt: EInteger): BigInt = BigInt(eInt.signum, eInt.ToBytes(false))
 
-  def sortRecordFields(data: Map[String, CBORmodel]): Seq[(FieldName, Expression)] =
-    data.toSeq.sortBy(_._1).map { case (name, expr) => (FieldName(name), expr.toExpression) }
+  private def sortRecordFields(data: Map[String, CBORmodel]): Seq[(FieldName, Expression)] =
+    data.toSeq.map { case (name, expr) => (FieldName(name), expr.toExpression) }
 
   final case object CNull extends CBORmodel {
     override def toCBOR: CBORObject = CBORObject.Null

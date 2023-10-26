@@ -1146,7 +1146,7 @@ object Grammar {
 
   def non_empty_record_type[$: P]: P[Expression.RecordType] = P(
     record_type_entry ~ (whsp ~ "," ~ whsp ~ record_type_entry).rep ~ (whsp ~ ",").?
-  ).map { case (headName, headExpr, tail) => (headName, headExpr) +: tail }.map(_.sortBy(_._1.name)).map(Expression.RecordType)
+  ).map { case (headName, headExpr, tail) => (headName, headExpr) +: tail }.map(Expression.RecordType).map(_.sorted)
 
   def record_type_entry[$: P]: P[(FieldName, Expression)] = P(
     any_label_or_some.map(FieldName) ~ whsp ~ ":" ~ whsp1 ~ expression
@@ -1154,7 +1154,7 @@ object Grammar {
 
   def non_empty_record_literal[$: P]: P[Expression.RecordLiteral] = P(
     record_literal_entry ~ (whsp ~ "," ~ whsp ~ record_literal_entry).rep ~ (whsp ~ ",").?
-  ).map { case (head, tail) => Expression.RecordLiteral.of(head +: tail) }
+  ).map { case (head, tail) => Expression.RecordLiteral.of(head +: tail).sorted }
 
   def record_literal_entry[$: P]: P[RawRecordLiteral] = P(
     any_label_or_some.map(FieldName) ~ record_literal_normal_entry.?
@@ -1167,7 +1167,7 @@ object Grammar {
   def union_type[$: P]: P[Expression.UnionType] = P(
     (union_type_entry ~ (whsp ~ "|" ~ whsp ~ union_type_entry).rep ~ (whsp ~ "|").?).?
   ).map {
-    case Some((headName, headType, tail)) => Expression.UnionType((headName, headType) +: tail)
+    case Some((headName, headType, tail)) => Expression.UnionType((headName, headType) +: tail).sorted
     case None => Expression.UnionType(Seq())
   }
 
@@ -1220,11 +1220,11 @@ object Parser {
     val zoneR = zoneOption.map { zone => (FieldName("timeZone"), TimeZoneLiteral(zone)) }
     val zoneT = zoneOption.map { zone => (FieldName("timeZone"), Builtin(SyntaxConstants.Builtin.TimeZone)) }
 
-    val record = RecordLiteral(Seq(dateR, timeR, zoneR).flatten)
-    val recordType = RecordType(Seq(dateT, timeT, zoneT).flatten)
+    val record = RecordLiteral(Seq(dateR, timeR, zoneR).flatten).sorted
+    val recordType = RecordType(Seq(dateT, timeT, zoneT).flatten).sorted
 
+    // Return { date : Date, time : Time, timeZone : TimeZone } or some subset of that record without the type.
     record
-    //Annotation(record, recordType) // Return { date : Date, time : Time, timeZone : TimeZone } or some subset of that record without the type.
   }
 
   def localDateTimeWithZone(date: DateLiteral, time: TimeLiteral, zone: Int): Expression = localDateTimeZone(Some(date), Some(time), Some(zone))

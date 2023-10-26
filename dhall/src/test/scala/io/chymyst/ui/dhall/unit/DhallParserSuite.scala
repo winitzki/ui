@@ -128,7 +128,7 @@ class DhallParserSuite extends FunSuite {
         Try(model.toExpression == expression) match {
           case Failure(exception) => Failure(new Exception(s"${file.getName}: Parser crashed on model $model: $exception"))
           case Success(true) => Success(file.getName)
-          case Success(false) => Failure(new Exception(s"${file.getName}: After restoring from bytes, expression differs: expected $expression but got ${model.toExpression}"))
+          case Success(false) => Failure(new Exception(s"${file.getName}: After restoring from bytes, expression differs: expected:\n$expression\n\t\tbut got:\n${model.toExpression}"))
         }
       }
 
@@ -136,7 +136,6 @@ class DhallParserSuite extends FunSuite {
 
     println(s"Success count: ${results.count(_.isSuccess)}\nFailure count: ${results.count(_.isFailure)}\nCBOR expression mismatch count: ${results.filter(_.isFailure).count(_.failed.get.getMessage.contains("expression differs"))}")
     results.filter(_.isFailure).map(_.failed.get.getMessage).foreach(println)
-    // The file "largeExpressionA.dhall" contains a record with fields that are not alphabetically ordered. Converting to CBOR and back makes them alphabetically ordered. We expect only one such mismatch.
-    expect(results.count(_.isFailure) == 1 && results.find(_.isFailure).get.failed.get.getMessage.startsWith("largeExpressionA.dhall: After restoring from bytes, expression differs:"))
+    expect(results.count(_.isFailure) == 0)
   }
 }

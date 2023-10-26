@@ -277,7 +277,7 @@ object Syntax {
     final case class With(data: Expression, pathComponents: Seq[PathComponent], body: Expression) extends Expression
 
     final case class DoubleLiteral(value: Double) extends Expression {
-      override def equals(other: Any): Boolean =  other.isInstanceOf[DoubleLiteral] && {
+      override def equals(other: Any): Boolean = other.isInstanceOf[DoubleLiteral] && {
         val otherValue = other.asInstanceOf[DoubleLiteral].value
         (value == otherValue) || (value.isNaN && otherValue.isNaN)
       }
@@ -417,9 +417,13 @@ object Syntax {
 
     final case class TimeZoneLiteral(totalMinutes: Int) extends Expression
 
-    final case class RecordType(defs: Seq[(FieldName, Expression)]) extends Expression
+    final case class RecordType(defs: Seq[(FieldName, Expression)]) extends Expression {
+      def sorted = RecordType(defs.sortBy(_._1.name))
+    }
 
-    final case class RecordLiteral(defs: Seq[(FieldName, Expression)]) extends Expression
+    final case class RecordLiteral(defs: Seq[(FieldName, Expression)]) extends Expression {
+      def sorted = RecordLiteral(defs.sortBy(_._1.name))
+    }
 
     object RecordLiteral {
       // Parse a non-empty sequence of RawRecordLiteral's into a RecordLiteral.
@@ -462,14 +466,16 @@ object Syntax {
           defs.map(_._1).distinct.map { fieldName => (fieldName, recordMap(fieldName)) }
         }
 
-        RecordLiteral(desugarRepetition(desugared).sortBy(_._1.name)) // TODO: do we need this sorting?
+        RecordLiteral(desugarRepetition(desugared))
       }
     }
 
     // Raw record syntax: { x.y.z = 1 } that needs to be processed further.
     final case class RawRecordLiteral(base: FieldName, defs: Option[(Seq[FieldName], Expression)]) extends Expression
 
-    final case class UnionType(defs: Seq[(ConstructorName, Option[Expression])]) extends Expression
+    final case class UnionType(defs: Seq[(ConstructorName, Option[Expression])]) extends Expression {
+      def sorted = UnionType(defs.sortBy(_._1.name))
+    }
 
     final case class ShowConstructor(data: Expression) extends Expression
 
