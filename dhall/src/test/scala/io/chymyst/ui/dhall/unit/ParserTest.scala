@@ -252,7 +252,7 @@ class ParserTest extends FunSuite {
   }
 
   test("identifier special cases") {
-    check(Grammar.identifier(_), "Natural+blahblah", ExprBuiltin(SyntaxConstants.Builtin.Natural), 7)
+    check(Grammar.identifier(_), "Natural+blahblah", Expression(ExprBuiltin(SyntaxConstants.Builtin.Natural)), 7)
     toFail(Grammar.identifier(_), "-abc", "", "", 0)
     toFail(Grammar.identifier(_), "/abc", "", "", 0)
   }

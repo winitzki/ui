@@ -11,7 +11,7 @@ import scala.util.Try
 
 object TestUtils {
 
-  def v(name: String) = Variable(SyntaxConstants.VarName(name), BigInt(0))
+  def v(name: String) = Expression(Variable(SyntaxConstants.VarName(name), BigInt(0)))
 
   def printFailure(t: Throwable): String = {
     val stackTrace = new StringWriter
