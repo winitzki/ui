@@ -13,22 +13,22 @@ object Semantics {
   def shift(positive: Boolean, x: VarName, minIndex: Natural, expr: Expression): Expression = {
     val d = if (positive) 1 else -1
     expr.scheme match {
-      case ExpressionScheme.Variable(name, index) =>  if (name != x || index < minIndex) expr else  Variable(name,   index + d)
-      case ExpressionScheme.Lambda(name, tipe, body) =>
+      case Variable(name, index) => if (name != x || index < minIndex) expr else Variable(name, index + d)
+      case Lambda(name, tipe, body) =>
         val newMinIndex = if (name != x) minIndex else minIndex + 1
-        ExpressionScheme.Lambda(name, shift(positive, x, minIndex, tipe), shift(positive, x, newMinIndex, body))
-      case ExpressionScheme.Forall(name, tipe, body) => ???
+        Lambda(name, shift(positive, x, minIndex, tipe), shift(positive, x, newMinIndex, body))
+      case Forall(name, tipe, body) =>
         val newMinIndex = if (name != x) minIndex else minIndex + 1
-        ExpressionScheme.Forall(name, shift(positive, x, minIndex, tipe), shift(positive, x, newMinIndex, body))
-      case ExpressionScheme.Let(name, tipe, subst, body) => ???
+        Forall(name, shift(positive, x, minIndex, tipe), shift(positive, x, newMinIndex, body))
+      case Let(name, tipe, subst, body) =>
         val newMinIndex = if (name != x) minIndex else minIndex + 1
-        ExpressionScheme.Let(name, tipe.map(shift(positive, x, minIndex, _)),shift(positive, x, minIndex, subst), shift(positive, x, newMinIndex, body))
-      case other =>  Expression(other.map(expression => shift(positive, x, minIndex, expression)))
+        Let(name, tipe.map(shift(positive, x, minIndex, _)), shift(positive, x, minIndex, subst), shift(positive, x, newMinIndex, body))
+      case other => other.map(expression => shift(positive, x, minIndex, expression))
     }
   }
 
   // See https://github.com/dhall-lang/dhall-lang/blob/master/standard/substitution.md
-  def substitute(expr: Expression, x: ExpressionScheme.Variable, body: Expression): Expression = ???
+  def substitute(expr: Expression, x: Variable, body: Expression): Expression = ???
 
   // See https://github.com/dhall-lang/dhall-lang/blob/master/standard/alpha-normalization.md
   def alphaNormalize(expr: Expression): Expression = ???
@@ -41,7 +41,7 @@ object Semantics {
     CBOR.exprToBytes(betaNormalize(alphaNormalize(x))) sameElements CBOR.exprToBytes(betaNormalize(alphaNormalize(y)))
 
   // See https://github.com/dhall-lang/dhall-lang/blob/master/standard/type-inference.md
-  def inferType(gamma:GammaTypeContext, expr: Expression): Expression = ???
+  def inferType(gamma: GammaTypeContext, expr: Expression): Expression = ???
 
   // See https://github.com/dhall-lang/dhall-lang/blob/master/standard/imports.md
   def canonicalize(x: File): File = ???
