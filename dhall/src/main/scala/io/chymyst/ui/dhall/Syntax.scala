@@ -236,6 +236,13 @@ object Syntax {
 
   type Integer = BigInt
 
+  // Define a recursion scheme for Expression.
+  sealed trait ExpressionScheme[E]
+
+  object ExpressionScheme {
+    final case class Lambda[E](name: VarName, tipe: E, body: E) extends ExpressionScheme[E]
+  }
+
   sealed trait Expression
 
   object Expression {
