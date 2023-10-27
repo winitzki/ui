@@ -3,6 +3,7 @@ package io.chymyst.ui.dhall.unit
 import com.eed3si9n.expecty.Expecty.expect
 import fastparse._
 import io.chymyst.ui.dhall.Syntax.Expression
+import io.chymyst.ui.dhall.Syntax.ExpressionScheme.Variable
 import io.chymyst.ui.dhall.SyntaxConstants
 
 import java.io.{PrintWriter, StringWriter}
@@ -10,7 +11,7 @@ import scala.util.Try
 
 object TestUtils {
 
-  def v(name: String) = Expression.Variable(SyntaxConstants.VarName(name), BigInt(0))
+  def v(name: String) = Variable(SyntaxConstants.VarName(name), BigInt(0))
 
   def printFailure(t: Throwable): String = {
     val stackTrace = new StringWriter

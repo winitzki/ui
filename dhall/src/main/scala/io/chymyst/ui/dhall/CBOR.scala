@@ -5,8 +5,7 @@ import com.upokecenter.cbor.{CBORObject, CBORType}
 import com.upokecenter.numbers.EInteger
 import io.chymyst.ui.dhall.CBORmodel.CBytes.byteArrayToHexString
 import io.chymyst.ui.dhall.CBORmodel._
-import io.chymyst.ui.dhall.Syntax.Expression.BytesLiteral
-import io.chymyst.ui.dhall.Syntax.{Expression, Natural, PathComponent}
+import io.chymyst.ui.dhall.Syntax.{Expression, ExpressionScheme, Natural, PathComponent}
 import io.chymyst.ui.dhall.SyntaxConstants._
 
 import java.time.LocalTime
@@ -78,6 +77,7 @@ object CBORfix {
 }
 
 sealed trait CBORmodel {
+
   def toCBOR: CBORObject
 
   private implicit class OrError[A](expr: => A) {
@@ -89,102 +89,102 @@ sealed trait CBORmodel {
     }
   }
 
-  final def toExpression: Expression = this match {
+  final def toScheme: ExpressionScheme[Expression] = this match {
     case CNull => ().die(s"Invalid top-level CBOR null value")
-    case CTrue => Expression.Builtin(SyntaxConstants.Builtin.True)
-    case CFalse => Expression.Builtin(SyntaxConstants.Builtin.False)
-    case CInt(data) => Expression.Variable(VarName("_"), data)
-    case CDouble(data) => Expression.DoubleLiteral(data)
+    case CTrue => ExpressionScheme.ExprBuiltin(SyntaxConstants.Builtin.True)
+    case CFalse => ExpressionScheme.ExprBuiltin(SyntaxConstants.Builtin.False)
+    case CInt(data) => ExpressionScheme.Variable(VarName("_"), data)
+    case CDouble(data) => ExpressionScheme.DoubleLiteral(data)
 
-    case CString(data) => Expression.Builtin(SyntaxConstants.Builtin.withName(data)).or(s"String '$data' must be a Builtin name (one of ${SyntaxConstants.Builtin.values.mkString(", ")})")
+    case CString(data) => ExpressionScheme.ExprBuiltin(SyntaxConstants.Builtin.withName(data)).or(s"String '$data' must be a Builtin name (one of ${SyntaxConstants.Builtin.values.mkString(", ")})")
 
     case CArray(data) =>
       data.toList match {
         case CIntTag(0) :: head :: firstArg :: tail =>
-          val firstTerm = Expression.Application(head.toExpression, firstArg.toExpression)
-          tail.map(_.toExpression).foldLeft(firstTerm)((prev, x) => Expression.Application(prev, x))
+          val firstTerm = ExpressionScheme.Application[Expression](head.toScheme, firstArg.toScheme)
+          tail.map(_.toScheme).foldLeft(firstTerm)((prev, x) => ExpressionScheme.Application(prev, x))
 
         case CNull :: _ | CTrue :: _ | CFalse :: _ | CDouble(_) :: _ => ().die(s"Invalid array $this - may not start with ${data.head}")
-        case CIntTag(1) :: tipe :: body :: Nil => Expression.Lambda(VarName("_"), tipe.toExpression, body.toExpression)
-        case CIntTag(1) :: CString(name) :: tipe :: body :: Nil if name != "_" => Expression.Lambda(VarName(name), tipe.toExpression, body.toExpression)
+        case CIntTag(1) :: tipe :: body :: Nil => ExpressionScheme.Lambda(VarName("_"), tipe.toScheme, body.toScheme)
+        case CIntTag(1) :: CString(name) :: tipe :: body :: Nil if name != "_" => ExpressionScheme.Lambda(VarName(name), tipe.toScheme, body.toScheme)
 
-        case CIntTag(2) :: tipe :: body :: Nil => Expression.Forall(VarName("_"), tipe.toExpression, body.toExpression)
-        case CIntTag(2) :: CString(name) :: tipe :: body :: Nil if name != "_" => Expression.Forall(VarName(name), tipe.toExpression, body.toExpression)
+        case CIntTag(2) :: tipe :: body :: Nil => ExpressionScheme.Forall(VarName("_"), tipe.toScheme, body.toScheme)
+        case CIntTag(2) :: CString(name) :: tipe :: body :: Nil if name != "_" => ExpressionScheme.Forall(VarName(name), tipe.toScheme, body.toScheme)
 
-        case CIntTag(3) :: CInt(code) :: left :: right :: Nil if code.isValidByte && code >= 0 && code < 13 => // Expression.Operator
-          Expression.Operator(left.toExpression, SyntaxConstants.Operator.cborCodeDict(code.toInt), right.toExpression)
+        case CIntTag(3) :: CInt(code) :: left :: right :: Nil if code.isValidByte && code >= 0 && code < 13 => // ExpressionScheme.Operator
+          ExpressionScheme.ExprOperator(left.toScheme, SyntaxConstants.Operator.cborCodeDict(code.toInt), right.toScheme)
 
-        case CIntTag(3) :: CInt(code) :: left :: right :: Nil if code.isValidInt && code.intValue == 13 => // Expression.Operator
-          Expression.Completion(left.toExpression, right.toExpression)
+        case CIntTag(3) :: CInt(code) :: left :: right :: Nil if code.isValidInt && code.intValue == 13 => // ExpressionScheme.Operator
+          ExpressionScheme.Completion(left.toScheme, right.toScheme)
 
-        case CIntTag(28) :: tipe :: Nil => Expression.EmptyList(tipe.toExpression)
+        case CIntTag(28) :: tipe :: Nil => ExpressionScheme.EmptyList(tipe.toScheme)
 
-        case CIntTag(4) :: tipe :: Nil if tipe != CNull => Expression.EmptyList(Expression.Application(Expression.Builtin(SyntaxConstants.Builtin.List), tipe.toExpression))
+        case CIntTag(4) :: tipe :: Nil if tipe != CNull => ExpressionScheme.EmptyList[Expression](ExpressionScheme.Application[Expression](ExpressionScheme.ExprBuiltin(SyntaxConstants.Builtin.List), tipe.toScheme))
 
-        case CIntTag(4) :: CNull :: head :: tail => Expression.NonEmptyList(head.toExpression, tail.map(_.toExpression))
+        case CIntTag(4) :: CNull :: head :: tail => ExpressionScheme.NonEmptyList(head.toScheme, tail.map(_.toScheme))
 
-        case CIntTag(5) :: CNull :: body :: Nil => Expression.KeywordSome(body.toExpression)
+        case CIntTag(5) :: CNull :: body :: Nil => ExpressionScheme.KeywordSome(body.toScheme)
 
-        case CIntTag(6) :: t :: u :: Nil => Expression.Merge(t.toExpression, u.toExpression, None)
-        case CIntTag(6) :: t :: u :: v :: Nil => Expression.Merge(t.toExpression, u.toExpression, Some(v.toExpression))
+        case CIntTag(6) :: t :: u :: Nil => ExpressionScheme.Merge(t.toScheme, u.toScheme, None)
+        case CIntTag(6) :: t :: u :: v :: Nil => ExpressionScheme.Merge(t.toScheme, u.toScheme, Some(v.toScheme))
 
-        case CIntTag(27) :: u :: Nil => Expression.ToMap(u.toExpression, None)
-        case CIntTag(27) :: u :: v :: Nil => Expression.ToMap(u.toExpression, Some(v.toExpression))
+        case CIntTag(27) :: u :: Nil => ExpressionScheme.ToMap(u.toScheme, None)
+        case CIntTag(27) :: u :: v :: Nil => ExpressionScheme.ToMap(u.toScheme, Some(v.toScheme))
 
-        case CIntTag(34) :: u :: Nil => Expression.ShowConstructor(u.toExpression)
+        case CIntTag(34) :: u :: Nil => ExpressionScheme.ShowConstructor(u.toScheme)
 
-        case CIntTag(7) :: CMap(data) :: Nil => Expression.RecordType(sortRecordFields(data)).sorted
+        case CIntTag(7) :: CMap(data) :: Nil => ExpressionScheme.RecordType(sortRecordFields(data)).sorted
 
-        case CIntTag(8) :: CMap(data) :: Nil => Expression.RecordLiteral(sortRecordFields(data)).sorted
+        case CIntTag(8) :: CMap(data) :: Nil => ExpressionScheme.RecordLiteral(sortRecordFields(data)).sorted
 
-        case CIntTag(9) :: t :: CString(name) :: Nil => Expression.Field(t.toExpression, FieldName(name))
+        case CIntTag(9) :: t :: CString(name) :: Nil => ExpressionScheme.Field(t.toScheme, FieldName(name))
 
         case CIntTag(10) :: t :: tails if tails.nonEmpty && tails.forall(_.isInstanceOf[CString]) =>
-          Expression.ProjectByLabels(t.toExpression, tails.map(_.asInstanceOf[CString].data).map(FieldName))
+          ExpressionScheme.ProjectByLabels(t.toScheme, tails.map(_.asInstanceOf[CString].data).map(FieldName))
 
-        case CIntTag(10) :: t :: CArray(Array(tipe)) :: Nil => Expression.ProjectByType(t.toExpression, tipe.toExpression)
+        case CIntTag(10) :: t :: CArray(Array(tipe)) :: Nil => ExpressionScheme.ProjectByType(t.toScheme, tipe.toScheme)
 
-        case CIntTag(11) :: CMap(data) :: Nil => Expression.UnionType(data.toSeq.map { case (name, expr) => (ConstructorName(name), if (expr == CNull) None else Some(expr.toExpression)) }).sorted
+        case CIntTag(11) :: CMap(data) :: Nil => ExpressionScheme.UnionType[Expression](data.toSeq.map { case (name, expr) => (ConstructorName(name), if (expr == CNull) None else Some(expr.toScheme)) }).sorted
 
-        case CIntTag(14) :: cond :: ifTrue :: ifFalse :: Nil => Expression.If(cond.toExpression, ifTrue.toExpression, ifFalse.toExpression)
+        case CIntTag(14) :: cond :: ifTrue :: ifFalse :: Nil => ExpressionScheme.If(cond.toScheme, ifTrue.toScheme, ifFalse.toScheme)
 
-        case CIntTag(15) :: CInt(n) :: Nil if n >= 0 => Expression.NaturalLiteral(n)
-        case CIntTag(16) :: CInt(n) :: Nil => Expression.IntegerLiteral(n)
+        case CIntTag(15) :: CInt(n) :: Nil if n >= 0 => ExpressionScheme.NaturalLiteral(n)
+        case CIntTag(16) :: CInt(n) :: Nil => ExpressionScheme.IntegerLiteral(n)
 
         case CIntTag(18) :: CString(head) :: tail
           if tail.zipWithIndex.forall {
-            case (t, i) if i % 2 == 0 && t.toExpression != null => true
+            case (t, i) if i % 2 == 0 && t.toScheme != null => true
             case (CString(_), i) if i % 2 == 1 => true
             case _ => false
           } =>
           if (tail.isEmpty)
-            Expression.TextLiteral(List(), head)
+            ExpressionScheme.TextLiteral(List(), head)
           else {
             val trailing = tail.last.asInstanceOf[CString].data
-            Expression.TextLiteral(data.drop(1).init.grouped(2).toList.map { array => (array(0).asInstanceOf[CString].data, array(1).toExpression) }, trailing)
+            ExpressionScheme.TextLiteral(data.drop(1).init.grouped(2).toList.map { array => (array(0).asInstanceOf[CString].data, array(1).toScheme) }, trailing)
           }
 
-        case CString(name) :: CInt(index) :: Nil => Expression.Variable(VarName(name), index)
+        case CString(name) :: CInt(index) :: Nil => ExpressionScheme.Variable(VarName(name), index)
 
-        case CIntTag(33) :: CBytes(bytes) :: Nil => Expression.BytesLiteral(CBytes.byteArrayToHexString(bytes))
+        case CIntTag(33) :: CBytes(bytes) :: Nil => ExpressionScheme.BytesLiteral(CBytes.byteArrayToHexString(bytes))
 
-        case CIntTag(19) :: x :: Nil => Expression.Assert(x.toExpression)
+        case CIntTag(19) :: x :: Nil => ExpressionScheme.Assert(x.toScheme)
 
-        case CIntTag(26) :: body :: tipe :: Nil => Expression.Annotation(body.toExpression, tipe.toExpression)
+        case CIntTag(26) :: body :: tipe :: Nil => ExpressionScheme.Annotation(body.toScheme, tipe.toScheme)
 
-        case CIntTag(24) :: maybeHash :: CIntTag(importModeTag) :: CIntTag(schemeTag) :: tail => // Expression.Import
+        case CIntTag(24) :: maybeHash :: CIntTag(importModeTag) :: CIntTag(schemeTag) :: tail => // ExpressionScheme.Import
           val digest = maybeHash match {
             case CNull => None
-            case CBytes(bytes) if bytes.length == 34 && bytes(0) == 0x12.toByte && bytes(1) == 0x20.toByte => Some(BytesLiteral(CBytes.byteArrayToHexString(bytes.drop(2))))
+            case CBytes(bytes) if bytes.length == 34 && bytes(0) == 0x12.toByte && bytes(1) == 0x20.toByte => Some(ExpressionScheme.BytesLiteral(CBytes.byteArrayToHexString(bytes.drop(2))))
           }
           val importMode = ImportMode.cborCodeDict(importModeTag)
-          val importType: ImportType = (schemeTag, tail) match {
+          val importType: ImportType[Expression] = (schemeTag, tail) match {
             case (t, headersOrCNull :: CString(authority) :: relativeURL) if SyntaxConstants.Scheme.cborCodeDict.keySet contains t =>
-              val headers = if (headersOrCNull == CNull) None else Some(headersOrCNull.toExpression)
+              val headers = if (headersOrCNull == CNull) None else Some(headersOrCNull.toScheme)
               val query = if (relativeURL.last == CNull) None else Some(relativeURL.last.asString)
               val segments = relativeURL.init.map(_.asString)
               val url = SyntaxConstants.URL(scheme = SyntaxConstants.Scheme.cborCodeDict(t), authority = authority, path = SyntaxConstants.File.of(segments), query = query)
-              ImportType.Remote(url, headers)
+              ImportType.Remote[Expression](url, headers.map(Expression.apply))
 
             case (t, filePath) if SyntaxConstants.FilePrefix.cborCodeDict.keySet contains t =>
               val filePrefix: FilePrefix = FilePrefix.cborCodeDict(t)
@@ -194,23 +194,23 @@ sealed trait CBORmodel {
 
             case (7, List()) => ImportType.Missing
           }
-          Expression.Import(importType, importMode, digest)
+          ExpressionScheme.Import(importType, importMode, digest)
 
-        case CIntTag(25) :: defs if defs.length > 3 => // Expression.Let
+        case CIntTag(25) :: defs if defs.length > 3 => // ExpressionScheme.Let
           val target = defs.last
-          defs.init.grouped(3).foldRight(target.toExpression) { case (List(name, tipe, expr), t) =>
-            Expression.Let(VarName(name.asString), if (tipe == CNull) None else Some(tipe.toExpression), expr.toExpression, t)
+          defs.init.grouped(3).foldRight(target.toScheme) { case (List(name, tipe, expr), t) =>
+            ExpressionScheme.Let(VarName(name.asString), if (tipe == CNull) None else Some(tipe.toScheme), expr.toScheme, t)
           }
 
         case CIntTag(29) :: base :: CArray(defs) :: target :: Nil if defs.forall {
           case CIntTag(0) | CString(_) => true
           case _ => false
-        } => Expression.With(base.toExpression, defs.map {
+        } => ExpressionScheme.With(base.toScheme, defs.map {
           case CIntTag(0) => PathComponent.DescendOptional
           case CString(name) => PathComponent.Label(FieldName(name))
-        }, target.toExpression)
+        }, target.toScheme)
 
-        case CIntTag(30) :: CIntTag(year) :: CIntTag(month) :: CIntTag(day) :: Nil if month >= 1 && month <= 12 && day >= 1 && day <= 31 => Expression.DateLiteral(year, month, day)
+        case CIntTag(30) :: CIntTag(year) :: CIntTag(month) :: CIntTag(day) :: Nil if month >= 1 && month <= 12 && day >= 1 && day <= 31 => ExpressionScheme.DateLiteral(year, month, day)
 
         case CIntTag(31) :: CIntTag(hours) :: CIntTag(minutes) :: CTagged(4, CArray(Array(CIntTag(precision), CIntTag(totalSeconds)))) :: Nil if hours >= 0 && hours <= 23 && minutes >= 0 && minutes < 60 && precision <= 0 && precision >= -9 =>
           val power = math.pow(10, -precision).toInt
@@ -218,7 +218,7 @@ sealed trait CBORmodel {
           val seconds: Int = totalSeconds / power
           val nanos: Int = (totalSeconds % power) * math.pow(10, precision + 9).toInt
 
-          Expression.TimeLiteral(LocalTime.of(hours, minutes, seconds, nanos))
+          ExpressionScheme.TimeLiteral(LocalTime.of(hours, minutes, seconds, nanos))
 
 
         case CIntTag(32) :: (CTrue | CFalse) :: CIntTag(hours) :: CIntTag(minutes) :: Nil if hours >= 0 && hours <= 23 && minutes >= 0 && minutes < 60 =>
@@ -226,13 +226,13 @@ sealed trait CBORmodel {
             case CTrue => 1
             case CFalse => -1
           }
-          Expression.TimeZoneLiteral(sign * (hours * 60 + minutes))
+          ExpressionScheme.TimeZoneLiteral(sign * (hours * 60 + minutes))
 
 
         case _ => ().die(s"Invalid top-level array $this while parsing CBOR")
       }
 
-    case CTagged(55799, data) => data.toExpression
+    case CTagged(55799, data) => data.toScheme
     case CTagged(tag, data) => ().die(s"Unexpected tagged top-level CBOR object: tag $tag with data $data")
     case CBytes(_) | CMap(_) => ().die(s"Unexpected top-level CBOR object: $this")
   }
@@ -284,7 +284,7 @@ object CBORmodel {
   def eIntegerToBigInt(eInt: EInteger): BigInt = BigInt(eInt.signum, eInt.ToBytes(false))
 
   private def sortRecordFields(data: Map[String, CBORmodel]): Seq[(FieldName, Expression)] =
-    data.toSeq.map { case (name, expr) => (FieldName(name), expr.toExpression) }
+    data.toSeq.map { case (name, expr) => (FieldName(name), expr.toScheme) }
 
   final case object CNull extends CBORmodel {
     override def toCBOR: CBORObject = CBORObject.Null
@@ -394,6 +394,7 @@ object CBORmodel {
     case x: String => CString(x)
     case x: Array[Any] => CArray(x.map(toCBORmodel))
     case x: Map[String, Any] => CMap(x.map { case (k, v) => (k, toCBORmodel(v)) })
+    case x: ExpressionScheme[Expression] => CBOR.toCborModel(x)
     case x: Expression => CBOR.toCborModel(x)
     case x: CBORmodel => x
     case x => throw new Exception(s"Invalid input toCBORmodel($x:${x.getClass})")
@@ -408,7 +409,7 @@ object CBOR {
 
   def exprToBytes(e: Expression): Array[Byte] = toCborModel(e).toCBOR.EncodeToBytes()
 
-  def bytesToExpr(bytes: Array[Byte]): Expression = fromCbor(CBORObject.DecodeFromBytes(bytes)).toExpression
+  def bytesToExpr(bytes: Array[Byte]): Expression = fromCbor(CBORObject.DecodeFromBytes(bytes)).toScheme
 
   def naturalToCbor2(index: Natural): CBORObject =
     if (index < BigInt(1).<<(64))
@@ -416,85 +417,83 @@ object CBOR {
     else
       CBORObject.FromObject(EInteger.FromBytes(index.toByteArray, false)) // TODO: Does this work correctly? Do we need to set littleEndian = true?
 
-  def toCborModel(e: Expression): CBORmodel = e match {
-    case Expression.Variable(VarName("_"), index) => CInt(index)
+  def toCborModel(e: Expression ): CBORmodel = e.scheme match {
+    case ExpressionScheme.Variable(VarName("_"), index) => CInt(index)
 
-    case Expression.Variable(VarName(name), index) => array(name, index)
+    case ExpressionScheme.Variable(VarName(name), index) => array(name, index)
 
-    case Expression.Lambda(VarName(name), tipe, body) => if (name == "_") array(1, tipe, body) else array(1, name, tipe, body)
+    case ExpressionScheme.Lambda(VarName(name), tipe, body) => if (name == "_") array(1, tipe, body) else array(1, name, tipe, body)
 
-    case Expression.Forall(VarName(name), tipe, body) => if (name == "_") array(2, tipe, body) else array(2, name, tipe, body)
+    case ExpressionScheme.Forall(VarName(name), tipe, body) => if (name == "_") array(2, tipe, body) else array(2, name, tipe, body)
 
-    case e@Expression.Let(_, _, _, _) =>
-      @tailrec def loop(acc: Seq[Any], expr: Expression): Seq[Any] = expr match {
-        case Expression.Let(VarName(name), tipe, subst, body) => loop((acc :+ name) :+ tipe.orNull :+ subst, body)
+    case e@ExpressionScheme.Let(_, _, _, _) =>
+      @tailrec def loop(acc: Seq[Any], expr: ExpressionScheme[Expression]): Seq[Any] = expr match {
+        case ExpressionScheme.Let(VarName(name), tipe, subst, body) => loop((acc :+ name) :+ (tipe.orNull: Any) :+ subst, body)
         case _ => acc :+ expr
       }
 
       array(25 +: loop(Seq(), e): _*)
 
-    case Expression.If(cond, ifTrue, ifFalse) => array(14, cond, ifTrue, ifFalse)
+    case ExpressionScheme.If(cond, ifTrue, ifFalse) => array(14, cond, ifTrue, ifFalse)
 
-    case Expression.Merge(record, update, tipe) =>
+    case ExpressionScheme.Merge(record, update, tipe) =>
       val args: Seq[Expression] = Seq(record, update) ++ tipe.toSeq
       array(6 +: args: _*)
 
-    case Expression.ToMap(data, tipe) =>
+    case ExpressionScheme.ToMap(data, tipe) =>
       val args: Seq[Expression] = Seq(data) ++ tipe.toSeq
       array(27 +: args: _*)
 
-    case Expression.EmptyList(Expression.Application(Expression.Builtin(SyntaxConstants.Builtin.List), tipe)) => array(4, tipe)
+    case ExpressionScheme.EmptyList(Expression(ExpressionScheme.Application(Expression(ExpressionScheme.ExprBuiltin(SyntaxConstants.Builtin.List)), tipe))) => array(4, tipe)
 
-    case Expression.EmptyList(tipe) => array(28, tipe)
+    case ExpressionScheme.EmptyList(tipe) => array(28, tipe)
 
-    case Expression.NonEmptyList(head, tail) => array(4 +: null +: head +: tail: _*)
+    case ExpressionScheme.NonEmptyList(head, tail) => array(4 +: null +: head +: tail: _*)
 
-    case Expression.Annotation(data, tipe) => array(26, data, tipe)
+    case ExpressionScheme.Annotation(data, tipe) => array(26, data, tipe)
 
-    case Expression.Operator(lop, op, rop) => array(3, op.cborCode, lop, rop)
+    case ExpressionScheme.ExprOperator(lop, op, rop) => array(3, op.cborCode, lop, rop)
 
-    case f@Expression.Application(_, _) =>
-      @tailrec def loop(args: Seq[Expression], expr: Expression): Seq[Expression] = expr match {
-        case Expression.Application(f, a) => loop(a +: args, f)
+    case f@ExpressionScheme.Application(_, _) =>
+      @tailrec def loop(args: Seq[Expression], expr: Expression): Seq[Expression] = expr.scheme match {
+        case ExpressionScheme.Application(f, a) => loop(a +: args, f)
         case _ => expr +: args
       }
 
       array(0 +: loop(Seq(), f): _*)
 
-    case Expression.Field(base, FieldName(name)) => array(9, base, name)
+    case ExpressionScheme.Field(base, FieldName(name)) => array(9, base, name)
 
-    case Expression.ProjectByLabels(base, labels) => array(10 +: base +: labels.map(_.name): _*)
+    case ExpressionScheme.ProjectByLabels(base, labels) => array(10 +: base +: labels.map(_.name): _*)
 
-    case Expression.ProjectByType(base, by) => array(10, base, array(by))
+    case ExpressionScheme.ProjectByType(base, by) => array(10, base, array(by))
 
-    case Expression.Completion(base, target) => array(3, 13, base, target)
+    case ExpressionScheme.Completion(base, target) => array(3, 13, base, target)
 
-    case Expression.Assert(data) => array(19, data)
+    case ExpressionScheme.Assert(data) => array(19, data)
 
-    case Expression.With(data, pathComponents, body) =>
+    case ExpressionScheme.With(data, pathComponents, body) =>
       val path: Seq[Any] = pathComponents.map {
         case PathComponent.Label(FieldName(name)) => name
         case PathComponent.DescendOptional => 0
       }
       array(29, data, array(path: _*), body)
 
-    case Expression.DoubleLiteral(value) => CDouble(value) // TODO: this does not work correctly for value = -0.0 or value = +0.0 because of CBOR-java issue #24
+    case ExpressionScheme.DoubleLiteral(value) => CDouble(value) // TODO: this does not work correctly for value = -0.0 or value = +0.0 because of CBOR-java issue #24
 
-    case Expression.NaturalLiteral(value) => array(15, value)
+    case ExpressionScheme.NaturalLiteral(value) => array(15, value)
 
-    case Expression.IntegerLiteral(value) => array(16, value)
+    case ExpressionScheme.IntegerLiteral(value) => array(16, value)
 
-    case Expression.TextLiteralNoInterp(value) => array(18, value)
-
-    case Expression.TextLiteral(interpolations, trailing) =>
+    case ExpressionScheme.TextLiteral(interpolations, trailing) =>
       val objects: Seq[Any] = interpolations.flatMap { case (head, tail) => Seq(head, tail) } :+ trailing
       array(18 +: objects: _*)
 
-    case b@Expression.BytesLiteral(_) => array(33, CBytes(b.bytes))
+    case b@ExpressionScheme.BytesLiteral(_) => array(33, CBytes(b.bytes))
 
-    case Expression.DateLiteral(y, m, d) => array(30, y, m, d)
+    case ExpressionScheme.DateLiteral(y, m, d) => array(30, y, m, d)
 
-    case Expression.TimeLiteral(time) =>
+    case ExpressionScheme.TimeLiteral(time) =>
       @tailrec def getPrecision(nanos: Long, initPrecision: Int): Int =
         if (nanos <= 0) 0
         else if (nanos % 10 > 0) initPrecision
@@ -504,41 +503,41 @@ object CBOR {
       val totalSeconds: Long = (time.getSecond * math.pow(10, precision).toLong + time.getNano) / math.pow(10, precision).toLong
       array(31, time.getHour, time.getMinute, CTagged(4, array(precision, totalSeconds)))
 
-    case Expression.TimeZoneLiteral(totalMinutes) =>
+    case ExpressionScheme.TimeZoneLiteral(totalMinutes) =>
       val hours: Int = math.abs(totalMinutes) / 60
       val minutes: Int = math.abs(totalMinutes) % 60
       val isPositive: Boolean = totalMinutes >= 0
       val cborSign: CBORmodel = if (isPositive) CTrue else CFalse
       array(32, cborSign, hours, minutes)
 
-    case Expression.RecordType(defs) =>
+    case ExpressionScheme.RecordType(defs) =>
       val dict = defs
         .map { case (FieldName(name), expr) => (name, expr) }
         .toMap
       array(7, dict)
 
-    case Expression.RecordLiteral(defs) =>
+    case ExpressionScheme.RecordLiteral(defs) =>
       val dict = defs
         .map { case (FieldName(name), expr) => (name, expr) }
         .toMap
       array(8, dict)
 
-    case Expression.UnionType(defs) =>
+    case ExpressionScheme.UnionType(defs) =>
       val dict = defs
-        .map { case (ConstructorName(name), maybeExpr) => (name, maybeExpr.orNull)
+        .map { case (ConstructorName(name), maybeExpr) => (name, maybeExpr.orNull: Any)
         }.toMap
       array(11, dict)
 
-    case Expression.ShowConstructor(data) => array(34, data)
+    case ExpressionScheme.ShowConstructor(data) => array(34, data)
 
-    case Expression.Import(importType, importMode, digest) =>
+    case ExpressionScheme.Import(importType, importMode, digest) =>
       val integrity = digest.map(d => CBytes("\u0012\u0020".getBytes ++ d.bytes)).orNull
       val part1 = Seq(integrity, importMode.cborCode)
       val part2 = importType match {
         case ImportType.Missing => Seq(7)
 
         case ImportType.Remote(SyntaxConstants.URL(scheme, authority, SyntaxConstants.File(segments), query), headers) =>
-          scheme.cborCode +: headers.orNull +: authority +: segments :+ query.orNull
+          scheme.cborCode +: (headers.orNull: Any) +: authority +: segments :+ (query.orNull: Any)
 
         case ImportType.Path(filePrefix, SyntaxConstants.File(segments)) => filePrefix.cborCode +: segments
 
@@ -546,15 +545,15 @@ object CBOR {
       }
       array(24 +: (part1 ++ part2): _*)
 
-    case Expression.KeywordSome(data) => array(5, null, data)
+    case ExpressionScheme.KeywordSome(data) => array(5, null, data)
 
-    case Expression.Builtin(SyntaxConstants.Builtin.True) | Expression.Constant(SyntaxConstants.Constant.True) => CTrue
+    case ExpressionScheme.ExprBuiltin(SyntaxConstants.Builtin.True) | ExpressionScheme.ExprConstant(SyntaxConstants.Constant.True) => CTrue
 
-    case Expression.Builtin(SyntaxConstants.Builtin.False) | Expression.Constant(SyntaxConstants.Constant.False) => CFalse
+    case ExpressionScheme.ExprBuiltin(SyntaxConstants.Builtin.False) | ExpressionScheme.ExprConstant(SyntaxConstants.Constant.False) => CFalse
 
-    case Expression.Builtin(builtin) => CString(builtin.entryName)
+    case ExpressionScheme.ExprBuiltin(builtin) => CString(builtin.entryName)
 
-    case Expression.Constant(constant) => CString(constant.entryName)
+    case ExpressionScheme.ExprConstant(constant) => CString(constant.entryName)
   }
 
 }

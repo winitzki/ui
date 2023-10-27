@@ -74,7 +74,7 @@ class DhallParserSuite extends FunSuite {
     expect(results.count(_.isFailure) == 0)
   }
 
-  test("validate CBOR encoding for standard examples") {
+  test("validate CBOR writing for standard examples") {
     val outDir = "./testdhallb"
     Try(Files.createDirectory(Paths.get(outDir)))
     val results = testFilesForSuccess.flatMap { file =>
@@ -105,7 +105,7 @@ class DhallParserSuite extends FunSuite {
     expect(failures <= 2 && modelFailures == 0) // Two failures are due to a bug in CBOR-Java. PR was already merged to fix that bug.
   }
 
-  test("validate CBOR decoding for standard examples") {
+  test("validate CBOR reading for standard examples") {
     val results = testFilesForSuccess.flatMap { file =>
       val validationFile = file.getAbsolutePath.replace("A.dhall", "B.dhallb")
       val cborValidationBytes = Files.readAllBytes(Paths.get(validationFile))
@@ -125,10 +125,10 @@ class DhallParserSuite extends FunSuite {
         } else Failure(new Exception(s"CBOR model differs: our CBOR model is:\n$model\nbut the expected CBOR model is:\n$diagnosticString\n"))
       }.flatMap(_.toOption) // We ignore any failures with CBOR encoding because those failures are detected in the previous test.
       result2.map { case (model, expression) =>
-        Try(model.toExpression == expression) match {
+        Try(model.toScheme == expression.scheme) match {
           case Failure(exception) => Failure(new Exception(s"${file.getName}: Parser crashed on model $model: $exception"))
           case Success(true) => Success(file.getName)
-          case Success(false) => Failure(new Exception(s"${file.getName}: After restoring from bytes, expression differs: expected:\n$expression\n\t\tbut got:\n${model.toExpression}"))
+          case Success(false) => Failure(new Exception(s"${file.getName}: After restoring from bytes, expression differs: expected:\n$expression\n\t\tbut got:\n${model.toScheme}"))
         }
       }
 

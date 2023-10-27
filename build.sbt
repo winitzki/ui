@@ -17,6 +17,8 @@ val cbor1 = "co.nstant.in" % "cbor" % "0.9"
 val cbor2 = "com.upokecenter" % "cbor" % "4.5.2"
 val cbor3 = "io.bullet" %% "borer-core" % "1.8.0"
 
+val curryhoward = "io.chymyst" %% "curryhoward" % "0.3.8"
+
 lazy val root = (project in file(".")).settings(
   scalaVersion := scalaV,
   crossScalaVersions := Seq(scalaV),
@@ -93,5 +95,6 @@ lazy val dhall = (project in file("dhall")).settings(
     //    cbor1,
     cbor2,
     cbor3,
+    curryhoward,
   ),
 )

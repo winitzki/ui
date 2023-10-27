@@ -3,7 +3,8 @@ package io.chymyst.ui.dhall.unit
 import com.eed3si9n.expecty.Expecty.expect
 import com.upokecenter.cbor.CBORObject
 import fastparse.{Parsed, parse}
-import io.chymyst.ui.dhall.Syntax.Expression._
+import io.chymyst.ui.dhall.Syntax._
+import io.chymyst.ui.dhall.Syntax.ExpressionScheme._
 import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression}
 import io.chymyst.ui.dhall.SyntaxConstants.Builtin.Natural
 import io.chymyst.ui.dhall.SyntaxConstants.FilePrefix.Here
@@ -21,13 +22,13 @@ class SimpleExpressionTest extends FunSuite {
   test("simple invalid expression: 1+1") {
     toFail(Grammar.complete_dhall_file(_), "1+1", "", "", 1)
     //    val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall("1+1")
-    //    val expected = Expression.NaturalLiteral(1)
+    //    val expected = NaturalLiteral(1)
     //    expect(result == expected, "1+1 must be parsed as 1".nonEmpty)
   }
 
   test("simple expression: { foo, bar }") {
     val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall("{ foo, bar }")
-    val expected = Expression.RecordLiteral(List(
+    val expected: Expression = RecordLiteral[Expression](List(
       (FieldName("foo"), v("foo")),
       (FieldName("bar"), v("bar")),
     )).sorted
@@ -35,23 +36,23 @@ class SimpleExpressionTest extends FunSuite {
   }
 
   test("simple expression: x") {
-    expect(parse("x", Grammar.expression(_)).get.value == v("x"))
+    expect(parse("x", Grammar.expression(_)).get.value.scheme == v("x"))
   }
 
   test("simple expression: let x = 1 in x with hand-written grammar") {
-    expect(parse("1", Grammar.expression(_)).get.value == NaturalLiteral(1))
-    expect(parse("x", Grammar.expression(_)).get.value == v("x"))
-    expect(parse("let x = 1 ", Grammar.let_binding(_)).get.value == (VarName("x"), None, NaturalLiteral(1)))
+    expect(parse("1", Grammar.expression(_)).get.value.scheme == NaturalLiteral(1))
+    expect(parse("x", Grammar.expression(_)).get.value.scheme == v("x"))
+    expect(parse("let x = 1 ", Grammar.let_binding(_)).get.value == (VarName("x"), None, Expression(NaturalLiteral(1))))
 
     TestUtils.toFail(Grammar.identifier(_), "in", "", "", 0)
 
-    expect(parse("1 in", Grammar.application_expression(_)).get.value == NaturalLiteral(1))
+    expect(parse("1 in", Grammar.application_expression(_)).get.value.scheme == NaturalLiteral(1))
 
     import fastparse._
     import NoWhitespace._
     def grammar1[$: P] = P(Grammar.let_binding)
 
-    expect(parse("let x = 1 ", grammar1(_)).get.value == (VarName("x"), None, NaturalLiteral(1)))
+    expect(parse("let x = 1 ", grammar1(_)).get.value == (VarName("x"), None, Expression(NaturalLiteral(1))))
 
     def grammar2[$: P] = P(
       Grammar.let_binding ~ Grammar.requireKeyword("in")
@@ -66,20 +67,20 @@ class SimpleExpressionTest extends FunSuite {
 
   test("simple expression: let x = 1 in y") {
     val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall("let x = 1 in y")
-    val expected = Expression.Let(VarName("x"), None, NaturalLiteral(1), v("y"))
-    expect(result == expected)
+    val expected = Let(VarName("x"), None, Expression(NaturalLiteral(1)), Expression(v("y")))
+    expect(result.scheme == expected)
   }
 
   test("simple expression: (x)") {
     val Parsed.Success(result, _) = parse("(x)", Grammar.primitive_expression(_))
     val expected = v("x")
-    expect(result == expected)
+    expect(result.scheme == expected)
   }
 
   test("parse a string interpolation") {
     val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall(""" "${1}" """)
-    val expected = Expression.TextLiteral(List(("", Expression.NaturalLiteral(1))), "")
-    expect(result == expected)
+    val expected = TextLiteral(List(("", NaturalLiteral(1))), "")
+    expect(result.scheme == expected)
   }
 
   test("parse a sample file") {
@@ -89,14 +90,14 @@ class SimpleExpressionTest extends FunSuite {
 
   test("expression and a block comment") {
     val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall("""1 {- -}""")
-    val expected = Expression.NaturalLiteral(1)
-    expect(result == expected)
+    val expected = NaturalLiteral(1)
+    expect(result.scheme == expected)
   }
 
   test("expression and a line comment") {
     val Parsed.Success(DhallFile(Seq(), result), _) = Parser.parseDhall("""1 -- aaa \n""")
-    val expected = Expression.NaturalLiteral(1)
-    expect(result == expected)
+    val expected = NaturalLiteral(1)
+    expect(result.scheme == expected)
   }
 
   test("expression followed by comment") {
@@ -120,21 +121,21 @@ class SimpleExpressionTest extends FunSuite {
 
   test("parse assert : x") {
     val input = "assert : x"
-    val expected = Expression.Assert(v("x"))
+    val expected = Assert(v("x"))
     val Parsed.Success(result1, _) = parse(input, Grammar.expression_assert(_))
-    expect(result1 == expected)
+    expect(result1.scheme == expected)
     val Parsed.Success(result2, _) = parse(input, Grammar.expression(_))
-    expect(result2 == expected)
+    expect(result2.scheme == expected)
     val Parsed.Success(result3, _) = parse(input, Grammar.complete_expression(_))
-    expect(result3 == expected)
+    expect(result3.scheme == expected)
     val Parsed.Success(result4, _) = parse(input, Grammar.complete_dhall_file(_))
-    expect(result4.value == expected)
+    expect(result4.value.scheme == expected)
   }
 
   test("parse x === y") {
     import fastparse._
     val input = "x === y"
-    val expected = Expression.Operator(v("x"), SyntaxConstants.Operator.Equivalent, v("y"))
+    val expected = ExprOperator(v("x"), SyntaxConstants.Operator.Equivalent, v("y"))
 
     check(Grammar.equivalent(_), "===", ())
     check(Grammar.import_alt_expression(_), "x", v("x"))
@@ -166,7 +167,7 @@ class SimpleExpressionTest extends FunSuite {
 
   test("parse assert : x === y") {
     val input = "assert : x === y"
-    val expected = Expression.Assert(Expression.Operator(v("x"), SyntaxConstants.Operator.Equivalent, v("y")))
+    val expected = Assert(ExprOperator(v("x"), SyntaxConstants.Operator.Equivalent, v("y")))
     val Parsed.Success(result1, _) = parse(input, Grammar.expression_assert(_))
     expect(result1 == expected)
     val Parsed.Success(result2, _) = parse(input, Grammar.expression(_))
@@ -183,14 +184,14 @@ class SimpleExpressionTest extends FunSuite {
   }
 
   test("empty record literal") {
-    check(Grammar.complete_expression(_), "{ }", Expression.RecordType(Seq()))
-    check(Grammar.complete_expression(_), "{=}", Expression.RecordLiteral(Seq()))
-    check(Grammar.complete_expression(_), "{,}", Expression.RecordType(Seq()))
-    check(Grammar.complete_expression(_), "{}", Expression.RecordType(Seq()))
+    check(Grammar.complete_expression(_), "{ }", RecordType(Seq()))
+    check(Grammar.complete_expression(_), "{=}", RecordLiteral(Seq()))
+    check(Grammar.complete_expression(_), "{,}", RecordType(Seq()))
+    check(Grammar.complete_expression(_), "{}", RecordType(Seq()))
   }
 
   test("variables or missing import ambiguity 1") {
-    check(Grammar.complete_expression(_), "missingas Text", Application(v("missingas"),Builtin(SyntaxConstants.Builtin.Text)) )
+    check(Grammar.complete_expression(_), "missingas Text", Application(v("missingas"), ExprBuiltin(SyntaxConstants.Builtin.Text)))
   }
 
   test("variables or missing import ambiguity 2") {
@@ -199,9 +200,9 @@ class SimpleExpressionTest extends FunSuite {
 
   test("variables or missing import ambiguity 3") {
     import fastparse._, NoWhitespace._, Grammar._
-    def grammar[$: P] = P( ( "a" ~ !"b" | "ab") ~ End)
+    def grammar[$: P] = P(("a" ~ !"b" | "ab") ~ End)
 
-    check(grammar(_), "ab",  ())
+    check(grammar(_), "ab", ())
   }
 
   test("variable name missing//foo, conflict with import declaration") {
@@ -210,11 +211,11 @@ class SimpleExpressionTest extends FunSuite {
     check(Grammar.identifier(_), "missingas", v("missingas"))
 
     check(Seq(
-      "missing as Text" -> Expression.Import(Missing, RawText, None),
-      "missingas text" -> Expression.Application(v("missingas"), v("text")),
+      "missing as Text" -> Import(Missing, RawText, None),
+      "missingas text" -> Application(v("missingas"), v("text")),
       "missing//foo" -> v("missing//foo"),
     ) ++ Seq("missingas", "Natural/blah", "lets").map { m =>
-      s"let $m = \\(x: Natural) -> x in let text = 2 in $m text" -> Let(VarName(m), None, Lambda(VarName("x"), Expression.Builtin(Natural), v("x")), Let(VarName("text"), None, NaturalLiteral(2), Expression.Application(v(m), v("text"))))
+      s"let $m = \\(x: Natural) -> x in let text = 2 in $m text" -> Let(VarName(m), None, Lambda(VarName("x"), ExprBuiltin(Natural), v("x")), Let(VarName("text"), None, NaturalLiteral(2), Application(v(m), v("text"))))
     }, Grammar.complete_expression(_))
 
   }
@@ -261,8 +262,8 @@ class SimpleExpressionTest extends FunSuite {
       "https://example.com",
       "http://example.com/",
     ).foreach { urlString =>
-      val expr1a = Parser.parseDhall(urlString).get.value.value.asInstanceOf[Import]
-      val expr1b = CBOR.bytesToExpr(CBOR.exprToBytes(expr1a)).asInstanceOf[Import]
+      val expr1a = Parser.parseDhall(urlString).get.value.value.scheme.asInstanceOf[Import[Expression]]
+      val expr1b = CBOR.bytesToExpr(CBOR.exprToBytes(expr1a)).scheme.asInstanceOf[Import[Expression]]
       expect(expr1a == expr1b)
     }
   }
@@ -291,7 +292,7 @@ class SimpleExpressionTest extends FunSuite {
   }
 
   test("leading delimiter in union type") {
-    val expected = UnionType(List((ConstructorName("Foo"), Some(Expression.Builtin(Natural)))))
+    val expected = UnionType(List((ConstructorName("Foo"), Some(ExprBuiltin(Natural)))))
     check(Grammar.primitive_expression(_), "< Foo : Natural >", expected)
     check(Grammar.primitive_expression(_), "<  Foo : Natural  | >", expected)
     check(Grammar.primitive_expression(_), "< | Foo : Natural >", expected)
@@ -304,12 +305,12 @@ class SimpleExpressionTest extends FunSuite {
     val cborModelFromExampleFile = CBORmodel.fromCbor(CBORObject.Read(testFileB))
     val cborModelAfterRoundtrip = CBORmodel.fromCbor(CBORObject.DecodeFromBytes(CBOR.exprToBytes(expr)))
     expect(cborModelFromExampleFile.toString == cborModelAfterRoundtrip.toString)
-    val exprFromExampleFile = cborModelFromExampleFile.toExpression
+    val exprFromExampleFile = cborModelFromExampleFile.toScheme
     expect(exprFromExampleFile == expr)
   }
 
   test("application to an import") {
-    val expected = Application(Expression.Builtin(SyntaxConstants.Builtin.List), Import(Path(Here, File(List("file"))), Code, None))
+    val expected = Application(ExprBuiltin(SyntaxConstants.Builtin.List), Import(Path(Here, File(List("file"))), Code, None))
     check(Grammar.application_expression(_), "List ./file", expected)
   }
 }

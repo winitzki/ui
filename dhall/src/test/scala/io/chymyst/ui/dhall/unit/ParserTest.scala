@@ -3,6 +3,7 @@ package io.chymyst.ui.dhall.unit
 import com.eed3si9n.expecty.Expecty.expect
 import fastparse._
 import io.chymyst.ui.dhall.Syntax.Expression
+import io.chymyst.ui.dhall.Syntax.ExpressionScheme._
 import io.chymyst.ui.dhall.unit.TestFixtures._
 import io.chymyst.ui.dhall.unit.TestUtils._
 import io.chymyst.ui.dhall.{Grammar, SyntaxConstants}
@@ -86,7 +87,8 @@ class ParserTest extends FunSuite {
   }
 
   test("comment fails when not closed") {
-    import fastparse._, NoWhitespace._
+    import fastparse._
+    import NoWhitespace._
 
     // Incomplete comments will not fail to parse without ~End unless `{-` cuts. But if it cuts we cannot parse identifiers with trailing comments.
     def whspClosed[$: P] = Grammar.whsp ~ End
@@ -104,7 +106,8 @@ class ParserTest extends FunSuite {
       check(Grammar.whsp(_), input, (), 0)
     }
 
-    import fastparse._, NoWhitespace._
+    import fastparse._
+    import NoWhitespace._
 
     // Incomplete comments will not fail to parse without ~End unless `{-` cuts. But if it cuts we cannot parse identifiers with trailing comments.
     def whspClosed[$: P] = Grammar.whsp ~ End
@@ -168,7 +171,7 @@ class ParserTest extends FunSuite {
     val names = SyntaxConstants.Builtin.namesToValuesMap
     expect(names.keySet.size == 42)
     names.foreach { case (name, c) =>
-      check(Grammar.builtin(_), name, Expression.Builtin(c), name.length)
+      check(Grammar.builtin(_), name, Expression(ExprBuiltin(c)), name.length)
     }
   }
 
@@ -183,7 +186,7 @@ class ParserTest extends FunSuite {
       "100e-2" -> 100e-2,
       "1.0e-3" -> 1.0e-3,
     ).foreach { case (s, d) =>
-      check(Grammar.numeric_double_literal(_), s, Expression.DoubleLiteral(d), s.length)
+      check(Grammar.numeric_double_literal(_), s, DoubleLiteral(d), s.length)
     }
   }
 
@@ -195,10 +198,10 @@ class ParserTest extends FunSuite {
       "0x10" -> BigInt(16),
       "0xFFFF" -> BigInt(65535),
     ).foreach { case (s, d) =>
-      check(Grammar.natural_literal(_), s, Expression.NaturalLiteral(d), s.length)
+      check(Grammar.natural_literal(_), s, NaturalLiteral(d), s.length)
     }
     // Leading zero digits are not allowed.
-    check(Grammar.natural_literal(_), "00001", Expression.NaturalLiteral(BigInt(0)), 1)
+    check(Grammar.natural_literal(_), "00001", NaturalLiteral(BigInt(0)), 1)
   }
 
   test("integer_literal") {
@@ -215,11 +218,11 @@ class ParserTest extends FunSuite {
       "-0x10" -> BigInt(-16),
       "-0xFFFF" -> BigInt(-65535),
     ).foreach { case (s, d) =>
-      check(Grammar.integer_literal(_), s, Expression.IntegerLiteral(d), s.length)
+      check(Grammar.integer_literal(_), s, IntegerLiteral(d), s.length)
     }
     // Leading zero digits are not allowed.
-    check(Grammar.integer_literal(_), "+00001", Expression.IntegerLiteral(BigInt(0)), 2)
-    check(Grammar.integer_literal(_), "-00001", Expression.IntegerLiteral(BigInt(0)), 2)
+    check(Grammar.integer_literal(_), "+00001", IntegerLiteral(BigInt(0)), 2)
+    check(Grammar.integer_literal(_), "-00001", IntegerLiteral(BigInt(0)), 2)
     // Either plus or minus sign is required.
     toFail(Grammar.integer_literal(_), "0", "", "", 0)
     toFail(Grammar.integer_literal(_), "1", "", "", 0)
@@ -241,15 +244,15 @@ class ParserTest extends FunSuite {
   }
 
   test("nonreserved_label with backquotes") {
-    check(identifiersWithBackquote.map { case (k, v) => (k, v.name) }, Grammar.nonreserved_label(_))
+    check(identifiersWithBackquote.map { case (k, v) => (k, v.scheme.asInstanceOf[Variable].name) }, Grammar.nonreserved_label(_))
   }
 
   test("label with backquotes") {
-    check(identifiersWithBackquote.map { case (k, v) => (k, v.name.name) }, Grammar.label(_))
+    check(identifiersWithBackquote.map { case (k, v) => (k, v.scheme.asInstanceOf[Variable].name.name) }, Grammar.label(_))
   }
 
   test("identifier special cases") {
-    check(Grammar.identifier(_), "Natural+blahblah", Expression.Builtin(SyntaxConstants.Builtin.Natural), 7)
+    check(Grammar.identifier(_), "Natural+blahblah", ExprBuiltin(SyntaxConstants.Builtin.Natural), 7)
     toFail(Grammar.identifier(_), "-abc", "", "", 0)
     toFail(Grammar.identifier(_), "/abc", "", "", 0)
   }
@@ -262,7 +265,7 @@ class ParserTest extends FunSuite {
   test("primitive_expression") {
     check(primitiveExpressions, Grammar.primitive_expression(_))
 
-    val Parsed.Success(result: Expression.BytesLiteral, 12) = parse("0x\"64646464\"", Grammar.primitive_expression(_))
+    val Parsed.Success(Expression(result: BytesLiteral), 12) = parse("0x\"64646464\"", Grammar.primitive_expression(_))
     expect(new String(result.bytes) == "dddd")
   }
 

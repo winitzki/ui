@@ -2,11 +2,11 @@ package io.chymyst.ui.dhall
 
 import enumeratum._
 import io.chymyst.ui.dhall.CBORmodel.CBytes
-import io.chymyst.ui.dhall.Grammar.hexStringToByteArray
-import io.chymyst.ui.dhall.Syntax.Expression
-import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, VarName}
+import io.chymyst.ui.dhall.Grammar.{TextLiteralNoInterp, hexStringToByteArray}
+import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, ImportType, VarName}
 
 import java.time.LocalTime
+import scala.language.implicitConversions
 import scala.util.chaining.scalaUtilChainingOps
 
 object SyntaxConstants {
@@ -203,16 +203,21 @@ object SyntaxConstants {
     case object Home extends FilePrefix(5) // ~/something relative to the user's home directory
   }
 
-  sealed abstract class ImportType
+  sealed abstract class ImportType[+E] {
+    def map[H](f: E => H): ImportType[H] = this match {
+      case ImportType.Remote(url, headers) => ImportType.Remote(url, headers map f)
+      case _ => this.asInstanceOf[ImportType[H]]
+    }
+  }
 
   object ImportType {
-    final case object Missing extends ImportType
+    final case object Missing extends ImportType[Nothing]
 
-    final case class Remote(url: URL, headers: Option[Expression]) extends ImportType
+    final case class Remote[E](url: URL, headers: Option[E]) extends ImportType[E]
 
-    final case class Path(filePrefix: FilePrefix, file: File) extends ImportType
+    final case class Path(filePrefix: FilePrefix, file: File) extends ImportType[Nothing]
 
-    final case class Env(envVarName: String) extends ImportType
+    final case class Env(envVarName: String) extends ImportType[Nothing]
   }
 
   // The authority of http://user@host:port/foo is stored as "user@host:port".
@@ -229,7 +234,6 @@ object SyntaxConstants {
 }
 
 object Syntax {
-
   final case class DhallFile(shebangs: Seq[String], value: Expression)
 
   type Natural = BigInt
@@ -237,60 +241,102 @@ object Syntax {
   type Integer = BigInt
 
   // Define a recursion scheme for Expression.
-  sealed trait ExpressionScheme[E]
+  sealed trait ExpressionScheme[+E] {
 
-  object ExpressionScheme {
-    final case class Lambda[E](name: VarName, tipe: E, body: E) extends ExpressionScheme[E]
+    import ExpressionScheme._
+
+    def map[H](f: E => H): ExpressionScheme[H] = {
+      implicit val ff: E => H = f
+      implicit val ffOption: Option[E] => Option[H] = _ map f
+
+      implicit def fseq[A]: Seq[E] => Seq[H] = _ map f
+
+      implicit def fseqE[A]: Seq[(A, E)] => Seq[(A, H)] = _ map { case (a, b) => (a, b) }
+
+      implicit def fseqOption[A]: Seq[(A, Option[E])] => Seq[(A, Option[H])] = _ map { case (a, b) => (a, b) }
+
+      implicit def flist[A]: List[(A, E)] => List[(A, H)] = _ map { case (a, b) => (a, b) }
+
+      implicit def fImport[A]: ImportType[E] => ImportType[H] = _ map f
+
+      this match {
+        case Lambda(name, tipe, body) => Lambda(name, tipe, body)
+        case Forall(name, tipe, body) => Forall(name, tipe, body)
+        case Let(name, tipe, subst, body) => Let(name, tipe, subst, body)
+        case If(cond, ifTrue, ifFalse) => If(cond, ifTrue, ifFalse)
+        case Merge(record, update, tipe) => Merge(record, update, tipe)
+        case ToMap(data, tipe) => ToMap(data, tipe)
+        case EmptyList(tipe) => EmptyList(tipe)
+        case NonEmptyList(head, tail) => NonEmptyList(head, tail)
+        case Annotation(data, tipe) => Annotation(data, tipe)
+        case ExprOperator(lop, op, rop) => ExprOperator(lop, op, rop)
+        case Application(func, arg) => Application(func, arg)
+        case Field(base, name) => Field(base, name)
+        case ProjectByLabels(base, labels) => ProjectByLabels(base, labels)
+        case ProjectByType(base, by) => ProjectByType(base, by)
+        case Completion(base, target) => Completion(base, target)
+        case Assert(assertion) => Assert(assertion)
+        case With(data, pathComponents, body) => With(data, pathComponents, body)
+        case TextLiteral(interpolations, trailing) => TextLiteral(interpolations, trailing)
+        case RecordType(defs) => RecordType(defs)
+        case RecordLiteral(defs) => RecordLiteral(defs)
+        case UnionType(defs) => UnionType(defs)
+        case ShowConstructor(data) => ShowConstructor(data)
+        case Import(importType, importMode, digest) => Import(importType, importMode, digest)
+        case KeywordSome(data) => KeywordSome(data)
+        case _ => this.asInstanceOf[ExpressionScheme[H]]
+      }
+    }
   }
 
-  sealed trait Expression
+  object ExpressionScheme {
+    implicit def toExpression(s: ExpressionScheme[Expression]): Expression = Expression(s)
 
-  object Expression {
-    final case class Variable(name: VarName, index: Natural) extends Expression
+    final case class Variable(name: VarName, index: Natural) extends ExpressionScheme[Nothing]
 
-    final case class Lambda(name: VarName, tipe: Expression, body: Expression) extends Expression
+    final case class Lambda[E](name: VarName, tipe: E, body: E) extends ExpressionScheme[E]
 
-    final case class Forall(name: VarName, tipe: Expression, body: Expression) extends Expression
+    final case class Forall[E](name: VarName, tipe: E, body: E) extends ExpressionScheme[E]
 
-    final case class Let(name: VarName, tipe: Option[Expression], subst: Expression, body: Expression) extends Expression
+    final case class Let[E](name: VarName, tipe: Option[E], subst: E, body: E) extends ExpressionScheme[E]
 
-    final case class If(cond: Expression, ifTrue: Expression, ifFalse: Expression) extends Expression
+    final case class If[E](cond: E, ifTrue: E, ifFalse: E) extends ExpressionScheme[E]
 
-    final case class Merge(record: Expression, update: Expression, tipe: Option[Expression]) extends Expression
+    final case class Merge[E](record: E, update: E, tipe: Option[E]) extends ExpressionScheme[E]
 
-    final case class ToMap(data: Expression, tipe: Option[Expression]) extends Expression
+    final case class ToMap[E](data: E, tipe: Option[E]) extends ExpressionScheme[E]
 
-    final case class EmptyList(tipe: Expression) extends Expression
+    final case class EmptyList[E](tipe: E) extends ExpressionScheme[E]
 
-    final case class NonEmptyList(head: Expression, tail: Seq[Expression]) extends Expression
+    final case class NonEmptyList[E](head: E, tail: Seq[E]) extends ExpressionScheme[E]
 
-    final case class Annotation(data: Expression, tipe: Expression) extends Expression
+    final case class Annotation[E](data: E, tipe: E) extends ExpressionScheme[E]
 
-    final case class Operator(lop: Expression, op: SyntaxConstants.Operator, rop: Expression) extends Expression
+    final case class ExprOperator[E](lop: E, op: SyntaxConstants.Operator, rop: E) extends ExpressionScheme[E]
 
-    final case class Application(func: Expression, arg: Expression) extends Expression
+    final case class Application[E](func: E, arg: E) extends ExpressionScheme[E]
 
-    final case class Field(base: Expression, name: FieldName) extends Expression
+    final case class Field[E](base: E, name: FieldName) extends ExpressionScheme[E]
 
-    final case class ProjectByLabels(base: Expression, labels: Seq[FieldName]) extends Expression
+    final case class ProjectByLabels[E](base: E, labels: Seq[FieldName]) extends ExpressionScheme[E]
 
-    final case class ProjectByType(base: Expression, by: Expression) extends Expression
+    final case class ProjectByType[E](base: E, by: E) extends ExpressionScheme[E]
 
-    //    an expression of the form T::r is syntactic sugar for (T.default // r) : T.Type
-    final case class Completion(base: Expression, target: Expression) extends Expression
+    // An Expression of the form `T::r` is syntactic sugar for `(T.default // r) : T.Type`.
+    final case class Completion[E](base: E, target: E) extends ExpressionScheme[E]
 
-    final case class Assert(assertion: Expression) extends Expression
+    final case class Assert[E](assertion: E) extends ExpressionScheme[E]
 
-    final case class With(data: Expression, pathComponents: Seq[PathComponent], body: Expression) extends Expression
+    final case class With[E](data: E, pathComponents: Seq[PathComponent], body: E) extends ExpressionScheme[E]
 
-    final case class DoubleLiteral(value: Double) extends Expression {
+    final case class DoubleLiteral(value: Double) extends ExpressionScheme[Nothing] {
       override def equals(other: Any): Boolean = other.isInstanceOf[DoubleLiteral] && {
         val otherValue = other.asInstanceOf[DoubleLiteral].value
         (value == otherValue) || (value.isNaN && otherValue.isNaN)
       }
     }
 
-    final case class NaturalLiteral(value: Natural) extends Expression
+    final case class NaturalLiteral(value: Natural) extends ExpressionScheme[Nothing]
 
     object NaturalLiteral {
       def apply(value: Int): NaturalLiteral = {
@@ -299,7 +345,7 @@ object Syntax {
       }
     }
 
-    final case class IntegerLiteral(value: Integer) extends Expression
+    final case class IntegerLiteral(value: Integer) extends ExpressionScheme[Nothing]
 
     object IntegerLiteral {
       def apply(value: Int): IntegerLiteral = {
@@ -307,34 +353,26 @@ object Syntax {
       }
     }
 
-    final case class TextLiteralNoInterp(value: String) extends Expression
-
     object TextLiteral {
-      def ofString(s: String) = ofText(TextLiteralNoInterp(s))
+      def ofString[E](s: String) = ofText[E](TextLiteralNoInterp(s))
 
-      def ofText(textLiteralNoInterp: TextLiteralNoInterp) = TextLiteral(List(), textLiteralNoInterp.value)
+      def ofText[E](textLiteralNoInterp: TextLiteralNoInterp) = TextLiteral[E](List(), textLiteralNoInterp.value)
 
-      def empty = TextLiteral(List(), "")
+      def empty[E] = TextLiteral[E](List(), "")
 
-      def ofExpression(expression: Expression) = TextLiteral(interpolations = List(("", expression)), trailing = "")
+      def ofExpression[E](expr: E) = TextLiteral(interpolations = List(("", expr)), trailing = "")
     }
 
-    final case class TextLiteral(interpolations: List[(String, Expression)], trailing: String) extends Expression {
-      /*
-      instance Semigroup TextLiteral where
-          Chunks xys₀ z₀ <> Chunks [] z₁ =
-              Chunks xys₀ (z₀ <> z₁)
-          Chunks xys₀ z₀ <> Chunks ((x₁, y₁) : xys₁) z₁ =
-              Chunks (xys₀ <> ((z₀ <> x₁, y₁) : xys₁)) z₁
-       */
-      def ++(other: TextLiteral): TextLiteral = other.interpolations match {
+    final case class TextLiteral[+E](interpolations: List[(String, E)], trailing: String) extends ExpressionScheme[E] {
+
+      def ++[G >: E, H <: G](other: TextLiteral[H]): TextLiteral[G] = other.interpolations match {
         case List() =>
-          TextLiteral(interpolations, trailing ++ other.trailing)
+          TextLiteral(this.interpolations, this.trailing ++ other.trailing)
         case (headText, headExpr) :: tail =>
-          TextLiteral(interpolations ++ ((trailing ++ headText, headExpr) :: tail), other.trailing)
+          TextLiteral(this.interpolations ++ ((this.trailing + headText, headExpr: G) :: tail), other.trailing)
       }
 
-      // TODO: implement alignment by largest common indentation prefix of " " or "\t", see https://github.com/dhall-lang/dhall-lang/blob/master/standard/multiline.md
+      // See https://github.com/dhall-lang/dhall-lang/blob/master/standard/multiline.md
       private lazy val whitespacePrefixRegex = "[ \t]*".r
 
       lazy val whitespacePrefix: String = {
@@ -344,11 +382,12 @@ object Syntax {
 
       def isEmpty: Boolean = trailing.isEmpty && interpolations.isEmpty
 
-      private lazy val lines: Seq[TextLiteral] = {
-        def loop(currentLine: TextLiteral, nextLine: TextLiteral): Seq[TextLiteral] = {
+      private lazy val lines: Seq[TextLiteral[E]] = {
+        // Use H >: E to avoid covariance errors.
+        def loop[H >: E](currentLine: TextLiteral[H], nextLine: TextLiteral[H]): Seq[TextLiteral[H]] = {
           nextLine.interpolations.headOption match {
             case None =>
-              val splitLines = splitByAllNewlines(nextLine.trailing).map(TextLiteral.ofString)
+              val splitLines = splitByAllNewlines(nextLine.trailing).map(TextLiteral.ofString[H])
               (currentLine ++ splitLines.head) +: splitLines.tail
 
             case Some((head, interpolation)) =>
@@ -356,23 +395,23 @@ object Syntax {
               val l0 = headSplit.head // Guaranteed to exist.
               val ls = headSplit.tail
               if (ls.isEmpty) loop(
-                currentLine ++ TextLiteral(List((head, interpolation)), ""),
+                currentLine ++ TextLiteral[H](List((head, interpolation)), ""),
                 TextLiteral(nextLine.interpolations.tail, trailing),
               )
-              else (currentLine ++ TextLiteral.ofString(l0)) +: (ls.init.map(TextLiteral.ofString) ++ loop(
-                TextLiteral(List((ls.last, interpolation)), ""),
-                TextLiteral(nextLine.interpolations.tail, trailing),
+              else (currentLine ++ TextLiteral.ofString[H](l0)) +: (ls.init.map(TextLiteral.ofString[H]) ++ loop(
+                TextLiteral[H](List((ls.last, interpolation)), ""),
+                TextLiteral[H](nextLine.interpolations.tail, trailing),
               ))
           }
         }
 
-        loop(TextLiteral.empty, this)
+        loop(TextLiteral.empty[E], this)
       }
 
-      def align: TextLiteral = {
+      def align: TextLiteral[E] = {
         def longestCommonPrefix(a: String, b: String): String = a.iterator.zip(b.iterator).takeWhile { case (x, y) => x == y }.map(_._1).mkString
 
-        val removeEmpty: Seq[TextLiteral] = lines.init.filterNot(_.isEmpty) :+ lines.last
+        val removeEmpty: Seq[TextLiteral[E]] = lines.init.filterNot(_.isEmpty) :+ lines.last
         val longestCommonIndent: String = removeEmpty.map(_.whitespacePrefix).reduceRight(longestCommonPrefix)
         removeIndentsAndConcatenate(longestCommonIndent.length)
       }
@@ -383,32 +422,32 @@ object Syntax {
           .toSeq
           .pipe(s => if (s.isEmpty) Seq("") else s)
 
-      private def removeIndentsAndConcatenate(indent: Int): TextLiteral = {
-        def join(a: TextLiteral, b: TextLiteral): TextLiteral = a ++ TextLiteral.ofString("\n") ++ b
+      private def removeIndentsAndConcatenate(indent: Int): TextLiteral[E] = {
+        def join(a: TextLiteral[E], b: TextLiteral[E]): TextLiteral[E] = a ++ TextLiteral.ofString("\n") ++ b
 
-        def joinLines(lines: Seq[TextLiteral]): TextLiteral = lines.reduceRight(join)
+        def joinLines(lines: Seq[TextLiteral[E]]): TextLiteral[E] = lines.reduceRight(join)
 
         joinLines(lines.map(_.stripPrefix(indent))).escape
       }
 
-      def stripPrefix(indent: Int): TextLiteral = interpolations.headOption match {
+      def stripPrefix(indent: Int): TextLiteral[E] = interpolations.headOption match {
         case Some((head, tail)) => copy(interpolations = (head.drop(indent), tail) +: interpolations.tail)
         case None => copy(trailing = trailing.drop(indent))
       }
 
-      def mapStrings(f: String => String): TextLiteral = copy(
+      def mapStrings(f: String => String): TextLiteral[E] = copy(
         interpolations = interpolations.map { case (head, tail) => (f(head), tail) },
         trailing = f(trailing),
       )
 
       private def reEscape(s: String): String = s.replace("'''", "''").replace("''${", "${")
 
-      private def escape: TextLiteral = mapStrings(reEscape)
+      private def escape: TextLiteral[E] = mapStrings(reEscape)
 
     }
 
     // The hex string must be lowercase.
-    final case class BytesLiteral private(hex: String) extends Expression {
+    final case class BytesLiteral private(hex: String) extends ExpressionScheme[Nothing] {
       val bytes: Array[Byte] = hexStringToByteArray(hex)
     }
 
@@ -418,23 +457,23 @@ object Syntax {
       def of(bytes: Array[Byte]) = BytesLiteral(CBytes.byteArrayToHexString(bytes))
     }
 
-    final case class DateLiteral(year: Int, month: Int, day: Int) extends Expression
+    final case class DateLiteral(year: Int, month: Int, day: Int) extends ExpressionScheme[Nothing]
 
-    final case class TimeLiteral(time: LocalTime) extends Expression
+    final case class TimeLiteral(time: LocalTime) extends ExpressionScheme[Nothing]
 
-    final case class TimeZoneLiteral(totalMinutes: Int) extends Expression
+    final case class TimeZoneLiteral(totalMinutes: Int) extends ExpressionScheme[Nothing]
 
-    final case class RecordType(defs: Seq[(FieldName, Expression)]) extends Expression {
+    final case class RecordType[E](defs: Seq[(FieldName, E)]) extends ExpressionScheme[E] {
       def sorted = RecordType(defs.sortBy(_._1.name))
     }
 
-    final case class RecordLiteral(defs: Seq[(FieldName, Expression)]) extends Expression {
+    final case class RecordLiteral[+E](defs: Seq[(FieldName, E)]) extends ExpressionScheme[E] {
       def sorted = RecordLiteral(defs.sortBy(_._1.name))
     }
 
     object RecordLiteral {
       // Parse a non-empty sequence of RawRecordLiteral's into a RecordLiteral.
-      def of(values: Seq[RawRecordLiteral]): RecordLiteral = {
+      def of(values: Seq[RawRecordLiteral]): RecordLiteral[Expression] = {
         /* See https://github.com/dhall-lang/dhall-lang/blob/master/standard/README.md#record-syntactic-sugar
 
           ... a record literal of the form:
@@ -456,10 +495,10 @@ object Syntax {
            */
         val desugared: Seq[(FieldName, Expression)] = values.map {
           // Desugar { x } into { x = x }.
-          case RawRecordLiteral(base, None) => (base, Expression.Variable(VarName(base.name), BigInt(0)))
+          case RawRecordLiteral(base, None) => (base, Expression(Variable(VarName(base.name), BigInt(0))))
 
           // Desugar { w.x.y.z = expr } into {w = {x = { y = {z = expr }}}}.
-          case RawRecordLiteral(base, Some((fields, target))) => (base, fields.foldRight(target) { (field, expr) => RecordLiteral(Seq((field, expr))) })
+          case RawRecordLiteral(base, Some((fields, target))) => (base, fields.foldRight(target) { (field, expr) => Expression(RecordLiteral(Seq((field, expr)))) })
         }
 
         // Desugar repeated field names { x = { y = 1 }, x = { z = 1 } } into { x = { y = 1 } ∧ { z = 1} }. This is needed at the top nested level only.
@@ -467,30 +506,37 @@ object Syntax {
           val recordMap: Map[FieldName, Expression] =
             defs.groupBy(_._1)
               .map { case (field, subDefs) =>
-                (field, subDefs.map(_._2).reduce((a, b) => Expression.Operator(a, SyntaxConstants.Operator.CombineRecordTerms, b)))
+                (field, subDefs.map(_._2).reduce((a, b) => Expression(ExprOperator(a, SyntaxConstants.Operator.CombineRecordTerms, b))))
               }
           // Preserve the original order of definitions.
           defs.map(_._1).distinct.map { fieldName => (fieldName, recordMap(fieldName)) }
         }
 
-        RecordLiteral(desugarRepetition(desugared))
+        RecordLiteral[Expression](desugarRepetition(desugared))
       }
     }
 
-    final case class UnionType(defs: Seq[(ConstructorName, Option[Expression])]) extends Expression {
+    final case class UnionType[E](defs: Seq[(ConstructorName, Option[E])]) extends ExpressionScheme[E] {
       def sorted = UnionType(defs.sortBy(_._1.name))
     }
 
-    final case class ShowConstructor(data: Expression) extends Expression
+    final case class ShowConstructor[E](data: E) extends ExpressionScheme[E]
 
-    final case class Import(importType: SyntaxConstants.ImportType, importMode: SyntaxConstants.ImportMode, digest: Option[BytesLiteral]) extends Expression
+    final case class Import[E](importType: SyntaxConstants.ImportType[E], importMode: SyntaxConstants.ImportMode, digest: Option[BytesLiteral]) extends ExpressionScheme[E]
 
-    final case class KeywordSome(data: Expression) extends Expression
+    final case class KeywordSome[E](data: E) extends ExpressionScheme[E]
 
-    final case class Builtin(builtin: SyntaxConstants.Builtin) extends Expression
+    final case class ExprBuiltin(builtin: SyntaxConstants.Builtin) extends ExpressionScheme[Nothing]
 
-    final case class Constant(constant: SyntaxConstants.Constant) extends Expression
+    final case class ExprConstant(constant: SyntaxConstants.Constant) extends ExpressionScheme[Nothing]
+  }
 
+  final case class Expression(scheme: ExpressionScheme[Expression]) extends AnyVal {
+    def toCBORmodel: CBORmodel = CBOR.toCborModel(scheme)
+  }
+
+  object Expression {
+    implicit def toExpressionScheme(expression: Expression): ExpressionScheme[Expression] = expression.scheme
   }
 
   sealed trait PathComponent
@@ -501,13 +547,7 @@ object Syntax {
     final case object DescendOptional extends PathComponent
   }
 
-  // Raw record syntax: { x.y.z = 1 } that needs to be processed further. This is a part of a RecordLiteral.
+  // Raw record syntax: { x.y.z = 1 } that needs to be processed further. This is a part of a RecordLiteral but not an Expression.
   final case class RawRecordLiteral(base: FieldName, defs: Option[(Seq[FieldName], Expression)])
 
-}
-
-trait Monoid[A] {
-  def empty: A
-
-  def combine(x: A, y: A): A
 }

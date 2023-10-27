@@ -1,12 +1,13 @@
 package io.chymyst.ui.dhall.unit
 
 import com.eed3si9n.expecty.Expecty.expect
-import com.upokecenter.cbor.{CBORDataUtilities, CBOREncodeOptions, CBORObject}
+import com.upokecenter.cbor.CBORObject
 import io.chymyst.ui.dhall.CBORmodel.{CDouble, CMap, CString, CTagged}
-import io.chymyst.ui.dhall.{CBOR, CBORmodel, SyntaxConstants}
-import io.chymyst.ui.dhall.Syntax.Expression
+import io.chymyst.ui.dhall.Syntax.ExpressionScheme._
+import io.chymyst.ui.dhall.Syntax.{Expression, ExpressionScheme}
 import io.chymyst.ui.dhall.SyntaxConstants.VarName
 import io.chymyst.ui.dhall.unit.CBORtest.{bytesToCBORmodel, cborRoundtrip}
+import io.chymyst.ui.dhall.{CBOR, CBORmodel, Grammar, SyntaxConstants}
 import munit.FunSuite
 
 import java.time.LocalTime
@@ -30,22 +31,22 @@ class CBORtest extends FunSuite {
 
 
   test("CBOR roundtrips 1") {
-    cborRoundtrip(Expression.Builtin(SyntaxConstants.Builtin.True))
-    cborRoundtrip(Expression.Builtin(SyntaxConstants.Builtin.List))
+    cborRoundtrip(ExpressionScheme.ExprBuiltin(SyntaxConstants.Builtin.True))
+    cborRoundtrip(ExpressionScheme.ExprBuiltin(SyntaxConstants.Builtin.List))
   }
 
   test("CBOR roundtrips 2") {
-    cborRoundtrip(Expression.NaturalLiteral(123))
-    cborRoundtrip(Expression.DoubleLiteral(456.0))
-    cborRoundtrip(Expression.DoubleLiteral(0.0))
-    cborRoundtrip(Expression.DoubleLiteral(Double.NaN))
-    cborRoundtrip(Expression.DoubleLiteral(Double.NegativeInfinity))
-    cborRoundtrip(Expression.DoubleLiteral(Double.PositiveInfinity))
+    cborRoundtrip(NaturalLiteral(123))
+    cborRoundtrip(DoubleLiteral(456.0))
+    cborRoundtrip(DoubleLiteral(0.0))
+    cborRoundtrip(DoubleLiteral(Double.NaN))
+    cborRoundtrip(DoubleLiteral(Double.NegativeInfinity))
+    cborRoundtrip(DoubleLiteral(Double.PositiveInfinity))
   }
 
   test("CBOR roundtrips 2a") {
     intercept[AssertionError] { // This fails because the CBOR library converts all doubles even after specifying the half-precision bits.
-      cborRoundtrip(Expression.DoubleLiteral(-0.0))
+      cborRoundtrip(DoubleLiteral(-0.0))
     }
   }
 
@@ -70,19 +71,19 @@ class CBORtest extends FunSuite {
   }
 
   test("CBOR roundtrips 3") {
-    cborRoundtrip(Expression.TextLiteralNoInterp("abcde"))
+    cborRoundtrip(TextLiteral.ofText(Grammar.TextLiteralNoInterp("abcde")))
   }
 
   test("CBOR roundtrips 4") {
-    cborRoundtrip(Expression.NonEmptyList(Expression.NaturalLiteral(1), Seq(2, 3, 4, 5).map(x => Expression.NaturalLiteral(x))))
+    cborRoundtrip(NonEmptyList[Expression](NaturalLiteral(1), Seq(2, 3, 4, 5).map(x => NaturalLiteral(x))))
   }
 
   test("CBOR roundtrips 5") {
-    cborRoundtrip(Expression.Variable(VarName("_"), BigInt(7)))
+    cborRoundtrip(Variable(VarName("_"), BigInt(7)))
   }
 
   test("CBOR roundtrips 6") {
-    cborRoundtrip(Expression.TimeLiteral(LocalTime.of(12, 0)))
+    cborRoundtrip(TimeLiteral(LocalTime.of(12, 0)))
   }
 
   test("CBOR for dictionaries") {

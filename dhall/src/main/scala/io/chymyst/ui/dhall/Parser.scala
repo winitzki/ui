@@ -3,9 +3,11 @@ package io.chymyst.ui.dhall
 import fastparse.NoWhitespace._
 import fastparse._
 import io.chymyst.ui.dhall.ABNFGrammar.BIT
-import io.chymyst.ui.dhall.Syntax.Expression.{KeywordSome => ExpressionSome, _}
-import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression, PathComponent, RawRecordLiteral}
+import io.chymyst.ui.dhall.Syntax.ExpressionScheme.TextLiteral._
+import io.chymyst.ui.dhall.Syntax.ExpressionScheme._
+import io.chymyst.ui.dhall.Syntax.{DhallFile, Expression, ExpressionScheme, PathComponent, RawRecordLiteral}
 import io.chymyst.ui.dhall.SyntaxConstants.{ConstructorName, FieldName, ImportType, VarName}
+import jdk.jfr.Experimental
 
 import java.io.InputStream
 import java.time.{LocalDate, LocalTime, ZoneOffset}
@@ -215,12 +217,14 @@ object Grammar {
     any_label_or_some | "?".!
   ).!
 
+  final case class TextLiteralNoInterp(value: String) extends AnyVal
+
   // Either a complete interpolated expression ${...} or a single character.
-  def double_quote_chunk[$: P]: P[Either[Expression.TextLiteral, Expression.TextLiteralNoInterp]] = P( // text literal with or without interpolations
-    interpolation.map(Expression.TextLiteral.ofExpression).map(Left.apply)
+  def double_quote_chunk[$: P]: P[Either[ExpressionScheme.TextLiteral[Expression], TextLiteralNoInterp]] = P( // text literal with or without interpolations
+    interpolation.map(ExpressionScheme.TextLiteral.ofExpression).map(Left.apply)
       // '\'    Beginning of escape sequence
-      | ("\\" ~/ double_quote_escaped).map(Expression.TextLiteralNoInterp).map(Right.apply)
-      | double_quote_char.!.map(Expression.TextLiteralNoInterp).map(Right.apply)
+      | ("\\" ~/ double_quote_escaped).map(TextLiteralNoInterp).map(Right.apply)
+      | double_quote_char.!.map(TextLiteralNoInterp).map(Right.apply)
   )
 
   def double_quote_escaped[$: P]: P[String] = P(
@@ -281,24 +285,24 @@ object Grammar {
       | valid_non_ascii
   )
 
-  def double_quote_literal[$: P]: P[TextLiteral] = P(
+  def double_quote_literal[$: P]: P[ExpressionScheme.TextLiteral[Expression]] = P(
     "\"" ~/ double_quote_chunk.rep ~ "\""
   ).map(_.map(literalOrInterp => literalOrInterp.map(TextLiteral.ofText).merge).fold(TextLiteral.empty)(_ ++ _))
 
-  def single_quote_continue[$: P]: P[Expression.TextLiteral] = P(
-    (interpolation ~ single_quote_continue).map { case (head, tail) => Expression.TextLiteral.ofExpression(head) ++ tail }
+  def single_quote_continue[$: P]: P[ExpressionScheme.TextLiteral[Expression]] = P(
+    (interpolation ~ single_quote_continue).map { case (head, tail) => ExpressionScheme.TextLiteral.ofExpression(head) ++ tail }
       | (escaped_quote_pair ~ single_quote_continue).map { case (a, b) => a ++ b }
       | (escaped_interpolation ~ single_quote_continue).map { case (a, b) => a ++ b }
-      | P("''").map(_ => Expression.TextLiteral.empty) // End of text literal.
-      | (single_quote_char ~ single_quote_continue).map { case (char, tail) => TextLiteral.ofString(char) ++ tail }
+      | P("''").map(_ => ExpressionScheme.TextLiteral.empty) // End of text literal.
+      | (single_quote_char ~ single_quote_continue).map { case (char, tail) => TextLiteral.ofString[Expression](char) ++ tail }
   )
 
-  def escaped_quote_pair[$: P]: P[TextLiteral] = P(
-    "'''".!.map(_ => Expression.TextLiteral.ofString(s"''"))
+  def escaped_quote_pair[$: P]: P[ExpressionScheme.TextLiteral[Expression]] = P(
+    "'''".!.map(_ => ExpressionScheme.TextLiteral.ofString(s"''"))
   )
 
-  def escaped_interpolation[$: P]: P[TextLiteral] = P(
-    "''${".!.map(_ => Expression.TextLiteral.ofString("${"))
+  def escaped_interpolation[$: P]: P[ExpressionScheme.TextLiteral[Expression]] = P(
+    "''${".!.map(_ => ExpressionScheme.TextLiteral.ofString("${"))
   )
 
   def single_quote_char[$: P]: P[String] = P(
@@ -308,7 +312,7 @@ object Grammar {
       | end_of_line
   ).!
 
-  def single_quote_literal[$: P]: P[TextLiteral] = P(
+  def single_quote_literal[$: P]: P[ExpressionScheme.TextLiteral[Expression]] = P(
     "''" ~ end_of_line ~/ single_quote_continue
   ).map(_.align)
 
@@ -316,7 +320,7 @@ object Grammar {
     "${" ~ complete_expression ~/ "}"
   )
 
-  def text_literal[$: P]: P[TextLiteral] = P(
+  def text_literal[$: P]: P[ExpressionScheme.TextLiteral[Expression]] = P(
     double_quote_literal
       | single_quote_literal
   )
@@ -333,9 +337,9 @@ object Grammar {
     data
   }
 
-  def bytes_literal[$: P]: P[Expression.BytesLiteral] = P(
+  def bytes_literal[$: P]: P[ExpressionScheme.BytesLiteral] = P(
     "0x\"" ~ HEXDIG.rep(exactly = 2).rep.! ~ "\""
-  ).map(Expression.BytesLiteral.of)
+  ).map(ExpressionScheme.BytesLiteral.of)
 
   val simpleKeywords = Seq(
     "if",
@@ -404,9 +408,9 @@ object Grammar {
 
   val builtinSymbolNames = SyntaxConstants.Builtin.namesToValuesMap.keys.toSeq
 
-  def builtin[$: P]: P[Expression.Builtin] =
+  def builtin[$: P]: P[Expression] =
     concatKeywords(builtinSymbolNames)
-      .map(SyntaxConstants.Builtin.withName).map(Expression.Builtin)
+      .map(SyntaxConstants.Builtin.withName).map(ExpressionScheme.ExprBuiltin).map(Expression.apply)
 
   def combine[$: P] = P(
     "\u2227" | "/\\"
@@ -497,13 +501,13 @@ object Grammar {
       | (partial_time ~ time_offset)
       .map { case (time, zone) => Parser.localTimeWithZone(time, zone) }
       // "YYYY_MM_DD", parsed as a `Date`
-      | full_date
+      | full_date.map(Expression.apply)
       // "hh:mm:ss", parsed as a `Time`
-      | partial_time
+      | partial_time.map(Expression.apply)
       // "[+-]HH:MM", parsed as a `TimeZone`
       // Carefully note that this `time_numoffset` and not `time_offset`, meaning
       // that a standalone `Z` is not a valid Dhall literal for a `TimeZone`
-      | time_numoffset.map(TimeZoneLiteral)
+      | time_numoffset.map(i => Expression(TimeZoneLiteral(i)))
   )
 
   def date_fullyear[$: P]: P[Int] = P(
@@ -588,7 +592,7 @@ object Grammar {
      */
   def variable[$: P]: P[Expression] = P(
     nonreserved_label ~ (whsp ~ "@" ~/ whsp ~ natural_literal).? // TODO: do we need a cut after "@"?
-  ).map { case (name, index) => Expression.Variable(name, index.map(_.value).getOrElse(BigInt(0))) }
+  ).map { case (name, index) => ExpressionScheme.Variable(name, index.map(_.value).getOrElse(BigInt(0))) }
 
   def path_character[$: P] = P( // Note: character 002D is the hyphen and needs to be escaped when used under CharIn().
     CharIn("\u0021\u0024-\u0027\u002A-\u002B\\-\u002E\u0030\u003B\u0040-\u005A\u005E-\u007A\u007C\u007E")
@@ -757,12 +761,12 @@ object Grammar {
   )
 
   // This does not seem to be necessary. The headers field is optional.
-  //  val emptyHeaders: Expression = Expression.EmptyList(Expression.RecordType(Seq(
-  //    (FieldName("mapKey"), Expression.Builtin(SyntaxConstants.Builtin.Text)),
-  //    (FieldName("mapValue"), Expression.Builtin(SyntaxConstants.Builtin.Text)),
+  //  val emptyHeaders: Expression = ExpressionScheme.EmptyList(ExpressionScheme.RecordType(Seq(
+  //    (FieldName("mapKey"), ExpressionScheme.Builtin(SyntaxConstants.Builtin.Text)),
+  //    (FieldName("mapValue"), ExpressionScheme.Builtin(SyntaxConstants.Builtin.Text)),
   //  )))
 
-  def http[$: P]: P[ImportType.Remote] = P(
+  def http[$: P]: P[ImportType.Remote[Expression]] = P(
     http_raw ~ (whsp1 ~ requireKeyword("using") ~ whsp1 ~/ import_expression).? // Do not add cut after `http_raw ~ (whsp1 ~`.
   ).map { case (url, headers) => ImportType.Remote(url, headers) }
 
@@ -817,7 +821,7 @@ object Grammar {
     //      | %x5D_7E
   )
 
-  def import_type[$: P]: P[ImportType] = P( // Prevent parsing `missingfoo` as `missing` followed by a parse failure.
+  def import_type[$: P]: P[ImportType[Expression]] = P( // Prevent parsing `missingfoo` as `missing` followed by a parse failure.
     (requireKeyword("missing") ~ !simple_label_next_char).map(_ => ImportType.Missing)
       | local
       | http
@@ -828,11 +832,11 @@ object Grammar {
     "sha256:" ~/ HEXDIG.rep(exactly = 64).! // "sha256:XXX...XXX"
   )
 
-  def import_hashed[$: P]: P[(ImportType, Option[String])] = P(
+  def import_hashed[$: P]: P[(ImportType[Expression], Option[String])] = P(
     import_type ~ (whsp1 ~ hash).?
   )
 
-  def import_only[$: P]: P[Import] = P(
+  def import_only[$: P]: P[Expression] = P(
     import_hashed ~ (whsp1 ~ requireKeyword("as") ~ whsp1 ~/ (requireKeyword("Text") | requireKeyword("Location") | requireKeyword("Bytes")).!).?
   ).map { case (importType, digest, mode) =>
     val importMode = mode match {
@@ -846,11 +850,11 @@ object Grammar {
 
   // The ABNF spec does not define those sub-rules. They are created only to help with debugging.
 
-  def expression_lambda[$: P]: P[Lambda] = P(lambda ~ whsp ~/ "(" ~ whsp ~/ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~/ expression ~ whsp ~ ")" ~ whsp ~ arrow ~/
+  def expression_lambda[$: P]: P[Expression] = P(lambda ~ whsp ~/ "(" ~ whsp ~/ nonreserved_label ~ whsp ~ ":" ~ whsp1 ~/ expression ~ whsp ~ ")" ~ whsp ~ arrow ~/
     whsp ~ expression)
     .map { case (name, tipe, body) => Lambda(name, tipe, body) }
 
-  def expression_if_then_else[$: P]: P[If] = P(
+  def expression_if_then_else[$: P]: P[Expression] = P(
     requireKeyword("if") ~ whsp1 ~/ expression ~ whsp ~ requireKeyword("then") ~ whsp1 ~/ expression ~ whsp ~ requireKeyword("else") ~ whsp1 ~/ expression
   ).map { case (cond, ifTrue, ifFalse) =>
     If(cond, ifTrue, ifFalse)
@@ -861,22 +865,22 @@ object Grammar {
       letBindings.foldRight(expr) { case ((varName, tipe, body), prev) => Let(varName, tipe, body, prev) }
     }
 
-  def expression_forall[$: P]: P[Forall] = P(forall ~ whsp ~/ "(" ~ whsp ~ nonreserved_label ~ whsp ~/ ":" ~ whsp1 ~/ expression ~ whsp ~ ")" ~ whsp ~ arrow ~/
+  def expression_forall[$: P]: P[Expression] = P(forall ~ whsp ~/ "(" ~ whsp ~ nonreserved_label ~ whsp ~/ ":" ~ whsp1 ~/ expression ~ whsp ~ ")" ~ whsp ~ arrow ~/
     whsp ~ expression)
     .map { case (varName, tipe, body) => Forall(varName, tipe, body) }
 
   // (`A → B` is short-hand for `∀(_ : A) → B`)
   def expression_arrow[$: P]: P[Expression] = P(operator_expression ~ whsp ~ arrow ~/ whsp ~ expression)
-    .map { case (head, body) => Expression.Forall(VarName("_"), head, body) }
+    .map { case (head, body) => ExpressionScheme.Forall(VarName("_"), head, body) }
 
-  def expression_merge[$: P]: P[Merge] = P(requireKeyword("merge") ~ whsp1 ~/ import_expression ~ whsp1 ~/ import_expression ~ whsp ~/ ":" ~ whsp1 ~/
+  def expression_merge[$: P]: P[Expression] = P(requireKeyword("merge") ~ whsp1 ~/ import_expression ~ whsp1 ~/ import_expression ~ whsp ~/ ":" ~ whsp1 ~/
     expression)
     .map { case (e1, e2, t) => Merge(e1, e2, Some(t)) }
 
-  def expression_toMap[$: P]: P[ToMap] = P(requireKeyword("toMap") ~ whsp1 ~/ import_expression ~/ whsp ~ ":" ~ whsp1 ~/ expression)
+  def expression_toMap[$: P]: P[Expression] = P(requireKeyword("toMap") ~ whsp1 ~/ import_expression ~/ whsp ~ ":" ~ whsp1 ~/ expression)
     .map { case (e1, e2) => ToMap(e1, Some(e2)) }
 
-  def expression_assert[$: P]: P[Assert] = P(requireKeyword("assert") ~ whsp ~/ ":" ~ whsp1 ~/ expression)
+  def expression_assert[$: P]: P[Expression] = P(requireKeyword("assert") ~ whsp ~/ ":" ~ whsp1 ~/ expression)
     .map { expr => Assert(expr) }
 
   def expression[$: P]: P[Expression] = P( // TODO: remove some of these NoCut() because they are probably not needed.
@@ -945,9 +949,9 @@ object Grammar {
     requireKeyword("let") ~ whsp1 ~/ nonreserved_label ~ whsp ~ (":" ~ whsp1 ~/ expression ~ whsp).? ~ "=" ~ whsp ~/ expression ~ whsp1./
   )
 
-  def empty_list_literal[$: P] = P(
+  def empty_list_literal[$: P]: P[Expression] = P(
     "[" ~ whsp ~ ("," ~ whsp).? ~ "]" ~ whsp ~/ ":" ~ whsp1 ~/ expression
-  ).map(EmptyList)
+  ).map(expr => EmptyList(expr))
 
   def with_expression[$: P] = P(
     import_expression ~ (whsp1 ~ "with" ~ whsp1 ~/ with_clause).rep(1)
@@ -969,7 +973,7 @@ object Grammar {
 
   private implicit class FoldOpExpression(resultWithExpressionSequence: P[(Expression, Seq[Expression])]) {
     def withOperator(op: SyntaxConstants.Operator): P[Expression] =
-      resultWithExpressionSequence.map { case (head, tail) => tail.foldLeft(head)((prev, arg) => Operator(prev, op, arg)) }
+      resultWithExpressionSequence.map { case (head, tail) => tail.foldLeft(head)((prev, arg) => ExprOperator(prev, op, arg)) }
   }
 
   def equivalent_expression[$: P]: P[Expression] = P(
@@ -1031,32 +1035,32 @@ object Grammar {
   def first_application_expression[$: P]: P[Expression] = P(
     //  "merge e1 e2"
     (requireKeyword("merge") ~ whsp1 ~/ import_expression ~ whsp1 ~/ import_expression)
-      .map { case (e1, e2) => Merge(e1, e2, None) }
+      .map { case (e1, e2) => Expression(Merge(e1, e2, None)) }
       //
       //  "Some e"
       | (requireKeyword("Some") ~ whsp1 ~/ import_expression)
-      .map(expr => ExpressionSome(expr))
+      .map(expr => Expression(KeywordSome(expr)))
       //
       //  "toMap e"
       | (requireKeyword("toMap") ~ whsp1 ~/ import_expression)
-      .map(expr => ToMap(expr, None))
+      .map(expr => Expression(ToMap(expr, None)))
       //
       //  "showConstructor e"
       | (requireKeyword("showConstructor") ~ whsp1 ~/ import_expression)
-      .map(expr => ShowConstructor(expr))
+      .map(expr => Expression(ShowConstructor(expr)))
       //
       | import_expression
   )
 
   def import_expression[$: P]: P[Expression] = P(
-     import_only | completion_expression
+    import_only | completion_expression
   )
 
   def completion_expression[$: P]: P[Expression] = P(
     selector_expression ~ (whsp ~ complete ~ whsp ~ selector_expression).?
   ).map {
     case (expr, None) => expr
-    case (expr, Some(tipe)) => Expression.Completion(expr, tipe)
+    case (expr, Some(tipe)) => ExpressionScheme.Completion(expr, tipe)
   }
 
   def selector_expression[$: P]: P[Expression] = P(
@@ -1065,9 +1069,9 @@ object Grammar {
 
   sealed trait ExpressionSelector {
     def chooseExpression(base: Expression): Expression = this match {
-      case ExpressionSelector.ByField(fieldName) => Expression.Field(base, fieldName)
-      case ExpressionSelector.ByLabels(fieldNames) => Expression.ProjectByLabels(base, fieldNames)
-      case ExpressionSelector.ByType(typeExpr) => Expression.ProjectByType(base, typeExpr)
+      case ExpressionSelector.ByField(fieldName) => ExpressionScheme.Field(base, fieldName)
+      case ExpressionSelector.ByLabels(fieldNames) => ExpressionScheme.ProjectByLabels(base, fieldNames)
+      case ExpressionSelector.ByType(typeExpr) => ExpressionScheme.ProjectByType(base, typeExpr)
     }
   }
 
@@ -1097,24 +1101,24 @@ object Grammar {
     temporal_literal
       // Put bytes_literal first, or else we will just parse the initial 0 as natural_literal
       //  '0x"01234567689abcdef"'
-      | bytes_literal
+      | bytes_literal.map(Expression.apply)
       //
       //  "2.0"
-      | double_literal
+      | double_literal.map(Expression.apply)
       //
       //  "2"
-      | natural_literal
+      | natural_literal.map(Expression.apply)
       //
       //  "+2" or "-2"
-      | integer_literal
+      | integer_literal.map(Expression.apply)
       //
       //  '"ABC"'
-      | text_literal
+      | text_literal.map(Expression.apply)
       //
       //  "{ foo = 1      , bar = True }"
       //  "{ foo : Integer, bar : Bool }"
       | ("{" ~/ whsp ~ ("," ~ whsp).? ~ record_type_or_literal ~ whsp ~ "}")
-      .map(_.getOrElse(Expression.RecordType(Seq())))
+      .map(_.getOrElse(Expression(ExpressionScheme.RecordType(Seq()))))
       //
       //  "< Foo : Integer | Bar : Bool >"
       //  "< Foo | Bar : Bool >"
@@ -1132,29 +1136,29 @@ object Grammar {
   )
 
   def record_type_or_literal[$: P]: P[Option[Expression]] = P(
-    empty_record_literal.map(Some.apply)
+    empty_record_literal.map(Expression.apply).map(Some.apply)
       | non_empty_record_type_or_literal.?
   )
 
-  def empty_record_literal[$: P]: P[Expression.RecordLiteral] = P(
+  def empty_record_literal[$: P]: P[ExpressionScheme.RecordLiteral[Expression]] = P(
     "=" ~/ (whsp ~ ",").?
-  ).map(_ => Expression.RecordLiteral(Seq()))
+  ).map(_ => ExpressionScheme.RecordLiteral(Seq()))
 
   def non_empty_record_type_or_literal[$: P]: P[Expression] = P(
     non_empty_record_type | non_empty_record_literal
-  )
+  ).map(Expression.apply)
 
-  def non_empty_record_type[$: P]: P[Expression.RecordType] = P(
+  def non_empty_record_type[$: P]: P[ExpressionScheme.RecordType[Expression]] = P(
     record_type_entry ~ (whsp ~ "," ~ whsp ~ record_type_entry).rep ~ (whsp ~ ",").?
-  ).map { case (headName, headExpr, tail) => (headName, headExpr) +: tail }.map(Expression.RecordType).map(_.sorted)
+  ).map { case (headName, headExpr, tail) => (headName, headExpr) +: tail }.map(ExpressionScheme.RecordType[Expression]).map(_.sorted)
 
   def record_type_entry[$: P]: P[(FieldName, Expression)] = P(
     any_label_or_some.map(FieldName) ~ whsp ~ ":" ~/ whsp1 ~/ expression
   )
 
-  def non_empty_record_literal[$: P]: P[Expression.RecordLiteral] = P(
+  def non_empty_record_literal[$: P]: P[ExpressionScheme.RecordLiteral[Expression]] = P(
     record_literal_entry ~ (whsp ~ "," ~ whsp ~ record_literal_entry).rep ~ (whsp ~ ",").?
-  ).map { case (head, tail) => Expression.RecordLiteral.of(head +: tail).sorted }
+  ).map { case (head, tail) => ExpressionScheme.RecordLiteral.of(head +: tail).sorted }
 
   def record_literal_entry[$: P]: P[RawRecordLiteral] = P(
     any_label_or_some.map(FieldName) ~ record_literal_normal_entry.?
@@ -1164,20 +1168,20 @@ object Grammar {
     (whsp ~ "." ~ whsp ~/ any_label_or_some.map(FieldName)).rep ~ whsp ~ "=" ~ whsp ~/ expression
   )
 
-  def union_type[$: P]: P[Expression.UnionType] = P(
+  def union_type[$: P]: P[Expression ] = P(
     (union_type_entry ~ (whsp ~ "|" ~ whsp ~ union_type_entry).rep ~ (whsp ~ "|").?).?
   ).map {
-    case Some((headName, headType, tail)) => Expression.UnionType((headName, headType) +: tail).sorted
-    case None => Expression.UnionType(Seq())
+    case Some((headName, headType, tail)) => ExpressionScheme.UnionType((headName, headType) +: tail).sorted
+    case None => ExpressionScheme.UnionType(Seq())
   }
 
   def union_type_entry[$: P] = P(
     any_label_or_some.map(ConstructorName) ~ (whsp ~ ":" ~/ whsp1 ~/ expression).?
   )
 
-  def non_empty_list_literal[$: P]: P[Expression.NonEmptyList] = P(
+  def non_empty_list_literal[$: P]: P[ Expression]  = P(
     "[" ~/ whsp ~ ("," ~ whsp).? ~ expression ~ whsp ~ ("," ~ whsp ~ /* No cut here, or else [, ,] cannot be parsed. */ expression ~ whsp).rep ~ ("," ~/ whsp).? ~ "]"
-  ).map { case (head, tail) => Expression.NonEmptyList(head, tail) }
+  ).map { case (head, tail) => Expression(ExpressionScheme.NonEmptyList(head, tail)) }
 
   def shebang[$: P] = P(
     "#!" ~/ not_end_of_line.rep.! ~ end_of_line
@@ -1213,15 +1217,15 @@ object Parser {
   def parseDhall(source: InputStream): Parsed[DhallFile] = parse(source, Grammar.complete_dhall_file(_))
 
   private def localDateTimeZone(dateOption: Option[DateLiteral], timeOption: Option[TimeLiteral], zoneOption: Option[Int]): Expression = {
-    val dateR = dateOption.map { date => (FieldName("date"), date) }
-    val dateT = dateOption.map { date => (FieldName("date"), Builtin(SyntaxConstants.Builtin.Date)) }
-    val timeR = timeOption.map { time => (FieldName("time"), time) }
-    val timeT = timeOption.map { time => (FieldName("time"), Builtin(SyntaxConstants.Builtin.Time)) }
-    val zoneR = zoneOption.map { zone => (FieldName("timeZone"), TimeZoneLiteral(zone)) }
-    val zoneT = zoneOption.map { zone => (FieldName("timeZone"), Builtin(SyntaxConstants.Builtin.TimeZone)) }
+    val dateR = dateOption.map { date => (FieldName("date"), Expression(date)) }
+    val dateT = dateOption.map { date => (FieldName("date"), Expression(ExprBuiltin(SyntaxConstants.Builtin.Date))) }
+    val timeR = timeOption.map { time => (FieldName("time"), Expression(time)) }
+    val timeT = timeOption.map { time => (FieldName("time"), Expression(ExprBuiltin(SyntaxConstants.Builtin.Time))) }
+    val zoneR = zoneOption.map { zone => (FieldName("timeZone"), Expression(TimeZoneLiteral(zone))) }
+    val zoneT = zoneOption.map { zone => (FieldName("timeZone"), Expression(ExprBuiltin(SyntaxConstants.Builtin.TimeZone))) }
 
-    val record = RecordLiteral(Seq(dateR, timeR, zoneR).flatten).sorted
-    val recordType = RecordType(Seq(dateT, timeT, zoneT).flatten).sorted
+    val record = RecordLiteral[Expression](Seq(dateR, timeR, zoneR).flatten).sorted
+    // val recordType = RecordType[Expression](Seq(dateT, timeT, zoneT).flatten).sorted
 
     // Return { date : Date, time : Time, timeZone : TimeZone } or some subset of that record without the type.
     record
