@@ -871,7 +871,7 @@ object Grammar {
 
   // (`A → B` is short-hand for `∀(_ : A) → B`)
   def expression_arrow[$: P]: P[Expression] = P(operator_expression ~ whsp ~ arrow ~/ whsp ~ expression)
-    .map { case (head, body) => Forall(VarName("_"), head, body) }
+    .map { case (head, body) => Forall(underscore, head, body) }
 
   def expression_merge[$: P]: P[Expression] = P(requireKeyword("merge") ~ whsp1 ~/ import_expression ~ whsp1 ~/ import_expression ~ whsp ~/ ":" ~ whsp1 ~/
     expression)

@@ -290,6 +290,8 @@ object Syntax {
   }
 
   object ExpressionScheme {
+    val underscore = VarName("_")
+
     implicit def toExpression(s: ExpressionScheme[Expression]): Expression = Expression(s)
 
     final case class Variable(name: VarName, index: Natural) extends ExpressionScheme[Nothing]

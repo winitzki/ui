@@ -60,9 +60,6 @@ object Semantics {
     case other => other.map(expression => substitute(expression, substVar, substIndex, substTarget))
   }
 
-  // TODO: can we reuse this VarName elsewhere instead of using the string "_"?
-  val underscore = VarName("_")
-
   // See https://github.com/dhall-lang/dhall-lang/blob/master/standard/alpha-normalization.md
   def alphaNormalize(expr: Expression): Expression = expr.scheme match {
     case Variable(_, _) => expr
@@ -89,7 +86,7 @@ object Semantics {
     }
 
     case Import(_, _, _) => throw new Exception(s"alphaNormalize($expr): Imports cannot be α-normalized")
-    
+
     case other => other.map(alphaNormalize)
   }
 

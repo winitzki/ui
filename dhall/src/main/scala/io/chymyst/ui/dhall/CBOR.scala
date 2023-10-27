@@ -5,6 +5,7 @@ import com.upokecenter.cbor.{CBORObject, CBORType}
 import com.upokecenter.numbers.EInteger
 import io.chymyst.ui.dhall.CBORmodel.CBytes.byteArrayToHexString
 import io.chymyst.ui.dhall.CBORmodel._
+import io.chymyst.ui.dhall.Syntax.ExpressionScheme.underscore
 import io.chymyst.ui.dhall.Syntax.{Expression, ExpressionScheme, Natural, PathComponent}
 import io.chymyst.ui.dhall.SyntaxConstants._
 
@@ -93,7 +94,7 @@ sealed trait CBORmodel {
     case CNull => ().die(s"Invalid top-level CBOR null value")
     case CTrue => ExpressionScheme.ExprBuiltin(SyntaxConstants.Builtin.True)
     case CFalse => ExpressionScheme.ExprBuiltin(SyntaxConstants.Builtin.False)
-    case CInt(data) => ExpressionScheme.Variable(VarName("_"), data)
+    case CInt(data) => ExpressionScheme.Variable(underscore, data)
     case CDouble(data) => ExpressionScheme.DoubleLiteral(data)
 
     case CString(data) => ExpressionScheme.ExprBuiltin(SyntaxConstants.Builtin.withName(data)).or(s"String '$data' must be a Builtin name (one of ${SyntaxConstants.Builtin.values.mkString(", ")})")
@@ -105,11 +106,11 @@ sealed trait CBORmodel {
           tail.map(_.toScheme).foldLeft(firstTerm)((prev, x) => ExpressionScheme.Application(prev, x))
 
         case CNull :: _ | CTrue :: _ | CFalse :: _ | CDouble(_) :: _ => ().die(s"Invalid array $this - may not start with ${data.head}")
-        case CIntTag(1) :: tipe :: body :: Nil => ExpressionScheme.Lambda(VarName("_"), tipe.toScheme, body.toScheme)
-        case CIntTag(1) :: CString(name) :: tipe :: body :: Nil if name != "_" => ExpressionScheme.Lambda(VarName(name), tipe.toScheme, body.toScheme)
+        case CIntTag(1) :: tipe :: body :: Nil => ExpressionScheme.Lambda(underscore, tipe.toScheme, body.toScheme)
+        case CIntTag(1) :: CString(name) :: tipe :: body :: Nil if name != underscore.name => ExpressionScheme.Lambda(VarName(name), tipe.toScheme, body.toScheme)
 
-        case CIntTag(2) :: tipe :: body :: Nil => ExpressionScheme.Forall(VarName("_"), tipe.toScheme, body.toScheme)
-        case CIntTag(2) :: CString(name) :: tipe :: body :: Nil if name != "_" => ExpressionScheme.Forall(VarName(name), tipe.toScheme, body.toScheme)
+        case CIntTag(2) :: tipe :: body :: Nil => ExpressionScheme.Forall(underscore, tipe.toScheme, body.toScheme)
+        case CIntTag(2) :: CString(name) :: tipe :: body :: Nil if name != underscore.name => ExpressionScheme.Forall(VarName(name), tipe.toScheme, body.toScheme)
 
         case CIntTag(3) :: CInt(code) :: left :: right :: Nil if code.isValidByte && code >= 0 && code < 13 => // ExpressionScheme.Operator
           ExpressionScheme.ExprOperator(left.toScheme, SyntaxConstants.Operator.cborCodeDict(code.toInt), right.toScheme)
@@ -417,14 +418,12 @@ object CBOR {
     else
       CBORObject.FromObject(EInteger.FromBytes(index.toByteArray, false)) // TODO: Does this work correctly? Do we need to set littleEndian = true?
 
-  def toCborModel(e: Expression ): CBORmodel = e.scheme match {
-    case ExpressionScheme.Variable(VarName("_"), index) => CInt(index)
+  def toCborModel(e: Expression): CBORmodel = e.scheme match {
+    case ExpressionScheme.Variable(name, index) => if (name == underscore) CInt(index) else array(name.name, index)
 
-    case ExpressionScheme.Variable(VarName(name), index) => array(name, index)
+    case ExpressionScheme.Lambda(name, tipe, body) => if (name == underscore) array(1, tipe, body) else array(1, name.name, tipe, body)
 
-    case ExpressionScheme.Lambda(VarName(name), tipe, body) => if (name == "_") array(1, tipe, body) else array(1, name, tipe, body)
-
-    case ExpressionScheme.Forall(VarName(name), tipe, body) => if (name == "_") array(2, tipe, body) else array(2, name, tipe, body)
+    case ExpressionScheme.Forall(name, tipe, body) => if (name == underscore) array(2, tipe, body) else array(2, name.name, tipe, body)
 
     case e@ExpressionScheme.Let(_, _, _, _) =>
       @tailrec def loop(acc: Seq[Any], expr: ExpressionScheme[Expression]): Seq[Any] = expr match {

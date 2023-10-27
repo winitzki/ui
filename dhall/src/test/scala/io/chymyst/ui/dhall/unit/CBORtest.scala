@@ -79,7 +79,7 @@ class CBORtest extends FunSuite {
   }
 
   test("CBOR roundtrips 5") {
-    cborRoundtrip(Variable(VarName("_"), BigInt(7)))
+    cborRoundtrip(Variable(underscore, BigInt(7)))
   }
 
   test("CBOR roundtrips 6") {
