@@ -48,7 +48,7 @@ object AwtRunner {
 
   private def getFrameAndPanel() = {
     val f = new Frame()
-    f.setTitle("AWT Runner example")
+    f.setTitle("AWT Runner")
     f.setBounds(400, 400, 640, 480)
     f.setLayout(new BoxLayout(f, BoxLayout.X_AXIS)) // TODO better layout, or just use Swing instead of AWT.
     val p = new Panel()
@@ -104,6 +104,7 @@ object AwtRunner {
           val n = new TextArea
           n.setRows(lines.length)
           n.setText(lines.mkString("\n"))
+          n.setEnabled(false) // Not editable.
           inPanel.add(n)
 
         case View.Label(text, alignment) =>

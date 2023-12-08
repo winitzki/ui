@@ -48,14 +48,14 @@ final class SwingRunner {
           inPanel.add(n)
 
         case View.TextArea(lines, wrap) =>
-//          val s = new JScrollPane
-//          s.setWheelScrollingEnabled(true)
           val n = new JTextArea
           n.setRows(lines.length)
           n.setLineWrap(wrap)
           n.setText(lines.mkString("\n"))
-//          s.add(n)
-          inPanel.add(n)
+          n.setEnabled(false) // Not editable.
+          val s = new JScrollPane(n)
+          s.setWheelScrollingEnabled(true)
+          inPanel.add(s)
 
         case View.Label(text, alignment) =>
           inPanel.add(new JLabel(text, toSwingLabelAlignment(alignment)))
