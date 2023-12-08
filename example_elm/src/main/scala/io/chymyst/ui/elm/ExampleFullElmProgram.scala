@@ -72,24 +72,24 @@ object ExampleFullElmProgram {
   type E = Events
 
   val displayView: M => View[E] = { m =>
-    val buttons = View.TileH(View.TileH(
+    val buttons = View.TileLeftToRight(View.TileLeftToRight(
       View.Button("Increment", Increment), View.Button("Reset", Reset),
-    ), View.TileH(
+    ), View.TileLeftToRight(
       View.Button("Start timer1", StartTimer1), View.Button("Start timer2", StartTimer2),
     )
     )
-    val clicksDisplay = View.TileH(View.TileH(
+    val clicksDisplay = View.TileLeftToRight(View.TileLeftToRight(
       View.Label(s"${m.clicks} clicks"), View.Label(m.lastCommandStatus match {
         case Some(value) => s"Last command $value"
         case None => "No last command"
-      })), View.TileH(View.Label(m.lastTimerTickHadInterval match {
+      })), View.TileLeftToRight(View.Label(m.lastTimerTickHadInterval match {
       case Some(value) => s"Last ticker had interval $value"
       case None => "No last ticker event"
     }), View.Button(if (m.showButtons) "Hide buttons" else "Show buttons", ToggleButtons)
     ))
-    val buttons2 = View.TileH(View.Button("Send command", SendCommand), View.Button("Stop all timers", StopAllTimers))
-    View.TileV(
-      if (m.showButtons) View.TileV(
+    val buttons2 = View.TileLeftToRight(View.Button("Send command", SendCommand), View.Button("Stop all timers", StopAllTimers))
+    View.TileTopToBottom(
+      if (m.showButtons) View.TileTopToBottom(
         clicksDisplay,
         buttons,
       ) else clicksDisplay,

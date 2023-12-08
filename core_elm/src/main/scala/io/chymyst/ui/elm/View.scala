@@ -13,14 +13,17 @@ object LabelAlignment {
 }
 
 object View {
+  // Basic components.
 
   final case class Label[+E](text: String, align: LabelAlignment = LabelAlignment.Center) extends View[E]
 
   final case class Button[+E](text: String, onClick: E) extends View[E]
 
+  final case class Choice[+E](items: Seq[String], onSelect: Int => E, selectedIndex: Int) extends View[E]
+
   //Define simple layout combinators (tile vertical, tile horizontal) building a larger `View` out of smaller `View`s.
 
-  final case class TileH[+E](left: View[E], right: View[E]) extends View[E]
+  final case class TileLeftToRight[+E](views: View[E]*) extends View[E]
 
-  final case class TileV[+E](top: View[E], bottom: View[E]) extends View[E]
+  final case class TileTopToBottom[+E](views: View[E]*) extends View[E]
 }

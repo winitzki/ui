@@ -4,9 +4,9 @@ import com.formdev.flatlaf.FlatLightLaf
 import io.chymyst.ui.elm.Elm.{Consume, UiBackend}
 import io.chymyst.ui.elm.{LabelAlignment, View}
 
-import java.awt.Container
-import java.awt.event.ActionEvent
-import javax.swing.{Box, BoxLayout, JButton, JFrame, JLabel, JPanel, SwingConstants, WindowConstants}
+import java.awt.{Choice, Container}
+import java.awt.event.{ActionEvent, ItemEvent}
+import javax.swing.{Box, BoxLayout, JButton, JComboBox, JFrame, JLabel, JPanel, SwingConstants, WindowConstants}
 
 final class SwingRunner {
   // This sets up the initial window for the entire GUI. Add any global setup here.
@@ -35,6 +35,12 @@ final class SwingRunner {
       //    EventQueue.invokeLater { () =>
       if (clearPanel) inPanel.removeAll() //else println(s"DEBUG: Not clearing panel for view $view")
       subview match {
+        case View.Choice(items, onSelect, selectedIndex) =>
+          val n = new JComboBox(items.toArray)
+          n.setSelectedIndex(selectedIndex)
+          n.addItemListener((e: ItemEvent) => if (e.getStateChange == ItemEvent.SELECTED) consume(onSelect(n.getSelectedIndex)))
+          inPanel.add(n)
+
         case View.Label(text, alignment) =>
           inPanel.add(new JLabel(text, toSwingLabelAlignment(alignment)))
 
@@ -45,24 +51,23 @@ final class SwingRunner {
           }
           inPanel.add(button)
 
-        case View.TileH(left, right) =>
+        case View.TileLeftToRight(items@_*) =>
           val n = new JPanel()
           n.setLayout(new BoxLayout(n, BoxLayout.X_AXIS)) // We are using a Swing layout manager here, and it seems to be working.
           n.setName(s"Panel for $subview")
           //        n.setVisible(true) // Not necessary.
           inPanel.add(n)
-          render(left, n, false)(consume)
-          render(right, n, false)(consume)
+          items.foreach { i => render(i, n, false)(consume) }
           n.add(Box.createHorizontalGlue)
 
-        case View.TileV(top, bottom) =>
+        case View.TileTopToBottom(items@_*) =>
           val n = new JPanel()
           n.setLayout(new BoxLayout(n, BoxLayout.Y_AXIS))
           n.setName(s"Panel for $subview")
           //        n.setVisible(true) // Not necessary.
           inPanel.add(n)
-          render(top, n, false)(consume)
-          render(bottom, n, false)(consume)
+          items.foreach { i => render(i, n, false)(consume) }
+
           n.add(Box.createVerticalGlue)
       }
       frame.setVisible(true) // Need to do this after any changes in layout or adding components. Otherwise nothing is shown and frame.isValid == false.

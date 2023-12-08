@@ -18,13 +18,13 @@ object ExampleSimpleElmProgram {
   type E = ExampleEvents // Three buttons. "Increment", "Reset", "Show/hide other buttons".
 
   val display: M => View[E] = { m =>
-    val buttons = View.TileH(
+    val buttons = View.TileLeftToRight(
       View.Button("Increment", Increment), View.Button("Reset", Reset)
     )
-    val clicksDisplay = View.TileH(
+    val clicksDisplay = View.TileLeftToRight(
       View.Label(s"${m.clicks} clicks"), View.Button(if (m.showButtons) "Hide buttons" else "Show buttons", ToggleButtons)
     )
-    if (m.showButtons) View.TileV(
+    if (m.showButtons) View.TileTopToBottom(
       clicksDisplay,
       buttons,
     ) else clicksDisplay

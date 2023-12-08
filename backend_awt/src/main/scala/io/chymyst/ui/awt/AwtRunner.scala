@@ -5,7 +5,7 @@ import io.chymyst.ui.elm.Elm.{Consume, UiBackend}
 import io.chymyst.ui.elm.{LabelAlignment, View}
 
 import java.awt._
-import java.awt.event.{ActionEvent, WindowAdapter, WindowEvent}
+import java.awt.event.{ActionEvent, ItemEvent, ItemListener, WindowAdapter, WindowEvent}
 import java.util.concurrent.{LinkedBlockingQueue, ThreadPoolExecutor, TimeUnit}
 import javax.swing.{Box, BoxLayout}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -87,6 +87,13 @@ object AwtRunner {
       //    EventQueue.invokeLater { () =>
       if (clearPanel) inPanel.removeAll() //else println(s"DEBUG: Not clearing panel for view $view")
       subview match {
+        case View.Choice(items, onSelect, selectedIndex) =>
+          val n = new Choice
+          items.foreach(n.add)
+          n.select(selectedIndex)
+          n.addItemListener((e: ItemEvent) => if (e.getStateChange == ItemEvent.SELECTED) consume(onSelect(n.getSelectedIndex)))
+          inPanel.add(n)
+
         case View.Label(text, alignment) =>
           inPanel.add(new Label(text, toAwtLabelAlignment(alignment)))
 
@@ -97,24 +104,22 @@ object AwtRunner {
           }
           inPanel.add(button)
 
-        case View.TileH(left, right) =>
+        case View.TileLeftToRight(items@_*) =>
           val n = new Panel()
           n.setLayout(new BoxLayout(n, BoxLayout.X_AXIS)) // We are using a Swing layout manager here, and it seems to be working.
           n.setName(s"Panel for $subview")
           //        n.setVisible(true) // Not necessary.
           inPanel.add(n)
-          render(left, n, false)(consume)
-          render(right, n, false)(consume)
+          items.foreach { i => render(i, n, false)(consume) }
           n.add(Box.createHorizontalGlue)
 
-        case View.TileV(top, bottom) =>
+        case View.TileTopToBottom(items@_*) =>
           val n = new Panel()
           n.setLayout(new BoxLayout(n, BoxLayout.Y_AXIS))
           n.setName(s"Panel for $subview")
           //        n.setVisible(true) // Not necessary.
           inPanel.add(n)
-          render(top, n, false)(consume)
-          render(bottom, n, false)(consume)
+          items.foreach { i => render(i, n, false)(consume) }
           n.add(Box.createVerticalGlue)
       }
       frame.setVisible(true) // Need to do this after any changes in layout or adding components. Otherwise nothing is shown and frame.isValid == false.
