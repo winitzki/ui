@@ -23,7 +23,7 @@ object ExampleSimpleElmProgram2 {
 
   val display: M => View[E] = { m =>
     val buttons = View.TileLeftToRight(
-      View.Choice(items = Seq("clicks 1", "clicks2  "), onSelect = SetCurrent, selectedIndex = m.currentIs1or2),
+      View.Choice(items = Seq("clicks 1", "clicks2  "), onClick = SetCurrent, selectedIndex = m.currentIs1or2),
       View.Button("Increment", Increment),
       View.Button("Reset", Reset),
     )

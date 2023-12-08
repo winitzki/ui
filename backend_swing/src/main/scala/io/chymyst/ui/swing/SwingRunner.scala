@@ -1,12 +1,13 @@
 package io.chymyst.ui.swing
 
 import com.formdev.flatlaf.FlatLightLaf
-import io.chymyst.ui.elm.Elm.{Consume, UiBackend}
-import io.chymyst.ui.elm.{LabelAlignment, View}
+import io.chymyst.ui.elm.Elm.Consume
+import io.chymyst.ui.elm.View
+import io.chymyst.ui.elm.View.Label.LabelAlignment
 
-import java.awt.{Choice, Container}
+import java.awt.Container
 import java.awt.event.{ActionEvent, ItemEvent}
-import javax.swing.{Box, BoxLayout, JButton, JCheckBox, JComboBox, JFrame, JLabel, JPanel, SwingConstants, WindowConstants}
+import javax.swing._
 
 final class SwingRunner {
   // This sets up the initial window for the entire GUI. Add any global setup here.
@@ -44,6 +45,16 @@ final class SwingRunner {
         case View.CheckBox(text, onClick, state) =>
           val n = new JCheckBox(text, state)
           n.addItemListener((e: ItemEvent) => consume(onClick(e.getStateChange == ItemEvent.SELECTED)))
+          inPanel.add(n)
+
+        case View.TextArea(lines, wrap) =>
+//          val s = new JScrollPane
+//          s.setWheelScrollingEnabled(true)
+          val n = new JTextArea
+          n.setRows(lines.length)
+          n.setLineWrap(wrap)
+          n.setText(lines.mkString("\n"))
+//          s.add(n)
           inPanel.add(n)
 
         case View.Label(text, alignment) =>

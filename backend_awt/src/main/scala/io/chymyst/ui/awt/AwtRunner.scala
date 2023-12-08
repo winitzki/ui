@@ -2,12 +2,13 @@ package io.chymyst.ui.awt
 
 import io.chymyst.ui.awt.AwtRunner.LabeledRunnable
 import io.chymyst.ui.elm.Elm.{Consume, UiBackend}
-import io.chymyst.ui.elm.{LabelAlignment, View}
+import io.chymyst.ui.elm.View
+import io.chymyst.ui.elm.View.Label.LabelAlignment
 
 import java.awt._
-import java.awt.event.{ActionEvent, ItemEvent, ItemListener, WindowAdapter, WindowEvent}
+import java.awt.event.{ActionEvent, ItemEvent, WindowAdapter, WindowEvent}
 import java.util.concurrent.{LinkedBlockingQueue, ThreadPoolExecutor, TimeUnit}
-import javax.swing.{Box, BoxLayout, JCheckBox}
+import javax.swing.{Box, BoxLayout}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, Promise}
 
@@ -97,6 +98,12 @@ object AwtRunner {
         case View.CheckBox(text, onClick, state) =>
           val n = new Checkbox(text, state)
           n.addItemListener((e: ItemEvent) => consume(onClick(e.getStateChange == ItemEvent.SELECTED)))
+          inPanel.add(n)
+
+        case View.TextArea(lines, wrap) =>
+          val n = new TextArea
+          n.setRows(lines.length)
+          n.setText(lines.mkString("\n"))
           inPanel.add(n)
 
         case View.Label(text, alignment) =>
