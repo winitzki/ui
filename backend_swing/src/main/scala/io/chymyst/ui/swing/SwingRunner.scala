@@ -5,7 +5,7 @@ import io.chymyst.ui.elm.Elm.Consume
 import io.chymyst.ui.elm.View
 import io.chymyst.ui.elm.View.Label.LabelAlignment
 
-import java.awt.Container
+import java.awt.{Container, FlowLayout, GridLayout}
 import java.awt.event.{ActionEvent, ItemEvent}
 import javax.swing._
 
@@ -69,7 +69,7 @@ final class SwingRunner {
 
         case View.TileLeftToRight(items@_*) =>
           val n = new JPanel()
-          n.setLayout(new BoxLayout(n, BoxLayout.X_AXIS)) // We are using a Swing layout manager here, and it seems to be working.
+          n.setLayout(new FlowLayout)
           n.setName(s"Panel for $subview")
           //        n.setVisible(true) // Not necessary.
           inPanel.add(n)
@@ -78,6 +78,7 @@ final class SwingRunner {
 
         case View.TileTopToBottom(items@_*) =>
           val n = new JPanel()
+          //          n.setLayout(new GridLayout(items.length, 1))
           n.setLayout(new BoxLayout(n, BoxLayout.Y_AXIS))
           n.setName(s"Panel for $subview")
           //        n.setVisible(true) // Not necessary.

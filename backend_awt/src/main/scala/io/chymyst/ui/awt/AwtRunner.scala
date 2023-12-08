@@ -50,7 +50,7 @@ object AwtRunner {
     val f = new Frame()
     f.setTitle("AWT Runner")
     f.setBounds(400, 400, 640, 480)
-    f.setLayout(new BoxLayout(f, BoxLayout.X_AXIS)) // TODO better layout, or just use Swing instead of AWT.
+    f.setLayout(new BoxLayout(f, BoxLayout.X_AXIS)) // TODO better layout
     val p = new Panel()
     p.setLayout(new BoxLayout(p, BoxLayout.X_AXIS))
     p.setName("main panel")
@@ -119,7 +119,9 @@ object AwtRunner {
 
         case View.TileLeftToRight(items@_*) =>
           val n = new Panel()
-          n.setLayout(new BoxLayout(n, BoxLayout.X_AXIS)) // We are using a Swing layout manager here, and it seems to be working.
+          // val layout = new BoxLayout(n, BoxLayout.X_AXIS)
+          val layout1 = new FlowLayout
+          n.setLayout(layout1) // We are using a Swing layout manager here, and it seems to be working.
           n.setName(s"Panel for $subview")
           //        n.setVisible(true) // Not necessary.
           inPanel.add(n)
@@ -128,7 +130,10 @@ object AwtRunner {
 
         case View.TileTopToBottom(items@_*) =>
           val n = new Panel()
-          n.setLayout(new BoxLayout(n, BoxLayout.Y_AXIS))
+
+          val layout = new BoxLayout(n, BoxLayout.Y_AXIS)
+          //          val layout1 = new GridLayout( items.length, 0)
+          n.setLayout(layout)
           n.setName(s"Panel for $subview")
           //        n.setVisible(true) // Not necessary.
           inPanel.add(n)
