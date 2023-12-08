@@ -21,6 +21,8 @@ object View {
 
   final case class Choice[+E](items: Seq[String], onSelect: Int => E, selectedIndex: Int) extends View[E]
 
+  final case class CheckBox[+E](text: String, onClick: Boolean => E, state: Boolean) extends View[E]
+
   //Define simple layout combinators (tile vertical, tile horizontal) building a larger `View` out of smaller `View`s.
 
   final case class TileLeftToRight[+E](views: View[E]*) extends View[E]

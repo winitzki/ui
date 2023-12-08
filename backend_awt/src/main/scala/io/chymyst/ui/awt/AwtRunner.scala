@@ -7,7 +7,7 @@ import io.chymyst.ui.elm.{LabelAlignment, View}
 import java.awt._
 import java.awt.event.{ActionEvent, ItemEvent, ItemListener, WindowAdapter, WindowEvent}
 import java.util.concurrent.{LinkedBlockingQueue, ThreadPoolExecutor, TimeUnit}
-import javax.swing.{Box, BoxLayout}
+import javax.swing.{Box, BoxLayout, JCheckBox}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, Promise}
 
@@ -92,6 +92,11 @@ object AwtRunner {
           items.foreach(n.add)
           n.select(selectedIndex)
           n.addItemListener((e: ItemEvent) => if (e.getStateChange == ItemEvent.SELECTED) consume(onSelect(n.getSelectedIndex)))
+          inPanel.add(n)
+
+        case View.CheckBox(text, onClick, state) =>
+          val n = new Checkbox(text, state)
+          n.addItemListener((e: ItemEvent) => consume(onClick(e.getStateChange == ItemEvent.SELECTED)))
           inPanel.add(n)
 
         case View.Label(text, alignment) =>

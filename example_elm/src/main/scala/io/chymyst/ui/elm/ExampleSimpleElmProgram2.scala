@@ -17,7 +17,7 @@ object ExampleSimpleElmProgram2 {
 
   case object Reset extends ExampleEvents
 
-  case object ToggleButtons extends ExampleEvents
+  case class ToggleButtons(visible: Boolean) extends ExampleEvents
 
   type E = ExampleEvents
 
@@ -28,9 +28,9 @@ object ExampleSimpleElmProgram2 {
       View.Button("Reset", Reset),
     )
     val clicksDisplay = View.TileLeftToRight(
-      View.Label(s"${m.clicks1} clicks1"),
-      View.Label(s"${m.clicks2} clicks2"),
-      View.Button(if (m.showButtons) "Hide buttons" else "Show buttons", ToggleButtons),
+      View.Label(s"clicks1=${m.clicks1}"),
+      View.Label(s"clicks2=${m.clicks2}"),
+      View.CheckBox("Show buttons", ToggleButtons, m.showButtons),
     )
     if (m.showButtons) View.TileTopToBottom(
       clicksDisplay,
@@ -42,7 +42,7 @@ object ExampleSimpleElmProgram2 {
     case SetCurrent(i) => m.copy(currentIs1or2 = i)
     case Increment => if (m.currentIs1or2 == 0) m.copy(clicks1 = m.clicks1 + 1) else m.copy(clicks2 = m.clicks2 + 1)
     case Reset => if (m.currentIs1or2 == 0) m.copy(clicks1 = 0) else m.copy(clicks2 = 0)
-    case ToggleButtons => m.copy(showButtons = !m.showButtons)
+    case ToggleButtons(visible) => m.copy(showButtons = visible)
   }
 
   val program: SimpleProgram[M, View, E] = (initModel, display, update)

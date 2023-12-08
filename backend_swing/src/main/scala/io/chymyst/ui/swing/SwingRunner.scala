@@ -6,7 +6,7 @@ import io.chymyst.ui.elm.{LabelAlignment, View}
 
 import java.awt.{Choice, Container}
 import java.awt.event.{ActionEvent, ItemEvent}
-import javax.swing.{Box, BoxLayout, JButton, JComboBox, JFrame, JLabel, JPanel, SwingConstants, WindowConstants}
+import javax.swing.{Box, BoxLayout, JButton, JCheckBox, JComboBox, JFrame, JLabel, JPanel, SwingConstants, WindowConstants}
 
 final class SwingRunner {
   // This sets up the initial window for the entire GUI. Add any global setup here.
@@ -39,6 +39,11 @@ final class SwingRunner {
           val n = new JComboBox(items.toArray)
           n.setSelectedIndex(selectedIndex)
           n.addItemListener((e: ItemEvent) => if (e.getStateChange == ItemEvent.SELECTED) consume(onSelect(n.getSelectedIndex)))
+          inPanel.add(n)
+
+        case View.CheckBox(text, onClick, state) =>
+          val n = new JCheckBox(text, state)
+          n.addItemListener((e: ItemEvent) => consume(onClick(e.getStateChange == ItemEvent.SELECTED)))
           inPanel.add(n)
 
         case View.Label(text, alignment) =>
