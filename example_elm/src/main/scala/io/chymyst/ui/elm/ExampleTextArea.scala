@@ -5,7 +5,7 @@ import io.chymyst.ui.elm.Elm.SimpleProgram
 object ExampleTextArea {
   final case class Model(lines: Seq[String], wrap: Boolean)
 
-  type M = Model // Count clicks and indicate whether control buttons are shown.
+  type M = Model
 
   val initModel: M = Model(Seq("first line", "second line", "long line: " + "." * 1000), wrap = false)
 
@@ -27,4 +27,12 @@ object ExampleTextArea {
   }
 
   val program: SimpleProgram[M, View, E] = (initModel, display, update)
+}
+
+object ExampleTextInput {
+  val program: SimpleProgram[String, View, Boolean] = ("initial string", s => View.TileLeftToRight(
+    View.Button("reset", true),
+    View.Button("do nothing", false),
+    View.TextInputField(s, t => println(s"current text = '$t'") != ()),
+  ), s => e => if (e) "" else s)
 }

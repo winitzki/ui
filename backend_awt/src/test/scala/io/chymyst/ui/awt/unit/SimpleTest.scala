@@ -2,7 +2,7 @@ package io.chymyst.ui.awt.unit
 
 import io.chymyst.ui.awt.AwtRunner
 import io.chymyst.ui.elm.Elm.runSimpleProgram
-import io.chymyst.ui.elm.{ExampleSimpleElmProgram, ExampleSimpleElmProgram2, ExampleTextArea, View}
+import io.chymyst.ui.elm._
 import munit.FunSuite
 
 class SimpleTest extends FunSuite {
@@ -19,6 +19,11 @@ class SimpleTest extends FunSuite {
 
   test("text area") {
     runSimpleProgram[ExampleTextArea.M, View, ExampleTextArea.E](ExampleTextArea.program, AwtRunner.renderView)
+    Thread.sleep(10000L)
+  }
+
+  test("text input field") {
+    runSimpleProgram[String, View, Boolean](ExampleTextInput.program, AwtRunner.renderView)
     Thread.sleep(10000L)
   }
 }

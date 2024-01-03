@@ -107,6 +107,14 @@ object AwtRunner {
           n.setEnabled(false) // Not editable.
           inPanel.add(n)
 
+        case View.TextInputField(currentText, onClick) =>
+          val n = new TextField
+          n.setText(currentText)
+          n.addActionListener { (e: ActionEvent) =>
+            if (e.getID == ActionEvent.ACTION_PERFORMED) consume(onClick(n.getText))
+          } // TODO: make sure that changed text is reported to the model after each keystroke. Right now it is reported only after pressing "Enter".
+          inPanel.add(n)
+
         case View.Label(text, alignment) =>
           inPanel.add(new Label(text, toAwtLabelAlignment(alignment)))
 

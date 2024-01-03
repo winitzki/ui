@@ -2,7 +2,7 @@ package io.chymyst.ui.swing.unit
 
 import io.chymyst.ui.swing.SwingRunner
 import io.chymyst.ui.elm.Elm.runSimpleProgram
-import io.chymyst.ui.elm.{ExampleSimpleElmProgram, ExampleSimpleElmProgram2, ExampleTextArea, View}
+import io.chymyst.ui.elm.{ExampleSimpleElmProgram, ExampleSimpleElmProgram2, ExampleTextArea, ExampleTextInput, View}
 import munit.FunSuite
 
 class SimpleTest extends FunSuite {
@@ -22,4 +22,8 @@ class SimpleTest extends FunSuite {
     Thread.sleep(10000L)
   }
 
+  test("text input field") {
+    runSimpleProgram[String, View, Boolean](ExampleTextInput.program, (new SwingRunner).renderView)
+    Thread.sleep(10000L)
+  }
 }

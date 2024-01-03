@@ -22,10 +22,12 @@ This makes the architecture flexible:
 
 # Future plans
 
-- Some proof-of-concept code that runs. (Done, with a very simple layout and a Java AWT-based backend.)
-- View model needs to have some commonly used widgets and layouts. Use Elm-UI, Elm-Components, etc., as inspiration. (Drop-down list box with search field.)
+- Some proof-of-concept code that runs. (Done, with a very simple layout and a Java AWT-based and Swing-based backends.)
+- View model needs to have some commonly used widgets and layouts. Use Elm-UI, Elm-Components, etc., as inspiration. (Drop-down list box with search field and autocomplete, etc.)
 - Cassowary layout constraints or other layout patterns. See, for example, [kiwi-java](https://github.com/alexbirkett/kiwi-java) or Apple's `AutoLayout`.
-- Rendering backends: Java AWT, Java Swing, JavaFX, [Jexer](https://gitlab.com/AutumnMeowMeow/jexer), [lanterna](https://github.com/mabe02/lanterna), [tui-scala](https://github.com/oyvindberg/tui-scala).
+- Optimization features: disable updating the view for certain kinds of events that nevertheless do update the model. (Because the GUI already redraws the view; e.g., during text editing.)
+- Simple heuristics for configuration-free layouts for basic data-driven applications.
+- Rendering backends: Java AWT, Java Swing, JavaFX, [Jexer](https://gitlab.com/AutumnMeowMeow/jexer), [lanterna](https://github.com/mabe02/lanterna), [tui-scala](https://github.com/oyvindberg/tui-scala), GTK+ and Qt via Scala Native.
 - Streamline and simplify the Scala types and interfaces. For clarity, consider using traits with named methods instead of bare curried functions. (Done.)
 - Implement a modular architecture where we can combine Elm programs and/or runloops together. Use partial functions to glue event types.
 - Implement a number of "standard" cases for external effects, such as timers, HTTP requests, random numbers, audio inputs.

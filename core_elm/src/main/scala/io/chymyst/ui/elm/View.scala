@@ -1,21 +1,10 @@
 package io.chymyst.ui.elm
 
 import io.chymyst.ui.elm.View.Label.LabelAlignment
+import io.chymyst.ui.elm.View.LayoutPreferences
 
 trait View[+E] { // Covariance makes it easier to use subtypes of Event in views.
-  /** Does this view typically look like a box that's horizontally long, vertically short?
-   * Example: a one-line text label.
-   *
-   * @return `true` if so
-   */
-  def isHorizontal: Boolean = true
-
-  /** Does this view typically look like a box that's horitontally short, vertically long?
-   * Example: a vertical slider.
-   *
-   * @return `true` if so
-   */
-  def isVertical: Boolean = false
+  def layoutPreferences = LayoutPreferences()
 }
 
 object View {
@@ -34,6 +23,13 @@ object View {
     }
   }
 
+  final case class LayoutPreferences(
+                                      fillsHorizontalSpace: Boolean = false,
+                                      fillsVerticalSpace: Boolean = false,
+                                      typicallyWide: Boolean = true,
+                                      typicallyTall: Boolean = false,
+                                    )
+
   final case class Button[+E](text: String, onClick: E) extends View[E]
 
   final case class Choice[+E](items: Seq[String], onClick: Int => E, selectedIndex: Int) extends View[E]
@@ -41,9 +37,11 @@ object View {
   final case class CheckBox[+E](text: String, onClick: Boolean => E, state: Boolean) extends View[E]
 
   final case class TextArea[+E](textLines: Seq[String], wrap: Boolean) extends View[E] {
-    override def isHorizontal: Boolean = false
+    override def layoutPreferences = LayoutPreferences(fillsHorizontalSpace = true, fillsVerticalSpace = true, typicallyWide = true, typicallyTall = true)
+  }
 
-    override def isVertical: Boolean = false
+  final case class TextInputField[+E](currentText: String, onClick: String => E) extends View[E] {
+    override def layoutPreferences = LayoutPreferences(fillsHorizontalSpace = true)
   }
 
   //Define simple layout combinators (tile vertical, tile horizontal) building a larger `View` out of smaller `View`s.

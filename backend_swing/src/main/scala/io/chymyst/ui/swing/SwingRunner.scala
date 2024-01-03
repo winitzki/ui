@@ -5,8 +5,8 @@ import io.chymyst.ui.elm.Elm.Consume
 import io.chymyst.ui.elm.View
 import io.chymyst.ui.elm.View.Label.LabelAlignment
 
-import java.awt.{Container, FlowLayout, GridLayout}
 import java.awt.event.{ActionEvent, ItemEvent}
+import java.awt.{Container, FlowLayout}
 import javax.swing._
 
 final class SwingRunner {
@@ -56,6 +56,14 @@ final class SwingRunner {
           val s = new JScrollPane(n)
           s.setWheelScrollingEnabled(true)
           inPanel.add(s)
+
+        case View.TextInputField(currentText, onClick) =>
+          val n = new JTextField
+          n.setText(currentText)
+          n.addActionListener { (e: ActionEvent) =>
+            if (e.getID == ActionEvent.ACTION_PERFORMED) consume(onClick(e.getActionCommand))
+          } // TODO: make sure that changed text is reported to the model after each keystroke. Right now it is reported only after pressing "Enter".
+          inPanel.add(n)
 
         case View.Label(text, alignment) =>
           inPanel.add(new JLabel(text, toSwingLabelAlignment(alignment)))
