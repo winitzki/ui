@@ -9,8 +9,8 @@ object Elm {
 
     def init: M
 
-    // Optimization: whether a given event is "enabled". If disabled, it means the event will be ignored.
-    def enable: E => M => Boolean = _ => _ => true
+    // Optimization: whether a given event requires an updated view. If `false`, it means the event may update the model but it is not necessary to update the view.
+    def needViewRefresh: PartialFunction[E, M => Boolean] = _ => _ => true
 
     // Enable or disable listening to recurrent "external events" such as timers or continuous inputs. Actions necessary to start or stop those events will be executed automatically.
     def subscriptions: M => Set[S[E]] = _ => Set()
@@ -94,20 +94,18 @@ object Elm {
 
     private def runSingleStep(event: E): Unit = {
       val oldM = currentModel
-      val eventIsEnabled = program.enable(event)(oldM)
-      if (eventIsEnabled) {
-        val modelUpdateNeeded = program.update.isDefinedAt(event)
-        if (modelUpdateNeeded) {
-          currentModel = program.update(event)(oldM)
-        }
-        if (program.commands.isDefinedAt(event)) {
-          val commands = program.commands(event)(oldM)
-          commands foreach { command =>
-            effects.runCommand(command)(ui.runOnEventThread((), runSingleStep))
-          }
-        }
-        if (eventIsEnabled && modelUpdateNeeded) outputStep()
+      val modelUpdateNeeded = program.update.isDefinedAt(event)
+      if (modelUpdateNeeded) {
+        currentModel = program.update(event)(oldM)
       }
+      if (program.commands.isDefinedAt(event)) {
+        val commands = program.commands(event)(oldM)
+        commands foreach { command =>
+          effects.runCommand(command)(ui.runOnEventThread((), runSingleStep))
+        }
+      }
+      val needToUpdateView = program.needViewRefresh.isDefinedAt(event) && program.needViewRefresh(event)(oldM)
+      if (needToUpdateView && modelUpdateNeeded) outputStep()
     }
 
     def start(): Unit = outputStep()
